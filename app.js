@@ -90,6 +90,8 @@ export function startGame(SYNCAPI) {
     pencil: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"></path></svg>',
     back: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg>',
     close: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>',
+    bulb: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFC93C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6M10 22h4"></path><path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.3h6c0-1 .4-1.8 1-2.3A7 7 0 0 0 12 2z"></path></svg>',
+    bolt: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFC93C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path></svg>',
     clock: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFC93C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>',
     chev: '<span aria-hidden="true">›</span>',
     paw: '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="margin-right:6px;vertical-align:-3px"><ellipse cx="7" cy="9" rx="2.2" ry="2.8"/><ellipse cx="12" cy="6.5" rx="2.2" ry="2.8"/><ellipse cx="17" cy="9" rx="2.2" ry="2.8"/><ellipse cx="4.5" cy="14" rx="1.9" ry="2.4"/><path d="M12 11c3.5 0 6.5 4 6.5 6.5 0 2-1.6 3-3.3 3-1.3 0-2-.7-3.2-.7s-1.9.7-3.2.7c-1.7 0-3.3-1-3.3-3C5.5 15 8.5 11 12 11z"/></svg>',
@@ -558,15 +560,17 @@ export function startGame(SYNCAPI) {
     return n;
   }
 
+  var REQ_WHAT = { pause: 'the pause', resume: 'the restart', clearweek: "clearing this week's history", clearall: 'clearing all history' };
+  var REQ_WANT = { pause: ' wants to pause the household.', resume: ' wants to get going again.', clearweek: " wants to clear this week's scores and activity.", clearall: ' wants to clear all history: scores, levels, badges and activity.' };
   function bannerHTML(pid) {
     var h = S.household, o = other(pid), pn = esc(nameOf(o)), out = '';
     var r = h.request;
     if (r) {
       var isPause = r.type === 'pause';
       if (r.from === pid) {
-        out += '<div class="banner' + (h.paused ? ' grey' : '') + '" role="status"><div class="brow"><span class="btxt">Waiting for ' + pn + ' to accept the ' + (isPause ? 'pause' : 'restart') + '.</span><button class="bbtn" data-act="req-cancel">Cancel</button></div>' + (r.note ? '<span class="bubble me">' + esc(r.note) + '</span>' : '') + '</div>';
+        out += '<div class="banner' + (h.paused ? ' grey' : '') + '" role="status"><div class="brow"><span class="btxt">Waiting for ' + pn + ' to accept ' + REQ_WHAT[r.type] + '.</span><button class="bbtn" data-act="req-cancel">Cancel</button></div>' + (r.note ? '<span class="bubble me">' + esc(r.note) + '</span>' : '') + '</div>';
       } else {
-        out += '<div class="banner' + (h.paused ? ' grey' : '') + '" role="status"><div class="brow"><span class="btxt">' + pn + (isPause ? ' wants to pause the household.' : ' wants to get going again.') + '</span></div>' + (r.note ? '<span class="bubble them">' + esc(r.note) + '</span>' : '') + '<div class="brow"><button class="bbtn gold" data-act="req-accept">Accept</button><button class="bbtn" data-act="req-decline">Not now</button></div></div>';
+        out += '<div class="banner' + (h.paused ? ' grey' : '') + '" role="status"><div class="brow"><span class="btxt">' + pn + REQ_WANT[r.type] + '</span></div>' + (r.note ? '<span class="bubble them">' + esc(r.note) + '</span>' : '') + '<div class="brow"><button class="bbtn gold" data-act="req-accept">Accept</button><button class="bbtn" data-act="req-decline">Not now</button></div></div>';
       }
     } else if (h.paused) {
       out += '<div class="banner grey" role="status"><div class="brow"><span class="btxt">Paused since ' + fmtDate(h.pausedAt) + '. Everything is frozen.</span><button class="bbtn" data-act="banner-resume">Propose restart</button></div></div>';
@@ -616,6 +620,59 @@ export function startGame(SYNCAPI) {
       '<span class="xp">+' + x + '</span></div>';
   }
 
+  /* ---------- 0.3.0: rotating tips ---------- */
+  // One tip at a time on Mine. A different one each time the app opens (or tap Next tip).
+  // Closing hides tips until midnight. Remembered on this phone only.
+  function tipCtx(pid) {
+    var T = effNow(), o = other(pid), today = S.completions.filter(function (c) { return c.by === pid && c.at >= sod(T); });
+    var steal = hasPartner(pid) ? S.tasks.filter(function (t) { return t.status === 'open' && t.assignee === o && canComplete(t, pid); }).length : 0;
+    return { claimed: today.length > 0, n: today.length, combo: today.reduce(function (a, c) { return a + (c.combo || 0); }, 0), steal: steal, hasP: hasPartner(pid), o: o };
+  }
+  function comboPills() { return '<span class="tip-pills">' + SIZE_KEYS.map(function (n) { return '<span>' + SIZES[n].label + ' <b>+' + SIZES[n].combo + '</b></span>'; }).join('') + '</span>'; }
+  var TIPS = [
+    { id: 'first', icon: 'clock', ok: function (p, c) { return !c.claimed; }, head: function () { return 'First quest of the day: +2 XP'; }, body: function () { return 'Finish any quest today to grab the bonus.'; } },
+    { id: 'combo', icon: 'clock', ok: function (p, c) { return c.claimed; }, head: function (p, c) { return c.n === 1 ? 'Combo unlocked' : 'Combo ×' + c.n + ' · +' + c.combo + ' XP so far'; }, body: function (p, c) { return (c.n === 1 ? 'Every quest you finish before midnight earns a bonus on top:' : 'Keep going until midnight. Each quest adds:') + comboPills(); } },
+    { id: 'steal', icon: 'bolt', ok: function (p, c) { return c.steal > 0; }, head: function (p, c) { return c.steal + ' of ' + esc(nameOf(c.o)) + (c.steal === 1 ? "'s quests is" : "'s quests are") + ' up for grabs'; }, body: function () { return 'Their grace period is over. Finish one and the points are yours, bounty included.'; }, action: { act: 'filter', f: 'partner', label: 'Show them' } },
+    { id: 'bounty', ok: function () { return true; }, head: function () { return 'Waiting pays'; }, body: function () { return 'Quests for Anyone gain a bounty of +10% per day they wait, up to double points.'; } },
+    { id: 'avatar', ok: function (p, c) { return c.hasP; }, head: function () { return 'Check the competition'; }, body: function (p, c) { return "Tap " + esc(nameOf(c.o)) + "'s dog at the top to see their level, stats and badges."; } },
+    { id: 'grace', ok: function (p, c) { return c.hasP; }, head: function () { return 'Grace period'; }, body: function () { return 'When you assign a quest, the grace period decides how long it is protected before it can be stolen.'; } },
+    { id: 'already', ok: function () { return true; }, head: function () { return 'Already did it?'; }, body: function () { return 'When adding a quest, tap I already did it to log it and get the points straight away.'; } },
+    { id: 'challenge', ok: function (p, c) { return c.hasP; }, head: function () { return 'Challenge your partner'; }, body: function () { return 'Open one of their quests and tap Challenge. If they finish in time they get +10. If not, you collect.'; } },
+    { id: 'mood', ok: function (p, c) { return c.hasP; }, head: function () { return 'Watch your dog'; }, body: function () { return "Your dog's mood follows your share of this week's points. Fall behind and it starts looking suspicious."; } },
+    { id: 'reward', ok: function (p, c) { return c.hasP; }, head: function () { return 'Sweeten the deal'; }, body: function () { return 'Open a quest and tap Reward to promise something real, like dinner or a massage, for getting it done.'; } },
+    { id: 'repeat', ok: function () { return true; }, head: function () { return 'Set it and forget it'; }, body: function () { return 'Recurring quests come back by themselves: daily, every other day, weekly, every other week or monthly.'; } },
+    { id: 'handback', ok: function (p, c) { return c.hasP; }, head: function () { return 'Not your job?'; }, body: function () { return 'Hand an assigned quest back with a note. Finishing one that was handed back to you earns a rare badge.'; } },
+    { id: 'showoff', ok: function (p, c) { return c.hasP; }, head: function () { return 'Brag a little'; }, body: function () { return 'On the Done tab, Show off sends your partner a list of what you got done today or this week.'; } },
+    { id: 'comment', ok: function (p, c) { return c.hasP; }, head: function () { return 'Nudge without nagging'; }, body: function () { return 'Open any quest and tap Comment to send a message about it, with a dog if you like.'; } },
+    { id: 'week', ok: function () { return true; }, head: function () { return 'New week, new battle'; }, body: function () { return 'Weekly scores reset on Monday at 00:00. Your level and badges stay.'; } },
+    { id: 'secret', ok: function () { return true; }, head: function () { return 'Secret badges'; }, body: function () { return 'Some badges stay hidden until you earn them. Early birds and thieves have an advantage.'; } },
+    { id: 'pause', ok: function (p, c) { return c.hasP; }, head: function () { return 'Going away?'; }, body: function () { return 'Propose a pause in Settings. Once your partner accepts, everything freezes until you both restart.'; } },
+    { id: 'coming', ok: function () { return true; }, head: function () { return 'Peek ahead'; }, body: function () { return 'Coming up, at the bottom of your list, shows recurring quests before they are due.'; } },
+    { id: 'drag', ok: function () { return true; }, head: function () { return 'Swipe it away'; }, body: function () { return 'Drag any panel that slides up from the bottom down to close it.'; } }
+  ];
+  function tipKey(pid) { return 'hb-tips-' + pid; }
+  function tipState(pid) { try { return JSON.parse(localStorage.getItem(tipKey(pid)) || '{}') || {}; } catch (e) { return {}; } }
+  function saveTipState(pid, st) { try { localStorage.setItem(tipKey(pid), JSON.stringify(st)); } catch (e) { } }
+  function pickTipAfter(pid, afterId) {
+    var c = tipCtx(pid), el = TIPS.filter(function (t) { return t.ok(pid, c); });
+    if (!el.length) return null;
+    var start = TIPS.findIndex(function (t) { return t.id === afterId; });
+    for (var k = 1; k <= TIPS.length; k++) { var t = TIPS[(start + k + TIPS.length) % TIPS.length]; if (el.indexOf(t) >= 0) return t.id; }
+    return el[0].id;
+  }
+  function nextTip(pid) { if (!S || !S.members[pid]) return; var st = tipState(pid); st.cur = pickTipAfter(pid, st.cur); saveTipState(pid, st); }
+  function tipHTML(pid) {
+    var st = tipState(pid), T = now();
+    if (st.hidden && st.hidden === sod(T)) return '';
+    var c = tipCtx(pid), tip = TIPS.find(function (t) { return t.id === st.cur; });
+    if (!tip || !tip.ok(pid, c)) { st.cur = pickTipAfter(pid, st.cur); saveTipState(pid, st); tip = TIPS.find(function (t) { return t.id === st.cur; }); }
+    if (!tip) return '';
+    var icon = tip.icon === 'clock' ? IC.clock : tip.icon === 'bolt' ? IC.bolt : IC.bulb;
+    return '<div class="tipcard" role="note"><span class="ticon">' + icon + '</span><div class="tip-main"><span class="tip-head">' + tip.head(pid, c) + '</span><span class="tip-body">' + tip.body(pid, c) + '</span>' +
+      '<span class="tip-foot">' + (tip.action ? '<button class="tbtn2" data-act="' + tip.action.act + '" data-f="' + tip.action.f + '">' + tip.action.label + '</button>' : '') + '<button class="tbtn2 plain" data-act="tip-next">Next tip ›</button></span></div>' +
+      '<button class="iconbtn tipx" data-act="tip-close" aria-label="Hide tips for today">' + IC.close + '</button></div>';
+  }
+
   function tasksHTML(pid) {
     var ui = UI[pid], o = other(pid), T = effNow();
     var active = S.tasks.filter(isActive);
@@ -643,9 +700,7 @@ export function startGame(SYNCAPI) {
       var list = lists[ui.filter];
       var todayList = S.completions.filter(function (c) { return c.by === pid && c.at >= sod(T); }), nToday = todayList.length;
       var comboToday = todayList.reduce(function (n, c) { return n + (c.combo || 0); }, 0);
-      if (ui.filter === 'mine' && !isPaused()) body += !claimed
-        ? (ui.hideTips.first ? '' : '<div class="info-card">' + IC.clock + '<span style="flex:1">First quest today gets <b class="gold">+2 XP</b>. Just putting it out there.</span><button class="iconbtn tipx" data-act="tip-close" data-tip="first" aria-label="Hide tip">' + IC.close + '</button></div>')
-        : ui.hideTips.combo ? '' : '<div class="info-card" style="align-items:flex-start">' + IC.clock + '<span style="flex:1">' + (nToday === 1 ? '<b class="gold">Combo unlocked.</b> Every quest you finish from now until midnight earns extra points on top, based on its size. The combo resets at 00:00.' : '<b class="gold">Combo ×' + nToday + ' today, +' + comboToday + ' XP extra so far.</b> Keep going: every quest you finish before midnight earns extra points on top, based on its size. The combo resets at 00:00.') + '<span class="combo-scale">' + SIZE_KEYS.map(function (n) { return SIZES[n].label + ' <b>+' + SIZES[n].combo + '</b>'; }).join('') + '</span></span><button class="iconbtn tipx" data-act="tip-close" data-tip="combo" aria-label="Hide tip">' + IC.close + '</button></div>';
+      if (ui.filter === 'mine' && !isPaused()) body += tipHTML(pid);
       if (!list.length) {
         if (ui.filter === 'mine') body += '<div class="empty"><span class="disp">NOTHING LEFT FOR YOU</span><span>Suspicious.</span></div>';
         else if (ui.filter === 'any') body += '<div class="empty"><span class="disp">NO OPEN QUESTS</span><span>Add one with the + button.</span></div>';
@@ -692,8 +747,7 @@ export function startGame(SYNCAPI) {
       var bd = badgeDef(ui.badgeOpen), e2 = earned.find(function (x) { return x.id === ui.badgeOpen; });
       pop = '<div class="badge-pop" role="status"><b>' + (e2 || !bd.rare ? esc(bd.name) : 'Hidden rare badge') + '</b><span>' + (e2 || !bd.rare ? esc(bd.desc) : 'A rare badge. Keep playing to find out.') + '</span><span>' + (e2 ? 'Earned ' + fmtDate(e2.at) : 'Not earned yet') + '</span></div>';
     }
-    return '<div class="scroll" data-scroll="score"><div class="page">' +
-      '<div class="page-title"><h2>SCORE · ' + (ui.scorePeriod === 'week' ? 'WEEK ' + isoWeek(T) : 'ALL TIME') + '</h2><div class="toggle" role="tablist"><button role="tab" class="' + (ui.scorePeriod === 'week' ? 'on' : '') + '" data-act="score-period" data-p="week" aria-selected="' + (ui.scorePeriod === 'week') + '">This week</button><button role="tab" class="' + (ui.scorePeriod === 'all' ? 'on' : '') + '" data-act="score-period" data-p="all" aria-selected="' + (ui.scorePeriod === 'all') + '">All time</button></div></div>' +
+    return '<div class="topbar page-title"><h2>SCORE · ' + (ui.scorePeriod === 'week' ? 'WEEK ' + isoWeek(T) : 'ALL TIME') + '</h2><div class="toggle" role="tablist"><button role="tab" class="' + (ui.scorePeriod === 'week' ? 'on' : '') + '" data-act="score-period" data-p="week" aria-selected="' + (ui.scorePeriod === 'week') + '">This week</button><button role="tab" class="' + (ui.scorePeriod === 'all' ? 'on' : '') + '" data-act="score-period" data-p="all" aria-selected="' + (ui.scorePeriod === 'all') + '">All time</button></div></div><div class="scroll" data-scroll="score"><div class="page">' +
       '<section class="panel"><div class="vs"><div class="player"><button class="avbtn" data-act="score-who" data-who="me" aria-label="Show your score">' + dogAvatar(pid, pid) + '</button>' + '<div class="player-meta"><small>' + esc(nameOf(pid)) + ' · Lvl ' + li.lvl + '</small><span class="score-num gold">' + me + '</span></div></div><div class="player right">' + (hasP ? '<button class="avbtn" data-act="score-who" data-who="partner" aria-label="Show ' + esc(nameOf(o)) + '\'s score">' + dogAvatar(o, pid) + '</button>' : dogAvatar(o, pid)) + '<div class="player-meta"><small>' + (hasP ? 'Lvl ' + lo.lvl + ' · ' + esc(nameOf(o)) : 'Not joined') + '</small><span class="score-num coral">' + (hasP ? p : '–') + '</span></div></div></div>' + tugHTML(me, p, hasP) + '<span class="cheeky">' + cap + '</span></section>' +
       personHTML(pid) +
       '<section class="stats" aria-label="Stats"><div class="r h"><span></span><span>You</span><span>' + (hasP ? esc(nameOf(o)) : 'Partner') + '</span></div>' +
@@ -760,7 +814,10 @@ export function startGame(SYNCAPI) {
       case 'resume_req': return who(a.actor) + ' proposed getting going again';
       case 'resume_ok': return who(a.actor) + ' accepted. Household active again.';
       case 'resume_no': return who(a.actor) + ' said not now to restarting';
-      case 'req_cancel': return who(a.actor) + ' cancelled the ' + (a.type === 'pause' ? 'pause' : 'restart') + ' request';
+      case 'req_cancel': return who(a.actor) + ' cancelled the request about ' + (REQ_WHAT[a.type] || 'the pause');
+      case 'clear_req': return who(a.actor) + ' asked about ' + REQ_WHAT[a.type];
+      case 'clear_no': return who(a.actor) + ' said not now to ' + REQ_WHAT[a.type];
+      case 'cleared': return (a.type === 'clearweek' ? "This week's history was cleared" : 'All history was cleared') + (S.members[other(a.actor)] ? ' · accepted by ' + who(a.actor) : '');
       case 'showoff': return who(a.actor) + ' showed off ' + a.items.length + (a.items.length === 1 ? ' quest' : ' quests') + ' · ' + a.total + ' XP';
       default: return '';
     }
@@ -786,6 +843,7 @@ export function startGame(SYNCAPI) {
     return b.length ? '<span class="act-btns">' + b.join('') + '</span>' : '';
   }
 
+  var SYS_KINDS = ['join', 'pause_ok', 'resume_ok', 'cleared', 'challenge_expired', 'challenge_failed', 'reward_expired'];
   function activityHTML(pid) {
     var items = S.activity.slice().sort(function (a, b) { return b.at - a.at; }).slice(0, 150);
     var html = '', lastDay = null;
@@ -794,7 +852,7 @@ export function startGame(SYNCAPI) {
       if (dl !== lastDay) { html += '<div class="day-h">' + esc(dl.toUpperCase()) + '</div>'; lastDay = dl; }
       var t = a.taskId ? getTask(a.taskId) : null, link = t && t.status === 'open';
       var txt = '<span class="act-txt">' + actText(a, pid) + '</span>';
-      var side = !a.actor || !S.members[a.actor] ? 'sys' : a.actor === pid ? 'mine' : 'theirs';
+      var side = !a.actor || !S.members[a.actor] || SYS_KINDS.indexOf(a.kind) >= 0 ? 'sys' : a.actor === pid ? 'mine' : 'theirs';
       var inner = (side === 'theirs' ? '<span class="act-av">' + dogAvatar(a.actor, pid) + '</span>' : '') + '<span class="act-body">' + txt;
       if (a.kind === 'showoff') inner += '<span class="show-card"><ul>' + a.items.map(function (it) { return '<li>' + esc(it.title) + ' · +' + it.xp + '</li>'; }).join('') + '</ul></span>';
       if (a.note || a.gif) inner += msgHTML(a.actor === pid ? 'me' : 'them', a.gif, a.note);
@@ -804,29 +862,62 @@ export function startGame(SYNCAPI) {
       html += '<div class="act-row ' + side + (a.note || a.gif || (a.replies && a.replies.length) ? ' noted' : '') + '">' + inner + '</div>';
     });
     if (!items.length) html = '<div class="empty"><span class="disp">QUIET HOUSEHOLD</span><span>Completed quests, notes and assignments show up here.</span></div>';
-    return '<div class="scroll" data-scroll="activity"><div class="page"><div class="page-title"><h2>ACTIVITY</h2></div>' + html + '</div></div>';
+    return '<div class="topbar page-title"><h2>ACTIVITY</h2></div><div class="scroll" data-scroll="activity"><div class="page">' + html + '</div></div>';
   }
 
   /* ================= Settings ================= */
+  function historyHTML(pid) {
+    var ui = UI[pid], h = S.household, o = other(pid), hasP = hasPartner(pid), ask = ui.clearAsk;
+    var x = '<section class="sect"><h4>HISTORY</h4>';
+    if (ask) {
+      var week = ask === 'clearweek';
+      x += '<p>' + (week ? "Clear this week's scores and activity for both of you? Levels, badges and open quests stay." : 'Clear all history for both of you? Scores, levels, badges, activity, challenges and rewards are wiped. Open quests stay.') + '</p>' +
+        (hasP ? '<p class="muted" style="margin:0">' + esc(nameOf(o)) + ' has to accept first.</p>' : '<p class="muted" style="margin:0">This can\'t be undone.</p>') +
+        '<div class="btn-row"><button class="btn ghost" data-act="clear-cancel">Cancel</button><button class="btn danger" data-act="clear-go">' + (hasP ? 'Ask ' + esc(nameOf(o)) : (week ? 'Clear week' : 'Clear all')) + '</button></div>';
+    } else if (h.request && (h.request.type === 'clearweek' || h.request.type === 'clearall')) {
+      x += '<p>' + (h.request.from === pid ? 'Waiting for ' + esc(nameOf(o)) + ' to accept ' + REQ_WHAT[h.request.type] + '.' : esc(nameOf(o)) + REQ_WANT[h.request.type] + ' Answer at the top of the screen.') + '</p>' + (h.request.from === pid ? '<button class="btn ghost" data-act="req-cancel">Cancel request</button>' : '');
+    } else {
+      var busy = !!h.request;
+      x += '<p>Start over without leaving the household.' + (busy ? ' Finish the open request first.' : '') + '</p><div class="btn-row"><button class="btn ghost" data-act="clear-ask" data-type="clearweek"' + (busy ? ' disabled' : '') + '>Clear this week</button><button class="btn ghost" data-act="clear-ask" data-type="clearall"' + (busy ? ' disabled' : '') + '>Clear all history</button></div>';
+    }
+    return x + '</section>';
+  }
+  function doClear(type, by) {
+    var T = now();
+    if (type === 'clearweek') {
+      var ws = weekStart(T);
+      S.completions = S.completions.filter(function (c) { return c.at < ws; });
+      S.adjust = (S.adjust || []).filter(function (a) { return a.at < ws; });
+      S.activity = S.activity.filter(function (a) { return a.at < ws; });
+    } else {
+      S.completions = []; S.adjust = []; S.activity = []; S.owed = []; S.badges = { A: [], B: [] };
+      S.tasks = S.tasks.filter(function (t) { return t.status === 'open'; });
+      S.tasks.forEach(function (t) { t.challenge = null; t.reward = null; });
+    }
+    S.seen = { A: 0, B: 0 };
+    addAct({ kind: 'cleared', actor: by, type: type });
+    log('<b>' + (type === 'clearweek' ? "This week's history" : 'All history') + '</b> cleared');
+  }
   function settingsHTML(pid) {
     var ui = UI[pid], h = S.household, o = other(pid), hasP = hasPartner(pid), r = h.request;
     var nameVal = ui.nameDraft != null ? ui.nameDraft : nameOf(pid);
     var pause = '';
     if (!hasP) pause = '<p>Your partner needs to join before you can pause the household.</p>';
-    else if (r && r.from === pid) pause = '<p>Waiting for ' + esc(nameOf(o)) + ' to accept your ' + (r.type === 'pause' ? 'pause' : 'restart') + ' request.</p><button class="btn ghost" data-act="req-cancel">Cancel request</button>';
-    else if (r) pause = '<p>' + esc(nameOf(o)) + ' wants to ' + (r.type === 'pause' ? 'pause the household' : 'get going again') + '.</p><div class="btn-row"><button class="btn gold" data-act="req-accept">ACCEPT</button><button class="btn ghost" data-act="req-decline">Not now</button></div>';
+    else if (r && r.from === pid) pause = '<p>Waiting for ' + esc(nameOf(o)) + ' to accept ' + REQ_WHAT[r.type] + '.</p><button class="btn ghost" data-act="req-cancel">Cancel request</button>';
+    else if (r) pause = '<p>' + esc(nameOf(o)) + REQ_WANT[r.type] + '</p><div class="btn-row"><button class="btn gold" data-act="req-accept">ACCEPT</button><button class="btn ghost" data-act="req-decline">Not now</button></div>';
     else if (ui.pauseCompose) {
       var type = ui.pauseCompose.type;
       pause = '<p>' + (type === 'pause' ? 'Pausing freezes everything: no quests, no points, no recurring tasks. ' + esc(nameOf(o)) + ' has to accept.' : 'Restarting unfreezes the household. ' + esc(nameOf(o)) + ' has to accept.') + '</p><span class="lbl">Add a note (optional)</span>' + composerHTML(pid, 'pause', type === 'pause' ? 'pause' : 'resume', 'select') + '<div class="btn-row"><button class="btn gold" data-act="pause-send">SEND REQUEST</button><button class="btn ghost" data-act="pause-compose-cancel">Cancel</button></div>';
     } else if (h.paused) pause = '<p>Paused since ' + fmtDate(h.pausedAt) + '. Everything before the pause is kept.</p><button class="btn gold" data-act="pause-compose" data-type="resume">PROPOSE RESTART</button>';
     else pause = '<p>Need a break? Propose a pause. Everything freezes until you both agree to restart.</p><button class="btn ghost" data-act="pause-compose" data-type="pause">Propose a pause</button>';
-    if (h.declined && h.declined.to === pid && !r) pause = '<p class="coral">' + esc(nameOf(o)) + ' said not now' + (h.declined.type === 'pause' ? ' to the pause.' : ' to restarting.') + '</p>' + pause;
+    if (h.declined && h.declined.to === pid && !r) pause = '<p class="coral">' + esc(nameOf(o)) + ' said not now to ' + REQ_WHAT[h.declined.type] + '.</p>' + pause;
     return '<div class="full"><div class="full-top"><button class="iconbtn" data-act="close-settings" aria-label="Back">' + IC.back + '</button><h2>SETTINGS</h2></div><div class="full-body" data-scroll="settings">' +
       '<section class="sect"><h4>YOUR DOG STYLE</h4>' + stylePickerHTML(pid, 'set') + '</section>' +
       '<section class="sect"><h4>YOUR NAME</h4><div class="own"><input class="field" id="' + pid + '-name" aria-label="Your name" data-bind="nameDraft" maxlength="24" value="' + esc(nameVal) + '"><button class="btn ghost" data-act="save-name">Save</button></div></section>' +
       '<section class="sect"><h4>HOUSEHOLD</h4>' + (hasP ? '<p>You and ' + esc(nameOf(o)) + '. Joined ' + fmtDate(S.members[o].joinedAt) + '.</p>' : '<p>Your partner hasn\'t joined yet. Share this code:</p>') + '<div class="own"><div class="code" id="' + pid + '-setcode" style="font-size:var(--fs-xl);letter-spacing:4px;flex:1;padding:10px">' + esc(h.code) + '</div><button class="btn ghost" data-act="copy-code" style="min-height:52px">' + (UI[pid].copiedAt && Date.now() - UI[pid].copiedAt < 1800 ? 'Copied ✓' : 'Copy') + '</button></div></section>' +
       weekScoreHTML(pid) +
       '<section class="sect"><h4>PAUSE</h4>' + pause + '</section>' +
+      historyHTML(pid) +
       installSettingsHTML() +
       '<section class="sect"><h4>ACCOUNT</h4><p>Signed in as ' + esc(APP.user ? (APP.user.email || APP.user.name) : '') + '.</p><button class="btn ghost" data-act="sign-out">Sign out</button>' +
       '<p class="muted" style="margin:6px 0 0;font-size:12px">HouseholdBattle ' + APP_VERSION + '</p></section>' +
@@ -922,11 +1013,11 @@ export function startGame(SYNCAPI) {
     var ed = ui.scoreEdit;
     function row(p, label) {
       var cur = weekXP(p, T), v = ed ? ed[p] : cur;
-      return '<div class="stepper" style="justify-content:space-between"><span style="flex:1">' + label + '</span>' +
+      return '<div class="stepper" style="justify-content:space-between"><span style="flex:1">' + label + (ed ? '' : ': <b style="font-variant-numeric:tabular-nums">' + cur + '</b>') + '</span>' +
         (ed ? '<button data-act="score-step" data-p="' + p + '" data-d="-1" aria-label="Lower ' + esc(label) + '">−</button><b style="min-width:36px;text-align:center;font-variant-numeric:tabular-nums">' + v + '</b><button data-act="score-step" data-p="' + p + '" data-d="1" aria-label="Raise ' + esc(label) + '">+</button>'
-            : '<b style="font-variant-numeric:tabular-nums">' + cur + ' XP</b>') + '</div>';
+            : '') + '</div>';
     }
-    var h = '<section class="sect"><h4>THIS WEEK\'S SCORE</h4>' + row(pid, 'You') + (hasP ? row(o, nameOf(o)) : '');
+    var h = '<section class="sect"><h4>THIS WEEK\'S SCORE</h4>' + row(pid, 'Your XP') + (hasP ? row(o, nameOf(o) + "'s XP") : '');
     if (!ed) h += '<p>Fix a mistake, like a quest someone forgot to tick. Changes show up in Activity for both of you.</p><button class="btn ghost" data-act="score-edit"' + (isPaused() ? ' disabled' : '') + '>Edit week score</button>';
     else h += '<div class="seg">' + [-5, -1, 1, 5].map(function (d) { return '<button data-act="score-step-all" data-d="' + d + '">' + (d > 0 ? '+' : '') + d + ' you</button>'; }).join('') + '</div><div class="btn-row"><button class="btn gold" data-act="score-save">SAVE</button><button class="btn ghost" data-act="score-cancel">Cancel</button></div>';
     return h + '</section>';
@@ -1278,7 +1369,7 @@ export function startGame(SYNCAPI) {
     try { localStorage.removeItem('hb-away-' + SYNC.code + '-' + ME); } catch (e) { }
     if (!a) return;
     var T = now(), o = other(ME);
-    if (T - a.at > 10 * MIN) { ui.hideTips = {}; }
+    if (T - a.at > 10 * MIN) { nextTip(ME); ui.intro = true; }
     if (hasPartner(ME) && !isPaused() && a.ws === weekStart(T) && !ui.sheet && !ui.settings) {
       var items = compsBy(o).filter(function (c) { return c.at > a.at && c.at <= T; }).sort(function (x, y) { return x.at - y.at; });
       var np = weekXP(o, T), me = weekXP(ME, T);
@@ -1415,6 +1506,20 @@ export function startGame(SYNCAPI) {
     el.classList.remove('fx-' + kind); void el.offsetWidth; el.classList.add('fx-' + kind);
     setTimeout(function () { el.classList.remove('fx-' + kind); }, 1300);
   }
+  function introBars(root) {
+    if (reduceMotion) return;
+    var hdr = root.querySelector('.hdr'); if (!hdr) return;
+    var l = hdr.querySelector('.tug .l'), r = hdr.querySelector('.tug .r'), lv = hdr.querySelector('.lvlrow .bar > i');
+    var bars = [];
+    if (l && r) { var lw = parseFloat(l.style.width) || 0; bars.push([l, lw + '%']); r.style.flex = 'none'; bars.push([r, (100 - lw) + '%']); }
+    if (lv) bars.push([lv, lv.style.width]);
+    bars.forEach(function (b) { b[0].style.transition = 'none'; b[0].style.width = '0%'; });
+    void hdr.offsetWidth;
+    bars.forEach(function (b) { b[0].style.transition = 'width 0.9s cubic-bezier(.2,.8,.2,1)'; b[0].style.width = b[1]; });
+    var tug = hdr.querySelector('.tug');
+    setTimeout(function () { if (tug) { tug.classList.remove('fx-bulge'); void tug.offsetWidth; tug.classList.add('fx-bulge'); } }, 780);
+    setTimeout(function () { bars.forEach(function (b) { b[0].style.transition = ''; }); if (r) { r.style.flex = ''; r.style.width = ''; } if (tug) tug.classList.remove('fx-bulge'); }, 1150);
+  }
   function applyFx(pid, root) {
     var ui = UI[pid], hdr = root.querySelector('.hdr');
     if (hdr) {
@@ -1500,7 +1605,9 @@ export function startGame(SYNCAPI) {
     Array.prototype.forEach.call(root.querySelectorAll('[data-scroll]'), function (el) { var k = el.getAttribute('data-scroll'); if (scrolls[k] != null) { el.scrollTop = scrolls[k][0]; el.scrollLeft = scrolls[k][1]; } });
     var ch = root.querySelector('.chips'); if (ch) wireChips(ch);
     wireSheets(root, pid);
+    if (ui.intro) { ui.intro = false; ui.introAt = Date.now(); introBars(root); }
     applyFx(pid, root);
+    if (typeof syncBack === 'function') syncBack();
     Array.prototype.forEach.call(root.querySelectorAll('.sheet.enter .strip.badge-new'), function (el, i) { el.style.animationDelay = (0.35 + i * 0.15) + 's'; el.classList.add('fx-badge'); });
     var fid = ui.focusNext || (focus && focus.id);
     if (fid) {
@@ -1517,7 +1624,7 @@ export function startGame(SYNCAPI) {
       if (bar) { var to = bar.getAttribute('data-wto'); if (reduceMotion) bar.style.width = to + '%'; else requestAnimationFrame(function () { requestAnimationFrame(function () { bar.style.width = to + '%'; }); }); }
     }
     if (ui.toast && ui.toast.fresh) ui.toast.fresh = false;
-    if (ui.catchup && !ui.catchup.started && !ui.closed) { ui.catchup.started = true; requestAnimationFrame(function () { runCatchup(pid); }); }
+    if (ui.catchup && !ui.catchup.started && !ui.closed) { ui.catchup.started = true; var wait = ui.introAt && Date.now() - ui.introAt < 1000 ? 950 : 0; setTimeout(function () { requestAnimationFrame(function () { runCatchup(pid); }); }, wait); }
   }
   function animateCount(el, to) {
     if (reduceMotion || to <= 1) { el.textContent = to; return; }
@@ -1608,7 +1715,7 @@ export function startGame(SYNCAPI) {
       case 'score-who': ui.badgeOwner = ds.who === 'partner' && hasPartner(pid) ? 'partner' : 'me'; ui.badgeOpen = null; break;
       case 'filter': ui.filter = ds.f; break;
       case 'open-settings': ui.settings = true; ui.sheet = null; ui.nameDraft = null; ui.pauseCompose = null; break;
-      case 'close-settings': ui.scoreEdit = null; ui.settings = false; ui.pauseCompose = null; ui.nameDraft = null; break;
+      case 'close-settings': ui.clearAsk = null; ui.scoreEdit = null; ui.settings = false; ui.pauseCompose = null; ui.nameDraft = null; break;
       case 'close-sheet': ui.dogPicker = null;
         if (s && s.kind === 'add' && s.confirmClose) { s.confirmClose = false; break; } // tap outside the question = keep editing
         if (s && s.kind === 'add' && addDirty(s)) { s.confirmClose = true; break; }
@@ -1806,7 +1913,8 @@ export function startGame(SYNCAPI) {
         break;
       case 'add-keep': if (s) s.confirmClose = false; break;
       case 'add-discard': ui.sheet = null; ui.dogPicker = null; infoToast(pid, s && s.editId ? 'Changes discarded.' : 'Quest discarded.'); break;
-      case 'tip-close': ui.hideTips[ds.tip] = true; break;
+      case 'tip-close': var tst = tipState(pid); tst.hidden = sod(now()); saveTipState(pid, tst); break;
+      case 'tip-next': nextTip(pid); break;
       case 'score-edit': ui.scoreEdit = {}; ui.scoreEdit[pid] = weekXP(pid, now()); if (hasPartner(pid)) ui.scoreEdit[o] = weekXP(o, now()); break;
       case 'score-step': if (ui.scoreEdit) ui.scoreEdit[ds.p] = Math.max(0, ui.scoreEdit[ds.p] + parseInt(ds.d, 10)); break;
       case 'score-step-all': if (ui.scoreEdit) ui.scoreEdit[pid] = Math.max(0, ui.scoreEdit[pid] + parseInt(ds.d, 10)); break;
@@ -1843,6 +1951,7 @@ export function startGame(SYNCAPI) {
         h.request = null; break;
       case 'req-accept':
         if (!h.request || h.request.from === pid) break;
+        if (h.request.type === 'clearweek' || h.request.type === 'clearall') { var rqt = h.request.type; h.request = null; doClear(rqt, pid); break; }
         if (h.request.type === 'pause') {
           h.paused = true; h.pausedAt = T; addAct({ kind: 'pause_ok', actor: pid });
           log('Household <b>paused</b>. Scores, ages and recurring tasks are frozen.');
@@ -1861,11 +1970,23 @@ export function startGame(SYNCAPI) {
         h.request = null; break;
       case 'req-decline':
         if (!h.request || h.request.from === pid) break;
-        addAct({ kind: h.request.type === 'pause' ? 'pause_no' : 'resume_no', actor: pid });
+        addAct({ kind: h.request.type === 'pause' ? 'pause_no' : h.request.type === 'resume' ? 'resume_no' : 'clear_no', actor: pid, type: h.request.type });
         h.declined = { to: h.request.from, type: h.request.type };
         log('<b>' + esc(nameOf(pid)) + '</b> said not now');
         h.request = null; break;
       case 'declined-dismiss': h.declined = null; break;
+      case 'clear-ask': if (!h.request) ui.clearAsk = ds.type; break;
+      case 'clear-cancel': ui.clearAsk = null; break;
+      case 'clear-go':
+        var ct = ui.clearAsk; ui.clearAsk = null;
+        if (!ct || h.request) break;
+        if (hasPartner(pid)) {
+          h.request = { type: ct, from: pid, note: null, gif: null, at: T }; h.declined = null;
+          addAct({ kind: 'clear_req', actor: pid, type: ct });
+          log('<b>' + esc(nameOf(pid)) + '</b> asked to clear ' + (ct === 'clearweek' ? 'this week' : 'all history'));
+          infoToast(pid, 'Request sent to ' + nameOf(o) + '.');
+        } else { doClear(ct, pid); infoToast(pid, ct === 'clearweek' ? 'This week is cleared.' : 'All history is cleared.'); }
+        break;
       default: return;
     }
     commit();
@@ -2196,9 +2317,25 @@ export function startGame(SYNCAPI) {
     ME = doc.pids[APP.user.uid];
     S = st; SYNC.code = code; SYNC.rev = doc.rev; SYNC.pending = [];
     UI[ME].ob.step = st.members[ME] ? 'done' : 'welcome';
-    APP.screen = null;
+    APP.screen = null; nextTip(ME); UI[ME].intro = true;
     subscribe(); sweep(); renderAll(); saveCache();
   }
+
+  /* ---------- Android back button ---------- */
+  // Back closes what's open (a sheet, Settings) and otherwise returns to Quests; from Quests it leaves the app.
+  function atRoot() { var ui = UI[ME]; return !!APP.screen || !S || !S.members[ME] || (!ui.settings && !ui.sheet && !ui.dogPicker && ui.tab === 'tasks'); }
+  function syncBack() {
+    try { if (!atRoot() && !(history.state && history.state.hb)) history.pushState({ hb: 1 }, ''); } catch (e) { }
+  }
+  window.addEventListener('popstate', function () {
+    var ui = UI[ME];
+    if (atRoot()) return;
+    if (ui.dogPicker) doAct(ME, 'dog-close', {}, null);
+    else if (ui.sheet) doAct(ME, 'close-sheet', {}, null);
+    else if (ui.settings) { doAct(ME, 'close-settings', {}, null); ui.tab = 'tasks'; renderPhone(ME); }
+    else if (ui.tab !== 'tasks') doAct(ME, 'tab', { tab: 'tasks' }, null);
+    syncBack();
+  });
 
   /* ---------- install the web app ---------- */
   var INSTALL = { evt: null };
@@ -2255,7 +2392,7 @@ export function startGame(SYNCAPI) {
     if (c && c.uid === user.uid && c.code && c.state) {
       // Start instantly from the copy on this phone, then catch up with the shared one.
       ME = c.me; S = c.state; SYNC.code = c.code; SYNC.rev = c.rev || 0; SYNC.pending = c.pending || [];
-      UI[ME].ob.step = 'done'; APP.screen = null; APP.catchupPending = true;
+      UI[ME].ob.step = 'done'; APP.screen = null; APP.catchupPending = true; nextTip(ME); UI[ME].intro = true;
       sweep(); renderAll(); subscribe(); flush();
       setTimeout(function () { if (APP.catchupPending) { APP.catchupPending = false; checkCatchup(); } }, 1500);
       return;

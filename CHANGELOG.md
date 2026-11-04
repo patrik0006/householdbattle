@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.3.0 · 4 Nov 2026
+- Tips: new, easier-to-read card; 18 tips that rotate each time you open the app (plus Next tip). Closing hides tips until midnight.
+- The score bar fills up when the app opens, then bulges.
+- Settings → History: clear this week, or clear all history. Your partner has to accept.
+- Settings sections are clearly separated; week score reads "Your XP: 12".
+- Every page has the same top bar: title in the same place, same background.
+- System events (joined, pause accepted, history cleared, expired challenges) span the full width in Activity.
+- Android back button: closes what's open, otherwise goes back to Quests.
+
 ## v0.2.0 · 4 Nov 2026 · commit 2c07add
 - New font scale (12 · 14 · 16 · 18 · 22 · 32 · 56). Body text is 14, nothing is smaller than 12.
 - Page titles: QUESTS, SCORE · WEEK n, ACTIVITY in one consistent style.
