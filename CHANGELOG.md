@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.4.0 · 4 Nov 2026
+## v0.4.0 · 4 Nov 2026 · commit 5afb375
 - New header: big dogs at the edges behind the score bar, scores beside them, names under the bar. Bar has a dark rim and shadow so it stands out from the dogs.
 - "Suggested for you" on Mine: your rhythm (overdue compared to how often you usually do it), jobs not done in 6+ months, end-of-month bills, seasonal ideas for Sweden and easy-to-forget classics. Add, Not now (a week), Never.
 - Level badges (Bronze, Silver, Gold, Ruby, Amethyst, Legend) and a level path: tap the level card on Score.
