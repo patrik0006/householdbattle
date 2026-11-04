@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.3.0 · 4 Nov 2026
+## v0.3.0 · 4 Nov 2026 · commit 0fdcee7
 - Tips: new, easier-to-read card; 18 tips that rotate each time you open the app (plus Next tip). Closing hides tips until midnight.
 - The score bar fills up when the app opens, then bulges.
 - Settings → History: clear this week, or clear all history. Your partner has to accept.
