@@ -557,6 +557,70 @@ button, [data-act]:not(input):not(textarea) { transition: scale 0.25s cubic-bezi
 .act-row.sys .act-txt { color: var(--soft); }
 .act-row.sys .act-btns { justify-content: center; }
 
+/* ---------- 0.3.1: level badge card + adventure path ---------- */
+button.pcard { width: 100%; border: 0; color: inherit; text-align: left; cursor: pointer; }
+.pcard .bar { display: block; }
+.pc-go { color: var(--muted); font-size: var(--fs-xl); flex: none; padding-right: 2px; }
+.lbadge { flex: none; filter: drop-shadow(0 3px 0 rgba(0,0,0,0.25)); }
+.lbadge.locked { filter: none; }
+.lp-map { position: relative; margin: 34px -6px 8px; }
+.lp-trail { position: absolute; left: 0; top: 0; width: 100%; }
+.lp-node { position: absolute; transform: translate(-50%, -50%); display: flex; align-items: center; }
+.lp-badge { display: flex; position: relative; z-index: 1; }
+.lp-node.here .lp-badge { animation: lpPulse 1.8s ease-in-out infinite; }
+@keyframes lpPulse { 0%, 100% { scale: 1; } 50% { scale: 1.08; } }
+.lp-label { position: absolute; top: 50%; transform: translateY(-50%); width: 140px; display: flex; flex-direction: column; gap: 1px; line-height: 1.25; }
+.lp-node.right .lp-label { left: calc(100% + 10px); text-align: left; }
+.lp-node.left .lp-label { right: calc(100% + 10px); text-align: right; }
+.lp-label b { font-size: var(--fs-body); font-weight: 700; }
+.lp-label span { color: var(--muted); }
+.lp-node.done .lp-label b { color: var(--soft); }
+.lp-node.here .lp-label b { color: var(--gold); font-size: var(--fs-md); }
+.lp-node.here .lp-label span { color: var(--ink); }
+.lp-node.locked .lp-label b { color: var(--grey); }
+.lp-dog { position: absolute; z-index: 2; top: -30px; }
+.lp-node.right .lp-dog { left: -26px; }
+.lp-node.left .lp-dog { right: -26px; }
+.lp-dog .avatar.dogav { width: 40px; height: 40px; }
+.lp-flag { position: absolute; top: -30px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 6px; color: var(--muted); }
+@media (prefers-reduced-motion: reduce) { .lp-node.here .lp-badge { animation: none; } }
+
+/* ---------- 0.4.0: big dogs behind the score bar ---------- */
+.hdr .vs, .panel .vs { position: relative; height: 104px; align-items: flex-end; margin-bottom: -16px; }
+.hdr .vs .player, .panel .vs .player { align-items: flex-end; gap: 2px; }
+.hdr .vs .avbtn, .panel .vs .avbtn { margin: 0 -4px; }
+.hdr .vs .avatar.dogav, .panel .vs .avatar.dogav { width: 104px; height: 104px; transform-origin: 50% 100%; }
+.hdr .vs .avatar.dogav img, .panel .vs .avatar.dogav img { object-position: 50% 100%; }
+.hdr .vs-word, .panel .vs-word { display: none; }
+.hdr .vs .player-meta, .panel .vs .player-meta { padding-bottom: 24px; }
+.hdr .vs .score-num, .panel .vs .score-num { font-size: var(--fs-2xl); line-height: 0.9; padding: 0 6px; }
+.panel .vs { height: 92px; }
+.panel .vs .avatar.dogav { width: 92px; height: 92px; }
+.hdr .tug, .panel .tug { position: relative; z-index: 2; margin-bottom: 20px; }
+.hdr .tug { box-shadow: 0 0 0 3px var(--bg-deep), 0 -6px 12px rgba(6,4,20,0.55); }
+.panel .tug { box-shadow: 0 0 0 3px var(--card), 0 -6px 12px rgba(6,4,20,0.5); }
+.hdr .vs .player-meta small, .panel .vs .player-meta small { position: absolute; top: calc(100% + 13px); max-width: 48%; }
+.hdr .vs .player:not(.right) .player-meta small, .panel .vs .player:not(.right) .player-meta small { left: 0; }
+.hdr .vs .player.right .player-meta small, .panel .vs .player.right .player-meta small { right: 0; }
+
+/* ---------- 0.4.0: suggestions ---------- */
+.sgcard { background: var(--card); border-radius: 16px; padding: 6px 6px 6px 14px; display: flex; flex-direction: column; }
+.sg-foot { display: flex; justify-content: flex-start; padding: 4px 0 6px; border-top: 1px solid var(--line); }
+.sg-more { border: 0; background: transparent; color: var(--gold); font-weight: 500; height: 40px; padding: 0; }
+.sg-head { display: flex; align-items: center; gap: 6px; min-height: 40px; }
+.sg-h { flex: 1; display: flex; align-items: center; gap: 8px; font-family: var(--display); letter-spacing: 1px; color: var(--gold); }
+.sg-x { width: 40px; height: 40px; }
+.sg-x svg { width: 16px; height: 16px; }
+.sg-row { padding: 10px 8px 10px 0; display: flex; flex-direction: column; gap: 8px; }
+.sg-row + .sg-row { border-top: 1px solid var(--line); }
+.sg-main { border: 0; background: transparent; text-align: left; padding: 0; display: flex; flex-direction: column; gap: 3px; color: inherit; }
+.sg-title { font-size: var(--fs-md); font-weight: 500; }
+.sg-why { color: var(--muted); line-height: 1.35; }
+.sg-tag { display: inline-block; background: rgba(255,201,60,0.14); color: var(--gold); border-radius: 6px; padding: 0 6px; margin-right: 6px; }
+.sg-acts { display: flex; gap: 6px; flex-wrap: wrap; }
+.sg-add { height: 36px; border: 0; border-radius: 10px; background: var(--gold); color: var(--gold-ink); font-weight: 700; padding: 0 12px; }
+.sg-btn { height: 36px; border: 1px solid var(--line); border-radius: 10px; background: transparent; color: var(--soft); padding: 0 12px; }
+
 /* ---------- Real app: one full-screen phone instead of the test bench ---------- */
 html, body { height: 100%; }
 body { background: var(--bg); overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
@@ -579,8 +643,8 @@ body { background: var(--bg); overscroll-behavior: none; -webkit-tap-highlight-c
 <div id="phone" class="phone" role="application" aria-label="HouseholdBattle"></div>
 <noscript>HouseholdBattle needs JavaScript.</noscript>
 <script type="module">
-import { createSync } from './sync.js?v=0.3.0';
-import { startGame } from './app.js?v=0.3.0';
+import { createSync } from './sync.js?v=0.4.0';
+import { startGame } from './app.js?v=0.4.0';
 createSync().then(startGame).catch(function (e) {
   document.getElementById('phone').innerHTML = '<div class="app"><div class="ob"><div class="logo">HOUSEHOLD<br>BATTLE</div><p>Couldn\'t start. Check your connection and try again.</p><button class="btn gold" onclick="location.reload()">TRY AGAIN</button></div></div>';
   console.error(e);
