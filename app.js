@@ -531,12 +531,12 @@ export function startGame(SYNCAPI) {
     if (cu && hasP) p = cu.from;
     var li = levelInfo(totalXP(pid)), lo = levelInfo(hasP ? totalXP(o) : 0);
     return '<header class="hdr">' +
-      '<div class="hdr-top"><span class="eyebrow">BATTLE OF WEEK ' + isoWeek(T) + (isPaused() ? ' · FROZEN' : '') + '</span>' +
+      '<div class="hdr-top"><span class="eyebrow">QUESTS' + (isPaused() ? ' · FROZEN' : '') + '</span>' +
       '<button class="iconbtn" data-act="open-settings" aria-label="Settings">' + IC.gear + '</button></div>' +
       '<div class="vs">' +
-        '<div class="player">' + dogAvatar(pid, pid) + '<div class="player-meta"><small>' + esc(nameOf(pid)) + ' · Lvl ' + li.lvl + '</small><span class="score-num gold">' + me + '</span></div></div>' +
+        '<div class="player"><button class="avbtn" data-act="open-score" data-who="me" aria-label="Your score">' + dogAvatar(pid, pid) + '</button><div class="player-meta"><small>' + esc(nameOf(pid)) + ' · Lvl ' + li.lvl + '</small><span class="score-num gold">' + me + '</span></div></div>' +
         '<span class="vs-word">VS</span>' +
-        '<div class="player right">' + dogAvatar(o, pid) + '<div class="player-meta"><small>' + (hasP ? 'Lvl ' + lo.lvl + ' · ' + esc(nameOf(o)) : 'Not joined') + '</small><span class="score-num coral" data-pscore="1">' + (hasP ? p : '–') + '</span></div></div>' +
+        '<div class="player right">' + (hasP ? '<button class="avbtn" data-act="open-score" data-who="partner" aria-label="' + esc(nameOf(o)) + '\'s score">' + dogAvatar(o, pid) + '</button>' : dogAvatar(o, pid)) + '<div class="player-meta"><small>' + (hasP ? 'Lvl ' + lo.lvl + ' · ' + esc(nameOf(o)) : 'Not joined') + '</small><span class="score-num coral" data-pscore="1">' + (hasP ? p : '–') + '</span></div></div>' +
       '</div>' +
       tugHTML(me, p, hasP) +
       '<span class="cheeky">' + rivalLine(pid) + '</span>' +
@@ -693,8 +693,9 @@ export function startGame(SYNCAPI) {
       pop = '<div class="badge-pop" role="status"><b>' + (e2 || !bd.rare ? esc(bd.name) : 'Hidden rare badge') + '</b><span>' + (e2 || !bd.rare ? esc(bd.desc) : 'A rare badge. Keep playing to find out.') + '</span><span>' + (e2 ? 'Earned ' + fmtDate(e2.at) : 'Not earned yet') + '</span></div>';
     }
     return '<div class="scroll" data-scroll="score"><div class="page">' +
-      '<div class="page-title"><h2>SCORE</h2><div class="toggle" role="tablist"><button role="tab" class="' + (ui.scorePeriod === 'week' ? 'on' : '') + '" data-act="score-period" data-p="week" aria-selected="' + (ui.scorePeriod === 'week') + '">This week</button><button role="tab" class="' + (ui.scorePeriod === 'all' ? 'on' : '') + '" data-act="score-period" data-p="all" aria-selected="' + (ui.scorePeriod === 'all') + '">All time</button></div></div>' +
-      '<section class="panel"><div class="vs"><div class="player">' + dogAvatar(pid, pid) + '<div class="player-meta"><small>' + esc(nameOf(pid)) + ' · Lvl ' + li.lvl + '</small><span class="score-num gold">' + me + '</span></div></div><div class="player right">' + dogAvatar(o, pid) + '<div class="player-meta"><small>' + (hasP ? 'Lvl ' + lo.lvl + ' · ' + esc(nameOf(o)) : 'Not joined') + '</small><span class="score-num coral">' + (hasP ? p : '–') + '</span></div></div></div>' + tugHTML(me, p, hasP) + '<span class="cheeky">' + cap + '</span></section>' +
+      '<div class="page-title"><h2>SCORE · ' + (ui.scorePeriod === 'week' ? 'WEEK ' + isoWeek(T) : 'ALL TIME') + '</h2><div class="toggle" role="tablist"><button role="tab" class="' + (ui.scorePeriod === 'week' ? 'on' : '') + '" data-act="score-period" data-p="week" aria-selected="' + (ui.scorePeriod === 'week') + '">This week</button><button role="tab" class="' + (ui.scorePeriod === 'all' ? 'on' : '') + '" data-act="score-period" data-p="all" aria-selected="' + (ui.scorePeriod === 'all') + '">All time</button></div></div>' +
+      '<section class="panel"><div class="vs"><div class="player"><button class="avbtn" data-act="score-who" data-who="me" aria-label="Show your score">' + dogAvatar(pid, pid) + '</button>' + '<div class="player-meta"><small>' + esc(nameOf(pid)) + ' · Lvl ' + li.lvl + '</small><span class="score-num gold">' + me + '</span></div></div><div class="player right">' + (hasP ? '<button class="avbtn" data-act="score-who" data-who="partner" aria-label="Show ' + esc(nameOf(o)) + '\'s score">' + dogAvatar(o, pid) + '</button>' : dogAvatar(o, pid)) + '<div class="player-meta"><small>' + (hasP ? 'Lvl ' + lo.lvl + ' · ' + esc(nameOf(o)) : 'Not joined') + '</small><span class="score-num coral">' + (hasP ? p : '–') + '</span></div></div></div>' + tugHTML(me, p, hasP) + '<span class="cheeky">' + cap + '</span></section>' +
+      personHTML(pid) +
       '<section class="stats" aria-label="Stats"><div class="r h"><span></span><span>You</span><span>' + (hasP ? esc(nameOf(o)) : 'Partner') + '</span></div>' +
         '<div class="r"><span>Quests done</span><span class="gold"' + hi(sm.n, sp.n, true) + '>' + sm.n + '</span><span class="coral"' + hi(sm.n, sp.n, false) + '>' + sp.n + '</span></div>' +
         '<div class="r"><span>Hard + Epic</span><span class="gold"' + hi(sm.hate, sp.hate, true) + '>' + sm.hate + '</span><span class="coral"' + hi(sm.hate, sp.hate, false) + '>' + sp.hate + '</span></div>' +
@@ -703,10 +704,18 @@ export function startGame(SYNCAPI) {
         '<div class="r"><span>Handed back</span><span class="gold">' + sm.hb + '</span><span class="coral">' + sp.hb + '</span></div>' +
       '</section>' +
       rewardsSection(pid) +
-      '<section class="sect"><div class="page-title"><h4>' + (ui.badgeOwner === 'me' ? 'YOUR BADGES' : esc(nameOf(o)).toUpperCase() + "'S BADGES") + ' · ' + earned.length + ' / ' + BADGES.length + '</h4>' + (hasP ? '<button class="cbtn" data-act="badge-owner">' + (ui.badgeOwner === 'me' ? 'See ' + esc(nameOf(o)) + "'s" : 'See yours') + '</button>' : '') + '</div><div class="badges">' + grid + '</div>' + pop + '</section>' +
+      '<section class="sect"><div class="page-title"><h4>' + (ui.badgeOwner === 'me' ? 'YOUR BADGES' : esc(nameOf(o)).toUpperCase() + "'S BADGES") + ' · ' + earned.length + ' / ' + BADGES.length + '</h4></div><div class="badges">' + grid + '</div>' + pop + '</section>' +
     '</div></div>';
   }
 
+  // Score page: whose page is it? (You / partner switch + level card)
+  function personHTML(pid) {
+    var ui = UI[pid], o = other(pid), hasP = hasPartner(pid), who = ui.badgeOwner === 'me' || !hasP ? pid : o;
+    var xp = totalXP(who), li = levelInfo(xp);
+    var sw = hasP ? '<div class="toggle person-sw" role="tablist" aria-label="Whose score"><button role="tab" class="' + (who === pid ? 'on' : '') + '" data-act="score-who" data-who="me" aria-selected="' + (who === pid) + '">You</button><button role="tab" class="' + (who === o ? 'on' : '') + '" data-act="score-who" data-who="partner" aria-selected="' + (who === o) + '">' + esc(nameOf(o)) + '</button></div>' : '';
+    return sw + '<section class="pcard">' + dogAvatar(who, pid) + '<div class="pc-body"><b>' + esc(nameOf(who)) + '</b><span class="pc-lvl">Lvl ' + li.lvl + ' · ' + esc(levelTitle(li.lvl)) + '</span>' +
+      '<div class="bar"><i style="width:' + Math.round(li.into / li.need * 100) + '%"></i></div><span class="pc-xp">' + xp + ' XP in total · ' + li.toNext + ' XP to Lvl ' + (li.lvl + 1) + '</span></div></section>';
+  }
   function rewardsSection(pid) {
     var list = (S.owed || []).filter(function (w) { return w.from === pid || w.to === pid; }).slice().reverse();
     if (!list.length) return '';
@@ -785,13 +794,14 @@ export function startGame(SYNCAPI) {
       if (dl !== lastDay) { html += '<div class="day-h">' + esc(dl.toUpperCase()) + '</div>'; lastDay = dl; }
       var t = a.taskId ? getTask(a.taskId) : null, link = t && t.status === 'open';
       var txt = '<span class="act-txt">' + actText(a, pid) + '</span>';
-      var inner = avatar(a.actor, pid, 'sm') + '<span class="act-body">' + txt;
+      var side = !a.actor || !S.members[a.actor] ? 'sys' : a.actor === pid ? 'mine' : 'theirs';
+      var inner = (side === 'theirs' ? '<span class="act-av">' + dogAvatar(a.actor, pid) + '</span>' : '') + '<span class="act-body">' + txt;
       if (a.kind === 'showoff') inner += '<span class="show-card"><ul>' + a.items.map(function (it) { return '<li>' + esc(it.title) + ' · +' + it.xp + '</li>'; }).join('') + '</ul></span>';
       if (a.note || a.gif) inner += msgHTML(a.actor === pid ? 'me' : 'them', a.gif, a.note);
       inner += '<span class="act-time">' + fmtTime(a.at) + '</span>' + repliesHTML(a, pid);
       inner += actButtons(a, pid, link ? t : null);
       inner += '</span>';
-      html += '<div class="act-row' + (a.note || a.gif || (a.replies && a.replies.length) ? ' noted' : '') + '">' + inner + '</div>';
+      html += '<div class="act-row ' + side + (a.note || a.gif || (a.replies && a.replies.length) ? ' noted' : '') + '">' + inner + '</div>';
     });
     if (!items.length) html = '<div class="empty"><span class="disp">QUIET HOUSEHOLD</span><span>Completed quests, notes and assignments show up here.</span></div>';
     return '<div class="scroll" data-scroll="activity"><div class="page"><div class="page-title"><h2>ACTIVITY</h2></div>' + html + '</div></div>';
@@ -814,9 +824,10 @@ export function startGame(SYNCAPI) {
     return '<div class="full"><div class="full-top"><button class="iconbtn" data-act="close-settings" aria-label="Back">' + IC.back + '</button><h2>SETTINGS</h2></div><div class="full-body" data-scroll="settings">' +
       '<section class="sect"><h4>YOUR DOG STYLE</h4>' + stylePickerHTML(pid, 'set') + '</section>' +
       '<section class="sect"><h4>YOUR NAME</h4><div class="own"><input class="field" id="' + pid + '-name" aria-label="Your name" data-bind="nameDraft" maxlength="24" value="' + esc(nameVal) + '"><button class="btn ghost" data-act="save-name">Save</button></div></section>' +
-      '<section class="sect"><h4>HOUSEHOLD</h4>' + (hasP ? '<p>You and ' + esc(nameOf(o)) + '. Joined ' + fmtDate(S.members[o].joinedAt) + '.</p>' : '<p>Your partner hasn\'t joined yet. Share this code:</p>') + '<div class="own"><div class="code" id="' + pid + '-setcode" style="font-size:22px;letter-spacing:4px;flex:1;padding:10px">' + esc(h.code) + '</div><button class="btn ghost" data-act="copy-code" style="min-height:52px">' + (UI[pid].copiedAt && Date.now() - UI[pid].copiedAt < 1800 ? 'Copied ✓' : 'Copy') + '</button></div></section>' +
+      '<section class="sect"><h4>HOUSEHOLD</h4>' + (hasP ? '<p>You and ' + esc(nameOf(o)) + '. Joined ' + fmtDate(S.members[o].joinedAt) + '.</p>' : '<p>Your partner hasn\'t joined yet. Share this code:</p>') + '<div class="own"><div class="code" id="' + pid + '-setcode" style="font-size:var(--fs-xl);letter-spacing:4px;flex:1;padding:10px">' + esc(h.code) + '</div><button class="btn ghost" data-act="copy-code" style="min-height:52px">' + (UI[pid].copiedAt && Date.now() - UI[pid].copiedAt < 1800 ? 'Copied ✓' : 'Copy') + '</button></div></section>' +
       weekScoreHTML(pid) +
       '<section class="sect"><h4>PAUSE</h4>' + pause + '</section>' +
+      installSettingsHTML() +
       '<section class="sect"><h4>ACCOUNT</h4><p>Signed in as ' + esc(APP.user ? (APP.user.email || APP.user.name) : '') + '.</p><button class="btn ghost" data-act="sign-out">Sign out</button>' +
       '<p class="muted" style="margin:6px 0 0;font-size:12px">HouseholdBattle ' + APP_VERSION + '</p></section>' +
     '</div></div>';
@@ -885,7 +896,7 @@ export function startGame(SYNCAPI) {
       var cov = st.set[st.cover] || STICKERS[st.cover];
       return '<button class="style-card' + (on ? ' on' : '') + '" role="radio" aria-checked="' + on + '" data-act="style-pick" data-mode="' + mode + '" data-id="' + st.id + '"' + (locked ? ' disabled' : '') + '>' +
         '<img src="' + cov.src + '" alt=""><b>' + esc(st.name) + '</b><small>' + (locked ? 'Taken by ' + esc(nameOf(by)) : by ? 'Shared with ' + esc(nameOf(by)) + ' for now' : on ? 'Your dog' : 'Available') + '</small></button>';
-    }).join('') + '</div>' + (DOG_STYLES.length < 2 ? '<p class="muted" style="margin:0;font-size:12.5px">More dog styles are coming. Once they arrive, each of you gets your own.</p>' : '');
+    }).join('') + '</div>' + (DOG_STYLES.length < 2 ? '<p class="muted" style="margin:0;font-size:var(--fs-body)">More dog styles are coming. Once they arrive, each of you gets your own.</p>' : '');
   }
   function gifHTML(g) {
     if (!g || !g.sticker) return '';
@@ -933,8 +944,8 @@ export function startGame(SYNCAPI) {
     html += '<button class="nchip icon' + (c.open ? ' on' : '') + '" data-act="note-own" data-c="' + where + '" aria-label="Write your own note" aria-pressed="' + c.open + '">' + IC.pencil + '</button>';
     html += '<button class="nchip' + (c.gif ? ' on' : '') + '" data-act="dog-open" data-c="' + where + '" aria-label="Add a dog illustration">' + IC.paw + 'Dog</button>';
     html += '</div>';
-    if (c.gif) html += '<div class="gif-att">' + msgHTML('', c.gif, '') + '<span class="lbl" style="flex:1">' + esc(stickerFor(c.gif) ? stickerFor(c.gif).title : 'Dog') + ' added' + (mode === 'send' ? '. Tap a line to send both, or send the dog alone.' : '') + '</span>' + (mode === 'send' && !c.open ? '<button class="btn gold" data-act="note-send-gif" data-c="' + where + '" style="font-size:12px;min-height:40px;height:40px">SEND</button>' : '') + '<button class="iconbtn" data-act="gif-remove" data-c="' + where + '" aria-label="Remove dog">' + IC.close + '</button></div>';
-    if (c.open) html += '<div class="own"><input class="field" id="' + pid + '-note-' + where + '" data-bind="c:' + where + '" maxlength="140" placeholder="Say something…" aria-label="Your note" value="' + esc(c.text) + '"' + (mode === 'send' ? ' data-enter="note-send" data-c="' + where + '"' : '') + '>' + (mode === 'send' ? '<button class="btn gold" data-act="note-send" data-c="' + where + '" style="font-size:13px">SEND</button>' : '') + '</div>';
+    if (c.gif) html += '<div class="gif-att">' + msgHTML('', c.gif, '') + '<span class="lbl" style="flex:1">' + esc(stickerFor(c.gif) ? stickerFor(c.gif).title : 'Dog') + ' added' + (mode === 'send' ? '. Tap a line to send both, or send the dog alone.' : '') + '</span>' + (mode === 'send' && !c.open ? '<button class="btn gold" data-act="note-send-gif" data-c="' + where + '" style="font-size:var(--fs-body);min-height:40px;height:40px">SEND</button>' : '') + '<button class="iconbtn" data-act="gif-remove" data-c="' + where + '" aria-label="Remove dog">' + IC.close + '</button></div>';
+    if (c.open) html += '<div class="own"><input class="field" id="' + pid + '-note-' + where + '" data-bind="c:' + where + '" maxlength="140" placeholder="Say something…" aria-label="Your note" value="' + esc(c.text) + '"' + (mode === 'send' ? ' data-enter="note-send" data-c="' + where + '"' : '') + '>' + (mode === 'send' ? '<button class="btn gold" data-act="note-send" data-c="' + where + '" style="font-size:var(--fs-body)">SEND</button>' : '') + '</div>';
     return html + '</div>';
   }
   function getComposer(pid, where) {
@@ -975,7 +986,7 @@ export function startGame(SYNCAPI) {
     var worth = '<b class="gold">+' + x + ' XP</b> for you' + (bounty || chB ? ' (' + SIZES[t.size].xp + ' base' + (bounty ? ' + ' + bounty + ' bounty' : '') + (chB ? ' + ' + chB + ' challenge' : '') + ')' : '') + ', plus first-of-day or combo bonus';
     var graceTxt = '';
     if (t.assignee !== 'any') graceTxt = graceLabel(t.grace || 0) + (inGrace(t) ? ' · ' + (t.assignee === pid ? 'only you until ' : on + "'s until ") + fmtGrace(t) : ' · over, it can be stolen');
-    var thread = t.thread.map(function (m) { return msgHTML(m.from === pid ? 'me' : 'them', m.gif, m.text) + '<small>' + (m.from === pid ? 'You' : esc(nameOf(m.from))) + ' · ' + (m.kind === 'handback' ? 'handed back' : m.kind === 'comment' ? 'commented' : m.kind === 'reply' ? 'replied' : 'assigned') + ' · ' + fmtDate(m.at) + '</small>'; }).join('');
+    var thread = t.thread.map(function (m) { return '<div class="tmsg ' + (m.from === pid ? 'mine' : 'theirs') + '">' + msgHTML(m.from === pid ? 'me' : 'them', m.gif, m.text) + '<small>' + (m.from === pid ? 'You' : esc(nameOf(m.from))) + ' · ' + (m.kind === 'handback' ? 'handed back' : m.kind === 'comment' ? 'commented' : m.kind === 'reply' ? 'replied' : 'assigned') + ' · ' + fmtDate(m.at) + '</small></div>'; }).join('');
     var inner = '<div class="sheet-top"><span class="ttl">' + (t.assignee === o ? on.toUpperCase() + "'S QUEST" : t.assignee === 'any' ? "ANYONE'S QUEST" : 'YOUR QUEST') + '</span><button class="iconbtn" data-act="close-sheet" aria-label="Close">' + IC.close + '</button></div>' +
       '<h3>' + esc(t.title) + '</h3>' +
       '<dl class="kv"><dt>Worth</dt><dd>' + worth + '</dd><dt>Size</dt><dd>' + SIZES[t.size].label + ' · ' + SIZES[t.size].xp + ' XP</dd><dt>For</dt><dd>' + forTxt + '</dd>' +
@@ -988,7 +999,7 @@ export function startGame(SYNCAPI) {
     if (c && st && st !== 'expired') {
       var who = c.from === pid ? 'You challenged ' + on : on + ' challenged you';
       var line = st === 'pending' ? 'Waiting for an answer. Deadline ' + fmtDeadline(c.deadline) + '.' : st === 'accepted' ? 'Accepted. ' + (c.to === pid ? 'Do it' : on + ' has to do it') + ' by ' + fmtDeadline(c.deadline) + '.' : 'Failed. The bonus now goes to ' + (c.from === pid ? 'you' : on) + '.';
-      inner += '<div class="strip" style="align-items:flex-start"><span class="lvlbox" style="font-size:13px;width:auto;padding:0 8px">+' + c.bonus + '</span><span class="tx"><b>CHALLENGE</b><span>' + who + '. ' + line + '</span>' + (c.note || c.gif ? msgHTML(c.from === pid ? 'me' : 'them', c.gif, c.note) : '') + '</span></div>';
+      inner += '<div class="strip" style="align-items:flex-start"><span class="lvlbox" style="font-size:var(--fs-body);width:auto;padding:0 8px">+' + c.bonus + '</span><span class="tx"><b>CHALLENGE</b><span>' + who + '. ' + line + '</span>' + (c.note || c.gif ? msgHTML(c.from === pid ? 'me' : 'them', c.gif, c.note) : '') + '</span></div>';
       if (!paused && st === 'pending' && c.to === pid) inner += '<div class="btn-row"><button class="btn gold" data-act="ch-accept" data-id="' + t.id + '">ACCEPT</button><button class="btn ghost" data-act="ch-decline" data-id="' + t.id + '">Decline</button></div>';
       if (!paused && st === 'pending' && c.from === pid) inner += '<button class="btn ghost" data-act="ch-cancel" data-id="' + t.id + '">Cancel challenge</button>';
     }
@@ -999,7 +1010,7 @@ export function startGame(SYNCAPI) {
     }
     if (!open) inner += '<p class="muted">Already done.</p>';
     else if (paused) inner += '<p class="muted">The household is paused. Quests can\'t be changed until you restart.</p>' + (hasPartner(pid) ? '<button class="btn ghost" data-act="comment-open">Comment</button>' : '');
-    else if (s.confirmDelete) inner += '<p>Delete "' + esc(t.title) + '"? ' + (hasPartner(pid) ? on + ' will see it in Activity.' : '') + '</p><div class="btn-row"><button class="btn danger" data-act="detail-delete-yes">Delete</button><button class="btn ghost" data-act="detail-delete-no">Keep it</button></div>';
+    else if (s.confirmDelete) inner += '<p>Delete "' + esc(t.title) + '"? ' + (hasPartner(pid) ? on + ' will see it in Activity.' : '') + '</p><div class="btn-row"><button class="btn ghost" data-act="detail-delete-no">Keep it</button><button class="btn danger" data-act="detail-delete-yes">Delete</button></div>';
     else {
       var can = canComplete(t, pid);
       var label = st === 'accepted' && c.to === pid ? 'COMPLETE CHALLENGE' : st === 'failed' && c.from === pid ? 'COLLECT THE BONUS' : t.assignee === o ? 'STEAL IT' : 'MARK DONE';
@@ -1081,7 +1092,7 @@ export function startGame(SYNCAPI) {
       return sheetWrap(pid, '<div class="confirm">' +
         '<h3>' + (s.editId ? 'Discard your changes?' : 'Discard this quest?') + '</h3>' +
         '<p class="muted" style="margin:0">' + (s.editId ? 'Your edits to ' + (title ? '"' + esc(title) + '"' : 'this quest') + ' won\'t be saved.' : (title ? '"' + esc(title) + '"' : 'This quest') + ' hasn\'t been added yet. Keep going, or throw it away?') + '</p>' +
-        '<div class="btn-row"><button class="btn plain" data-act="add-discard">Discard</button><button class="btn gold" data-act="add-keep">KEEP EDITING</button></div></div>', false, 'Discard quest');
+        '<div class="btn-row"><button class="btn gold" data-act="add-keep">KEEP EDITING</button><button class="btn plain" data-act="add-discard">Discard</button></div></div>', false, 'Discard quest');
     }
     var top = '<div class="sheet-top">' + (s.step !== 'what' && !(s.editId && s.step === 'summary') ? '<button class="iconbtn" data-act="add-back" aria-label="Back">' + IC.back + '</button>' : '') + '<span class="ttl">' + (s.editId ? 'EDIT QUEST' : 'NEW QUEST') + '</span>' + (s.editId ? '' : stepDots(s.step)) + '<button class="iconbtn" data-act="close-sheet" aria-label="Close">' + IC.close + '</button></div>';
     var skip = '<button class="textlink" data-act="add-skip">Skip to summary</button>';
@@ -1143,7 +1154,7 @@ export function startGame(SYNCAPI) {
     var o = other(pid), hasP = hasPartner(pid), c = s.comp;
     var kicker = s.gift ? 'GIFT UNLOCKED!' : s.levelUp ? 'LEVEL UP!' : s.challengeWon ? 'CHALLENGE WON!' : s.challengeCollect ? 'BONUS COLLECTED' : s.tookLead ? 'YOU TAKE THE LEAD' : s.stolen ? 'QUEST STOLEN!' : s.badges.length ? 'NEW BADGE' : 'QUEST COMPLETE';
     var pool = s.gift ? 'gift' : s.challengeWon ? 'chwin' : s.challengeCollect ? 'chcollect' : s.tookLead ? 'lead' : s.stolen ? 'steal' : s.levelUp ? 'level' : 'big';
-    var html = '<div class="reward-head"><span class="reward-kicker">' + kicker + '</span><span style="font-size:15px;color:var(--soft)">' + esc(c.title) + '</span><span class="reward-xp' + (s.fresh ? ' pop' : '') + '"><span data-count="' + c.xp + '">' + (s.fresh ? 0 : c.xp) + '</span> <small>XP</small></span></div>' +
+    var html = '<div class="reward-head"><span class="reward-kicker">' + kicker + '</span><span style="font-size:var(--fs-md);color:var(--soft)">' + esc(c.title) + '</span><span class="reward-xp' + (s.fresh ? ' pop' : '') + '"><span data-count="' + c.xp + '">' + (s.fresh ? 0 : c.xp) + '</span> <small>XP</small></span></div>' +
       '<div class="bd">' + c.breakdown.map(function (b) { return '<span>' + esc(b) + '</span>'; }).join('') + '</div>';
     if (s.gift) html += '<div class="gift' + (s.fresh ? ' pop' : '') + '">' + IC.gift + '<span class="disp">CONGRATS!</span><small>You earned ' + esc(nameOf(s.gift.from)) + "'s special reward</small><span class=\"gift-text\">\u201C" + esc(s.gift.text) + '\u201D</span><small>' + esc(nameOf(s.gift.from)) + ' has been told to pay up. You\'ll find it under Score.</small></div>';
     if (hasP) {
@@ -1151,12 +1162,12 @@ export function startGame(SYNCAPI) {
       html += '<div class="lead-card' + (s.tookLead ? '' : ' quiet') + '">' + (s.tookLead ? '<span class="disp">YOU TAKE THE LEAD</span>' : '') +
         '<div class="lead-nums"><b class="gold">' + a.me + '</b><span>' + (s.tookLead ? 'was ' + b.me + ' vs ' + b.p : 'this week') + '</span><b class="coral">' + a.p + '</b></div>' +
         '<div class="tug" role="img" aria-label="You ' + a.me + ', ' + esc(nameOf(o)) + ' ' + a.p + '"><div class="l" data-wfrom="' + pctB + '" style="width:' + (s.fresh ? pctB : pctA) + '%" data-wto="' + pctA + '"></div><div class="r"></div><div class="mid"></div></div>' +
-        '<span class="cheeky" style="text-align:center;font-size:12.5px;color:var(--soft)">' + (s.tookLead ? esc(nameOf(o)) + ' has been informed. (Not yet. Send a taunt.)' : a.me > a.p ? 'Still ahead by ' + (a.me - a.p) + '.' : a.me === a.p ? 'Dead even.' : (a.p - a.me) + ' behind ' + esc(nameOf(o)) + '. Closing in.') + '</span></div>';
+        '<span class="cheeky" style="text-align:center;font-size:var(--fs-body);color:var(--soft)">' + (s.tookLead ? esc(nameOf(o)) + ' has been informed. (Not yet. Send a taunt.)' : a.me > a.p ? 'Still ahead by ' + (a.me - a.p) + '.' : a.me === a.p ? 'Dead even.' : (a.p - a.me) + ' behind ' + esc(nameOf(o)) + '. Closing in.') + '</span></div>';
     }
     if (s.levelUp) html += '<div class="strip"><span class="lvlbox">' + s.levelUp + '</span><span class="tx"><b>LEVEL UP</b><span>You are now a ' + levelTitle(s.levelUp) + '.</span></span></div>';
-    if (s.challengeWon || s.challengeCollect) html += '<div class="strip"><span class="lvlbox" style="font-size:13px;width:auto;padding:0 8px">VS</span><span class="tx"><b>' + (s.challengeWon ? 'CHALLENGE WON' : 'BONUS COLLECTED') + '</b><span>' + (s.challengeWon ? 'You beat ' + esc(nameOf(o)) + "'s challenge." : esc(nameOf(o)) + ' missed the deadline. The bonus is yours.') + '</span></span></div>';
+    if (s.challengeWon || s.challengeCollect) html += '<div class="strip"><span class="lvlbox" style="font-size:var(--fs-body);width:auto;padding:0 8px">VS</span><span class="tx"><b>' + (s.challengeWon ? 'CHALLENGE WON' : 'BONUS COLLECTED') + '</b><span>' + (s.challengeWon ? 'You beat ' + esc(nameOf(o)) + "'s challenge." : esc(nameOf(o)) + ' missed the deadline. The bonus is yours.') + '</span></span></div>';
     if (s.stolen) html += '<div class="strip"><span class="avatar sm them" aria-hidden="true">' + esc(initial(o)) + '</span><span class="tx"><b>QUEST STOLEN</b><span>Taken from ' + esc(nameOf(o)) + "'s list. Full points.</span></span></div>";
-    s.badges.forEach(function (id) { var b = badgeDef(id); html += '<div class="strip">' + IC.hex(b.rare ? '#FF7A59' : '#FFC93C', '<path d="M11 16l3.5 3.5L21 12" fill="none" stroke="#241E4E" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"></path>') + '<span class="tx"><b>' + (b.rare ? 'RARE BADGE' : 'NEW BADGE') + '</b><span>' + esc(b.name) + ': ' + esc(b.desc) + '</span></span></div>'; });
+    s.badges.forEach(function (id) { var b = badgeDef(id); html += '<div class="strip badge-new">' + IC.hex(b.rare ? '#FF7A59' : '#FFC93C', '<path d="M11 16l3.5 3.5L21 12" fill="none" stroke="#241E4E" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"></path>') + '<span class="tx"><b>' + (b.rare ? 'RARE BADGE' : 'NEW BADGE') + '</b><span>' + esc(b.name) + ': ' + esc(b.desc) + '</span></span></div>'; });
     if (hasP) html += '<span style="font-weight:500">' + (s.tookLead || s.stolen ? 'Taunt ' : 'Tell ') + esc(nameOf(o)) + '?</span>' + composerHTML(pid, 'sheet', pool, 'send');
     html += '<div class="btn-row"><button class="btn plain" data-act="reward-undo" style="flex:none">Undo</button><button class="btn gold" data-act="close-sheet">CONTINUE</button></div>';
     return sheetWrap(pid, html, s.fresh, 'Reward');
@@ -1225,7 +1236,7 @@ export function startGame(SYNCAPI) {
         '<div class="grow"></div><button class="btn gold" data-act="ob-name-continue">CONTINUE</button>';
     } else if (ob.step === 'join-code') {
       x += '<button class="iconbtn" data-act="ob-back" aria-label="Back" style="margin-left:-10px">' + IC.back + '</button><h2>Enter your partner\'s code</h2><p>Your partner finds it on their invite screen or in Settings.</p>' +
-        '<label class="lbl" for="' + pid + '-ob-code">6-character code</label><input class="field" id="' + pid + '-ob-code" data-bind="ob.code" data-enter="ob-code-continue" maxlength="6" autocapitalize="characters" autocomplete="off" style="font-family:var(--display);letter-spacing:4px;font-size:20px;text-transform:uppercase" value="' + esc(ob.code) + '">' +
+        '<label class="lbl" for="' + pid + '-ob-code">6-character code</label><input class="field" id="' + pid + '-ob-code" data-bind="ob.code" data-enter="ob-code-continue" maxlength="6" autocapitalize="characters" autocomplete="off" style="font-family:var(--display);letter-spacing:4px;font-size:var(--fs-xl);text-transform:uppercase" value="' + esc(ob.code) + '">' +
         (ob.error ? '<span class="err">' + esc(ob.error) + '</span>' : '') + '<div class="grow"></div><button class="btn gold" data-act="ob-code-continue">JOIN</button>';
     } else if (ob.step === 'invite') {
       var joined = !!S.members[o];
@@ -1298,6 +1309,7 @@ export function startGame(SYNCAPI) {
       st.innerHTML = esc(nameOf(other(pid))).toUpperCase() + ' TOOK<br>THE LEAD';
       st.style.top = (hr.top - ar.top + hr.height / 2) + 'px';
       app.appendChild(st); hdr.classList.add('shake');
+      fxPlay(hdr.querySelector('.player:not(.right) .dogav'), 'flinch', pid);
       later(function () { st.classList.add('out'); }, 1500);
     }
     if (reduceMotion) {
@@ -1321,6 +1333,7 @@ export function startGame(SYNCAPI) {
         ], { duration: 500, easing: 'ease-in' });
         anim.onfinish = function () {
           coin.remove(); var from = cur; cur += c.xp; tween(scoreEl, from, cur, 220);
+          fxPlay(hdr.querySelector('.player.right .dogav'), c.size >= 4 ? 'popshake' : 'pop', other(pid));
           scoreEl.classList.remove('bump'); void scoreEl.offsetWidth; scoreEl.classList.add('bump');
         };
       }, 250 + i * 280);
@@ -1348,7 +1361,7 @@ export function startGame(SYNCAPI) {
     var paused = isPaused();
     var main;
     if (ui.settings) main = settingsHTML(pid);
-    else main = bannerHTML(pid) + (ui.tab === 'tasks' ? tasksHTML(pid) : ui.tab === 'score' ? scoreHTML(pid) : activityHTML(pid)) + navHTML(pid);
+    else main = bannerHTML(pid) + installBannerHTML() + (ui.tab === 'tasks' ? tasksHTML(pid) : ui.tab === 'score' ? scoreHTML(pid) : activityHTML(pid)) + navHTML(pid);
     var fab = ui.tab === 'tasks' && !ui.settings && !paused ? '<button class="fab" data-act="add-open" aria-label="Add quest">' + IC.plus + '</button>' : '';
     return '<div class="app' + (paused ? ' is-paused' : '') + '">' + (SYNC.status === 'offline' ? '<div class="netbar" role="status">Offline. Your changes will sync when you\'re back online.</div>' : '') + main + fab + (ui.settings ? '' : toastHTML(pid)) + sheetHTML(pid) + dogPickerHTML(pid) + '</div>';
   }
@@ -1385,6 +1398,96 @@ export function startGame(SYNCAPI) {
     el.addEventListener('click', function (e) { if (el.dataset.justDragged) { e.stopPropagation(); e.preventDefault(); } }, true);
   }
 
+  /* ---------- 0.2.0: vibration ---------- */
+  function buzz(kind) {
+    if (typeof REPLAYING !== 'undefined' && REPLAYING) return;
+    try { if (navigator.vibrate) navigator.vibrate(kind === 'big' ? [40, 60, 40] : kind === 'steal' ? [15, 60, 15] : 15); } catch (e) { }
+  }
+
+  /* ---------- 0.2.0: game-feel effects on the header dogs ---------- */
+  function fxPlay(el, kind, who, oldMood) {
+    if (!el || !kind) return;
+    var img = el.querySelector('img'), cur = el.getAttribute('data-mood');
+    if (img && oldMood && cur && oldMood !== cur && !reduceMotion) {
+      var st = styleById(styleOf(who)), old = st.set[oldMood] || STICKERS[oldMood], newSrc = img.src;
+      if (old) { img.src = old.src; setTimeout(function () { img.src = newSrc; }, 170); }
+    }
+    el.classList.remove('fx-' + kind); void el.offsetWidth; el.classList.add('fx-' + kind);
+    setTimeout(function () { el.classList.remove('fx-' + kind); }, 1300);
+  }
+  function applyFx(pid, root) {
+    var ui = UI[pid], hdr = root.querySelector('.hdr');
+    if (hdr) {
+      var meEl = hdr.querySelector('.player:not(.right) .score-num'), pEl = hdr.querySelector('[data-pscore]');
+      var now2 = { me: meEl ? meEl.textContent : null, p: pEl ? pEl.textContent : null };
+      var last = ui.lastScores;
+      if (last && !ui.catchup && !ui.animLock) {
+        if (meEl && last.me !== now2.me) fxPlay(meEl, 'bump');
+        if (pEl && last.p !== now2.p) fxPlay(pEl, 'bump');
+      }
+      ui.lastScores = now2;
+    }
+    var fx = ui.fx; if (!fx) return;
+    ui.fx = null;
+    if (!hdr) return;
+    fxPlay(hdr.querySelector('.player:not(.right) .dogav'), fx.me, pid, fx.moodMe);
+    fxPlay(hdr.querySelector('.player.right .dogav'), fx.them, other(pid), fx.moodThem);
+    if (fx.me === 'level') { var bar = hdr.querySelector('.lvlrow .bar'); if (bar) fxPlay(bar, 'glow'); }
+  }
+  function fxKind(r) { return r.levelUp ? 'level' : (r.challengeWon || r.challengeCollect) ? 'double' : r.comp && r.comp.size >= 4 ? 'popshake' : 'pop'; }
+
+  /* ---------- 0.2.0: drag a bottom sheet down to close it ---------- */
+  function closeFromDrag(pid, a) { doAct(pid, a, {}, null); }
+  function wireSheets(root, pid) {
+    Array.prototype.forEach.call(root.querySelectorAll('.overlay > .sheet'), function (sh) {
+      var ov = sh.parentNode, hit = ov.querySelector('.overlay-hit'), closeAct = hit ? hit.getAttribute('data-act') : 'close-sheet';
+      var st = null;
+      function start(y, target) {
+        if (target.closest && target.closest('input, textarea, .chips, .dog-grid-scroll')) { st = null; return; }
+        st = { y: y, handle: !!(target.closest && target.closest('.grab, .sheet-top')), drag: false, dy: 0, t: 0, lastY: y, lastT: Date.now(), v: 0 };
+      }
+      function move(y, ev) {
+        if (!st) return false;
+        var dy = y - st.y;
+        if (!st.drag) {
+          if (dy > 6 && (st.handle || sh.scrollTop <= 0)) { st.drag = true; st.y = y; dy = 0; sh.classList.add('dragging'); }
+          else if (Math.abs(dy) > 6) { st = null; return false; }
+          else return false;
+        }
+        if (ev && ev.cancelable) ev.preventDefault();
+        var tnow = Date.now(); st.v = (y - st.lastY) / Math.max(1, tnow - st.lastT); st.lastY = y; st.lastT = tnow;
+        st.dy = Math.max(0, dy);
+        sh.style.transform = 'translateY(' + st.dy + 'px)';
+        ov.style.backgroundColor = 'rgba(9,7,22,' + (0.74 * Math.max(0.15, 1 - st.dy / Math.max(1, sh.offsetHeight))) + ')';
+        return true;
+      }
+      function end() {
+        if (!st) return; var s0 = st; st = null;
+        if (!s0.drag) return;
+        sh.classList.remove('dragging');
+        sh.__dragged = true; setTimeout(function () { sh.__dragged = false; }, 0);
+        var h = sh.offsetHeight, ui = UI[pid], cur = ui.sheet;
+        var go = s0.dy > h / 3 || (s0.v > 0.6 && s0.dy > 30);
+        var needsAsk = closeAct === 'close-sheet' && cur && cur.kind === 'add' && !cur.confirmClose && addDirty(cur);
+        if (!go || needsAsk) {
+          sh.style.transition = 'transform 0.3s cubic-bezier(.34,1.56,.64,1)'; sh.style.transform = ''; ov.style.backgroundColor = '';
+          if (go && needsAsk) setTimeout(function () { closeFromDrag(pid, closeAct); }, 120);
+          return;
+        }
+        sh.style.transition = 'transform 0.2s ease-in'; sh.style.transform = 'translateY(100%)';
+        ov.style.transition = 'background-color 0.2s'; ov.style.backgroundColor = 'rgba(9,7,22,0)';
+        setTimeout(function () { closeFromDrag(pid, closeAct); }, 190);
+      }
+      sh.addEventListener('touchstart', function (e) { if (e.touches.length === 1) start(e.touches[0].clientY, e.target); }, { passive: true });
+      sh.addEventListener('touchmove', function (e) { if (e.touches.length === 1) move(e.touches[0].clientY, e); }, { passive: false });
+      sh.addEventListener('touchend', end); sh.addEventListener('touchcancel', end);
+      sh.addEventListener('pointerdown', function (e) { if (e.pointerType === 'mouse' && e.button === 0) start(e.clientY, e.target); });
+      sh.addEventListener('pointermove', function (e) { if (e.pointerType !== 'mouse' || !st) return; if (move(e.clientY, e) && !sh.hasPointerCapture(e.pointerId)) { try { sh.setPointerCapture(e.pointerId); } catch (x) { } } });
+      sh.addEventListener('pointerup', function (e) { if (e.pointerType === 'mouse') end(); });
+      sh.addEventListener('click', function (e) { if (sh.__dragged) { e.stopPropagation(); e.preventDefault(); } }, true);
+    });
+  }
+
   function renderPhone(pid) {
     if (REPLAYING || !phoneEl[pid]) return;
     var root = phoneEl[pid], ui = UI[pid];
@@ -1396,6 +1499,9 @@ export function startGame(SYNCAPI) {
     root.innerHTML = phoneHTML(pid);
     Array.prototype.forEach.call(root.querySelectorAll('[data-scroll]'), function (el) { var k = el.getAttribute('data-scroll'); if (scrolls[k] != null) { el.scrollTop = scrolls[k][0]; el.scrollLeft = scrolls[k][1]; } });
     var ch = root.querySelector('.chips'); if (ch) wireChips(ch);
+    wireSheets(root, pid);
+    applyFx(pid, root);
+    Array.prototype.forEach.call(root.querySelectorAll('.sheet.enter .strip.badge-new'), function (el, i) { el.style.animationDelay = (0.35 + i * 0.15) + 's'; el.classList.add('fx-badge'); });
     var fid = ui.focusNext || (focus && focus.id);
     if (fid) {
       var el = document.getElementById(fid);
@@ -1430,9 +1536,13 @@ export function startGame(SYNCAPI) {
   function draftDefaults(d) { if (d.size == null) d.size = 2; if (d.who == null) d.who = 'me'; if (d.repeat == null) d.repeat = 'none'; return d; }
 
   function doComplete(pid, id, opts) {
+    var o0 = other(pid), m0 = S.members[pid] ? moodFor(pid) : null, m1 = hasPartner(pid) ? moodFor(o0) : null;
     var r = completeTask(pid, id, opts);
     if (!r) return null;
     var ui = UI[pid];
+    ui.fx = { me: fxKind(r), them: (r.tookLead || r.stolen) && hasPartner(pid) ? 'flinch' : null, moodMe: m0, moodThem: m1 };
+    buzz(r.levelUp || r.tookLead ? 'big' : r.stolen ? 'steal' : 'done');
+    if (UI[o0] && !UI[o0].closed && hasPartner(pid)) UI[o0].fx = { them: fxKind(r), me: (r.tookLead || r.stolen) ? 'flinch' : null, moodMe: m1, moodThem: m0 };
     if (r.big) {
       ui.toast = null;
       openSheet(pid, { kind: 'reward', comp: r.comp, undo: [r.undo], tookLead: r.tookLead, before: r.before, after: r.after, levelUp: r.levelUp, badges: r.badges, stolen: r.stolen, challengeWon: r.challengeWon, challengeCollect: r.challengeCollect, gift: r.gift, actId: r.actId, c: newComposer() });
@@ -1493,7 +1603,9 @@ export function startGame(SYNCAPI) {
 
       case 'open-app': toggleApp(pid); return;
       /* navigation */
-      case 'tab': ui.tab = ds.tab; ui.sheet = null; ui.badgeOpen = null; break;
+      case 'tab': ui.tab = ds.tab; ui.sheet = null; ui.badgeOpen = null; if (ds.tab === 'score') ui.badgeOwner = 'me'; break;
+      case 'open-score': ui.tab = 'score'; ui.settings = false; ui.sheet = null; ui.badgeOpen = null; ui.badgeOwner = ds.who === 'partner' && hasPartner(pid) ? 'partner' : 'me'; break;
+      case 'score-who': ui.badgeOwner = ds.who === 'partner' && hasPartner(pid) ? 'partner' : 'me'; ui.badgeOpen = null; break;
       case 'filter': ui.filter = ds.f; break;
       case 'open-settings': ui.settings = true; ui.sheet = null; ui.nameDraft = null; ui.pauseCompose = null; break;
       case 'close-settings': ui.scoreEdit = null; ui.settings = false; ui.pauseCompose = null; ui.nameDraft = null; break;
@@ -1533,7 +1645,7 @@ export function startGame(SYNCAPI) {
       case 'upcoming-open': openSheet(pid, { kind: 'upcoming' }); break;
 
       /* add flow */
-      case 'add-open': var nd = newDraft(); openSheet(pid, { kind: 'add', step: 'what', draft: nd, orig: JSON.stringify(nd), more: false, editId: null, from: null, c: newComposer(), exSeed: Math.floor(Math.random() * 12) }); ui.focusNext = pid + '-add-title'; break;
+      case 'add-open': var nd = newDraft(); openSheet(pid, { kind: 'add', step: 'what', draft: nd, orig: JSON.stringify(nd), more: false, editId: null, from: null, c: newComposer(), exSeed: Math.floor(Math.random() * 12) }); break;
       case 'add-more': s.more = true; break;
       case 'add-suggest':
         var lib = LIBRARY.find(function (x) { return x.title === ds.title; });
@@ -1834,6 +1946,12 @@ export function startGame(SYNCAPI) {
   function selectText(el) { if (!el) return; try { var r = document.createRange(); r.selectNodeContents(el); var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r); } catch (e) { } }
 
   /* ================= Events ================= */
+  function zipThenSteal(pid, el, go) {
+    if (el.getAttribute('data-act') !== 'complete' || reduceMotion) return false;
+    var t0 = getTask(el.getAttribute('data-id')), row = el.closest('.task');
+    if (!t0 || !row || t0.assignee !== other(pid) || row.classList.contains('zip')) return false;
+    row.classList.add('zip'); setTimeout(go, 220); return true;
+  }
   function bindPhone() {
     var root = phoneEl[ME];
     root.addEventListener('click', function (e) {
@@ -1841,6 +1959,7 @@ export function startGame(SYNCAPI) {
       if (!el || !root.contains(el) || el.disabled) return;
       if (el.tagName === 'INPUT') return; // checkboxes handled on change
       e.preventDefault();
+      if (zipThenSteal(ME, el, function () { doAct(ME, 'complete', el.dataset, el); })) return;
       doAct(ME, el.getAttribute('data-act'), el.dataset, el);
     });
     root.addEventListener('change', function (e) {
@@ -1901,6 +2020,8 @@ export function startGame(SYNCAPI) {
     if (a === 'sign-out') { signOut(); return; }
     if (a === 'retry-boot') { APP.error = ''; boot(APP.user); return; }
     if (a === 'sign-in') { signIn(); return; }
+    if (a === 'install-app') { installApp(); return; }
+    if (a === 'install-dismiss') { try { localStorage.setItem('hb-install-dismissed', String(Date.now())); } catch (e) { } renderPhone(ME); return; }
     if (!SYNC.code) {
       if (a === 'ob-create' && S && !S.members[ME]) { S = emptyState(); ME = 'A'; }
       act(pid, a, ds, el);
@@ -1949,9 +2070,9 @@ export function startGame(SYNCAPI) {
       var rest = SYNC.pending.slice(sent);
       SYNC.pending = rest;
       if (res.replayed) {
-        var prev = S;
+        var prev = S, moods = liveMoods();
         S = JSON.parse(rest.length ? replayOn(res.json, rest) : res.json);
-        partnerNews(prev, S);
+        partnerNews(prev, S, moods);
         sweep(); renderAll();
       }
       setStatus('ok'); saveCache();
@@ -1973,21 +2094,31 @@ export function startGame(SYNCAPI) {
     var doc = SYNC.lastDoc;
     if (!doc || doc.rev <= SYNC.rev || SYNC.inflight) return;
     if (SYNC.pending.length) { flush(); return; }
-    var prev = S;
+    var prev = S, moods = liveMoods();
     S = JSON.parse(doc.state); SYNC.rev = doc.rev;
     if (SYNC.status === 'offline') SYNC.status = 'ok';
     if (APP.screen === 'loading') { APP.screen = null; UI[ME].ob.step = 'done'; }
-    partnerNews(prev, S);
+    partnerNews(prev, S, moods);
     sweep(); renderAll(); saveCache();
     if (APP.catchupPending) { APP.catchupPending = false; checkCatchup(); }
   }
 
   // A small heads-up when the partner did something while the app is open.
-  function partnerNews(prev, next) {
+  function liveMoods() { try { return S && S.members && S.members[ME] ? { me: moodFor(ME), them: hasPartner(ME) ? moodFor(other(ME)) : null, scoreMe: weekXP(ME, now()), scoreThem: hasPartner(ME) ? weekXP(other(ME), now()) : 0 } : null; } catch (e) { return null; } }
+  function partnerNews(prev, next, moods) {
     if (!prev || !prev.activity || !next.activity || APP.screen) return;
     var seen = {}; prev.activity.forEach(function (a) { seen[a.id] = 1; });
     var o = other(ME), fresh = next.activity.filter(function (a) { return !seen[a.id] && a.actor === o; });
     if (!fresh.length) return;
+    // the partner's dog reacts to what they just did; mine flinches if they stole from me or took the lead
+    var done = fresh.filter(function (a) { return a.kind === 'complete' || a.kind === 'steal'; });
+    if (done.length && moods && !document.hidden) {
+      var big = done.some(function (a) { var c = (next.completions || []).find(function (x) { return x.id === a.compId; }); return c && c.size >= 4; });
+      var tookLead = moods.scoreThem <= moods.scoreMe && weekXP(o, now()) > weekXP(ME, now());
+      var stoleMine = done.some(function (a) { return a.kind === 'steal' && a.owner === ME; });
+      UI[ME].fx = { them: big ? 'popshake' : 'pop', me: tookLead || stoleMine ? 'flinch' : null, moodMe: moods.me, moodThem: moods.them };
+      if (tookLead || stoleMine) buzz('steal');
+    }
     var t = UI[ME].toast; if (t && t.kind !== 'info') return;
     var last = fresh[fresh.length - 1], txt = '';
     try { txt = actText(last, ME).replace(/<[^>]+>/g, ''); } catch (e) { txt = nameOf(o) + ' did something.'; }
@@ -2067,6 +2198,35 @@ export function startGame(SYNCAPI) {
     UI[ME].ob.step = st.members[ME] ? 'done' : 'welcome';
     APP.screen = null;
     subscribe(); sweep(); renderAll(); saveCache();
+  }
+
+  /* ---------- install the web app ---------- */
+  var INSTALL = { evt: null };
+  function isInstalled() {
+    try { return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true; } catch (e) { return false; }
+  }
+  window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); INSTALL.evt = e; renderPhone(ME); });
+  window.addEventListener('appinstalled', function () { INSTALL.evt = null; try { localStorage.setItem('hb-installed', '1'); } catch (e) { } renderPhone(ME); });
+  function installDismissedRecently() {
+    try { var t = parseInt(localStorage.getItem('hb-install-dismissed') || '0', 10); return Date.now() - t < 7 * DAY; } catch (e) { return false; }
+  }
+  function installBannerHTML() {
+    if (!INSTALL.evt || isInstalled() || installDismissedRecently() || UI[ME].tab !== 'tasks') return '';
+    return '<div class="banner install" role="status"><div class="brow"><span class="btxt">Add HouseholdBattle to your home screen. It opens like an app, full screen.</span>' +
+      '<button class="bbtn gold" data-act="install-app">Install</button><button class="bbtn" data-act="install-dismiss" aria-label="Not now">✕</button></div></div>';
+  }
+  function installSettingsHTML() {
+    if (isInstalled()) return '';
+    return '<section class="sect"><h4>INSTALL</h4>' + (INSTALL.evt
+      ? '<p>Put HouseholdBattle on your home screen so it opens like an app.</p><button class="btn gold" data-act="install-app">INSTALL APP</button>'
+      : '<p>In Chrome, tap the menu (⋮) at the top right, then <b>Add to Home screen</b> and choose <b>Install</b>.</p>') + '</section>';
+  }
+  function installApp() {
+    var e = INSTALL.evt; if (!e) return;
+    try {
+      e.prompt();
+      e.userChoice.then(function (r) { if (r && r.outcome === 'accepted') INSTALL.evt = null; renderPhone(ME); }, function () { });
+    } catch (x) { }
   }
 
   /* ---------- auth ---------- */
