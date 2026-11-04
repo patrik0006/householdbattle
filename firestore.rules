@@ -1,0 +1,36 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Which household a signed-in person belongs to. Only they can read or change it.
+    match /users/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // One document per household. The document id is the 6-character invite code.
+    match /households/{code} {
+      // Members can read it. Before the partner joins, anyone signed in who knows the code can look it up.
+      allow get: if request.auth != null
+        && (resource == null
+            || request.auth.uid in resource.data.memberUids
+            || resource.data.memberUids.size() < 2);
+      allow list: if false;
+
+      // Create: only with yourself as the single member.
+      allow create: if request.auth != null
+        && request.resource.data.memberUids == [request.auth.uid];
+
+      allow update: if request.auth != null && (
+        // a member updating the game; membership can't change
+        (request.auth.uid in resource.data.memberUids
+          && request.resource.data.memberUids == resource.data.memberUids)
+        // or the partner joining: adds exactly themselves, max two members
+        || (resource.data.memberUids.size() < 2
+          && !(request.auth.uid in resource.data.memberUids)
+          && request.resource.data.memberUids == resource.data.memberUids.concat([request.auth.uid]))
+      );
+
+      allow delete: if false;
+    }
+  }
+}
