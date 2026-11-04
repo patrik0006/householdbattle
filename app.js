@@ -39,7 +39,7 @@ export function startGame(SYNCAPI) {
     { title: 'Grocery shopping', size: 2, rep: 'weekly' },
     { title: 'Mop the floors', size: 3, rep: 'none' }
   ];
-  var LEVEL_TITLES = ['Couch Potato', 'Dish Rookie', 'Sock Hunter', 'Chore Knight', 'Chore Baron', 'Dust Duke', 'Mop Marquis', 'Grime Lord', 'Household Hero', 'Domestic Legend'];
+  var LEVEL_TITLES = ['Couch Potato', 'Sofa Sausage', 'Crumb Sniffer', 'Sock Hunter I class', 'Sock Hunter II class', 'Dish Retriever', 'Chore Hound', 'Top Dog I class', 'Top Dog II class', 'Domestic Alpha', 'Domestic Omega', 'Pack Leader', 'Household Legend', 'Household Legend With Oakleaves', 'Mythical Chore Beast', 'Supreme Dust Destroyer', 'Immortal Housekeeper'];
   var NOTES = {
     small: ['Check it out', 'Yes, it counts', "Done. You're welcome.", 'Your move.', 'Easy.', 'Another one bites the dust.'],
     big: ['Check it out', 'Yes, it counts', 'That was disgusting. You\'re welcome.', 'Beat that.', 'I accept applause.', 'Scoreboard. Look at it.'],
@@ -90,6 +90,8 @@ export function startGame(SYNCAPI) {
     pencil: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"></path></svg>',
     back: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg>',
     close: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>',
+    spark: '<svg width="16" height="16" viewBox="0 0 24 24" fill="#FFC93C" aria-hidden="true" style="flex:none"><path d="M12 2l1.8 5.6L19.5 9.5l-5.7 1.9L12 17l-1.8-5.6L4.5 9.5l5.7-1.9z"></path><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"></path></svg>',
+    flag: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFC93C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 22V3"></path><path d="M5 4h11l-2 4 2 4H5"></path></svg>',
     bulb: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFC93C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6M10 22h4"></path><path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.3h6c0-1 .4-1.8 1-2.3A7 7 0 0 0 12 2z"></path></svg>',
     bolt: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFC93C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path></svg>',
     clock: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFC93C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>',
@@ -181,7 +183,8 @@ export function startGame(SYNCAPI) {
     while (xp >= floor + need) { floor += need; lvl++; need = Math.round(20 * Math.pow(1.25, lvl - 1)); }
     return { lvl: lvl, into: xp - floor, need: need, toNext: floor + need - xp };
   }
-  function levelTitle(l) { return l <= LEVEL_TITLES.length ? LEVEL_TITLES[l - 1] : 'Domestic Legend ' + (l - LEVEL_TITLES.length + 1); }
+  function roman(n) { var r = '', m = [[1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'], [100, 'C'], [90, 'XC'], [50, 'L'], [40, 'XL'], [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']]; m.forEach(function (x) { while (n >= x[0]) { r += x[1]; n -= x[0]; } }); return r; }
+  function levelTitle(l) { return l <= LEVEL_TITLES.length ? LEVEL_TITLES[l - 1] : LEVEL_TITLES[LEVEL_TITLES.length - 1] + ' ' + roman(l - LEVEL_TITLES.length + 1); }
   function compsBy(pid) { return S.completions.filter(function (c) { return c.by === pid; }); }
   function adjFor(pid) { return (S.adjust || []).filter(function (a) { return a.pid === pid; }); }
   function totalXP(pid) { return compsBy(pid).reduce(function (s, c) { return s + c.xp; }, 0) + adjFor(pid).reduce(function (s, a) { return s + a.delta; }, 0); }
@@ -393,6 +396,9 @@ export function startGame(SYNCAPI) {
     }
     function at(dayOff, h, m) { return addDays(today, dayOff) + h * HOUR + (m || 0) * MIN; }
     // Previous weeks (day offsets <= -7 are always before this week)
+    hist('B', at(-40, 18), 'Wash the towels', 2);
+    hist('B', at(-33, 18), 'Wash the towels', 2);
+    hist('B', at(-26, 19), 'Wash the towels', 2);
     hist('A', at(-22, 19), 'Empty the dishwasher', 2);
     hist('A', at(-21, 20), 'Laundry', 2);
     hist('A', at(-20, 10), 'Clean the pipes', 4);
@@ -673,6 +679,76 @@ export function startGame(SYNCAPI) {
       '<button class="iconbtn tipx" data-act="tip-close" aria-label="Hide tips for today">' + IC.close + '</button></div>';
   }
 
+  /* ---------- 0.4.0: suggestions ---------- */
+  // Rules that run on the phone (your rhythm, long overdue, calendar) + ideas.
+  // In the real app the ideas part comes from Gemini; here it is a seasonal list for Sweden.
+  var SEASON_IDEAS = {
+    0: [['Shovel snow off the steps', 2], ['Clean the dishwasher filter', 2], ['Declutter the hallway', 3]],
+    1: [['Check the window seals', 2], ['Clean the oven', 4], ['Sort the receipts', 2]],
+    2: [['Spring clean the balcony', 3], ['Wash the windows', 4], ['Book tyre change', 1]],
+    3: [['Change to summer tyres', 5], ['Rake the garden', 3], ['Clean the gutters', 4]],
+    4: [['Put out the garden furniture', 3], ['Clean the barbecue', 3], ['Wash the car', 3]],
+    5: [['Water the garden', 1], ['Clean the outdoor cushions', 2], ['Defrost the freezer', 4]],
+    6: [['Mow the lawn', 3], ['Clean the fridge seals', 2], ['Plan the holiday trip', 3]],
+    7: [['Pick and freeze berries', 3], ['Wash the curtains', 3], ['Clean the shower drain', 3]],
+    8: [['Bring in the garden furniture', 3], ['Clean the gutters', 4], ['Check the bike lights', 1]],
+    9: [['Book winter tyre change', 1], ['Rake the leaves', 3], ['Clean the range hood filter', 3]],
+    10: [['Change to winter tyres', 5], ['Test the smoke alarms', 1], ['Clear the gutters', 4]],
+    11: [['Put up the advent lights', 3], ['Test the smoke alarms', 1], ['Deep clean the kitchen', 4]]
+  };
+  var CLASSIC_IDEAS = [['Descale the kettle', 1], ['Clean the fridge seals', 2], ['Clean the washing machine', 3], ['Wash the shower curtain', 2], ['Clean the range hood filter', 3], ['Flip the mattress', 3], ['Clean behind the fridge', 4], ['Wipe the light switches', 1]];
+  function normT(t) { return String(t || '').trim().toLowerCase(); }
+  function suggestions(pid) {
+    var T = effNow(), out = [], seen = {};
+    var sg = S.sugg || {}, never = sg.never || {}, snooze = sg.snooze || {};
+    var open = {}; S.tasks.forEach(function (t) { if (t.status === 'open') open[normT(t.title)] = 1; });
+    var recurring = {}; S.tasks.forEach(function (t) { if (t.repeat && t.status === 'open') recurring[normT(t.title)] = 1; });
+    function push(title, size, reason, tag) {
+      var k = normT(title);
+      if (seen[k] || open[k] || never[k] || (snooze[k] && snooze[k] > T)) return;
+      seen[k] = 1; out.push({ key: k, title: title, size: size, reason: reason, tag: tag });
+    }
+    // history per title
+    var hist = {};
+    S.completions.forEach(function (c) { var k = normT(c.title); (hist[k] = hist[k] || { title: c.title, size: c.size, at: [] }).at.push(c.at); });
+    Object.keys(hist).forEach(function (k) { hist[k].at.sort(function (a, b) { return a - b; }); });
+    // 1. your rhythm: done 3+ times, now overdue against the usual gap
+    Object.keys(hist).forEach(function (k) {
+      var h = hist[k]; if (h.at.length < 3 || recurring[k]) return;
+      var gaps = []; for (var i = 1; i < h.at.length; i++) gaps.push(h.at[i] - h.at[i - 1]);
+      gaps.sort(function (a, b) { return a - b; });
+      var med = gaps[Math.floor(gaps.length / 2)], since = T - h.at[h.at.length - 1];
+      if (med >= DAY && since > med * 1.2) push(h.title, h.size, 'You usually do this every ' + Math.max(1, Math.round(med / DAY)) + ' days. It’s been ' + Math.floor(since / DAY) + '.', 'Your rhythm');
+    });
+    // 2. long overdue: bigger jobs not done in 6 months
+    Object.keys(hist).forEach(function (k) {
+      var h = hist[k], last = h.at[h.at.length - 1], m = Math.floor((T - last) / (30 * DAY));
+      if (h.size >= 3 && m >= 6) push(h.title, h.size, 'Last done ' + m + ' months ago.', 'Overdue');
+    });
+    // 3. calendar
+    var d = new Date(T), dim = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+    var billsDone = (hist['pay the bills'] || { at: [] }).at.some(function (a) { return T - a < 20 * DAY; });
+    if (d.getDate() >= dim - 6 && !billsDone) push('Pay the bills', 2, 'End of the month is coming up.', 'Calendar');
+    // 4. ideas: season first, then household classics never done
+    (SEASON_IDEAS[d.getMonth()] || []).forEach(function (x) { push(x[0], x[1], 'A good one for ' + MON_LONG[d.getMonth()] + '.', 'Season'); });
+    CLASSIC_IDEAS.forEach(function (x) { if (!hist[normT(x[0])]) push(x[0], x[1], 'Easy to forget. You haven’t logged it yet.', 'Idea'); });
+    return out;
+  }
+  var MON_LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  function suggHTML(pid) {
+    var ui = UI[pid], all = suggestions(pid);
+    if (!all.length || ui.suggHidden) return '';
+    var off = (ui.suggOff || 0) % all.length, list = all.slice(off, off + 3);
+    if (list.length < 3 && all.length > list.length) list = list.concat(all.slice(0, Math.min(3, all.length) - list.length));
+    var rows = list.map(function (g) {
+      return '<div class="sg-row"><button class="sg-main" data-act="sugg-edit" data-k="' + esc(g.key) + '"><span class="sg-title">' + esc(g.title) + '</span><span class="sg-why"><span class="sg-tag">' + esc(g.tag) + '</span>' + esc(g.reason) + '</span></button>' +
+        '<div class="sg-acts"><button class="sg-add" data-act="sugg-add" data-k="' + esc(g.key) + '" aria-label="Add ' + esc(g.title) + '">+ Add · ' + SIZES[g.size].xp + ' XP</button><button class="sg-btn" data-act="sugg-snooze" data-k="' + esc(g.key) + '">Not now</button><button class="sg-btn" data-act="sugg-never" data-k="' + esc(g.key) + '">Never</button></div></div>';
+    }).join('');
+    return '<section class="sgcard"><div class="sg-head"><span class="sg-h">' + IC.spark + 'SUGGESTED FOR YOU</span><button class="iconbtn sg-x" data-act="sugg-hide" aria-label="Hide suggestions">' + IC.close + '</button></div>' + rows +
+      (all.length > 3 ? '<div class="sg-foot"><button class="sg-more" data-act="sugg-more">New ideas ›</button></div>' : '') + '</section>';
+  }
+  function suggFind(pid, k) { var l = suggestions(pid); for (var i = 0; i < l.length; i++) if (l[i].key === k) return l[i]; return null; }
+
   function tasksHTML(pid) {
     var ui = UI[pid], o = other(pid), T = effNow();
     var active = S.tasks.filter(isActive);
@@ -700,7 +776,7 @@ export function startGame(SYNCAPI) {
       var list = lists[ui.filter];
       var todayList = S.completions.filter(function (c) { return c.by === pid && c.at >= sod(T); }), nToday = todayList.length;
       var comboToday = todayList.reduce(function (n, c) { return n + (c.combo || 0); }, 0);
-      if (ui.filter === 'mine' && !isPaused()) body += tipHTML(pid);
+      if (ui.filter === 'mine' && !isPaused()) body += tipHTML(pid) + suggHTML(pid);
       if (!list.length) {
         if (ui.filter === 'mine') body += '<div class="empty"><span class="disp">NOTHING LEFT FOR YOU</span><span>Suspicious.</span></div>';
         else if (ui.filter === 'any') body += '<div class="empty"><span class="disp">NO OPEN QUESTS</span><span>Add one with the + button.</span></div>';
@@ -763,12 +839,65 @@ export function startGame(SYNCAPI) {
   }
 
   // Score page: whose page is it? (You / partner switch + level card)
+  /* ---------- 0.3.1: level badges + level path ---------- */
+  var LEVEL_TIERS = [
+    { from: 1, name: 'Bronze', a: '#E0A070', b: '#9A5B32', ink: '#2B1608' },
+    { from: 4, name: 'Silver', a: '#E4E9F4', b: '#8F99B3', ink: '#1E2233' },
+    { from: 7, name: 'Gold', a: '#FFD966', b: '#D9941A', ink: '#3A2400' },
+    { from: 10, name: 'Ruby', a: '#FF9A80', b: '#C2412A', ink: '#2E0B05' },
+    { from: 13, name: 'Amethyst', a: '#CDB0FF', b: '#7446D8', ink: '#1E0E44' },
+    { from: 15, name: 'Legend', a: '#8FF5DB', b: '#1F9E83', ink: '#032A22' }
+  ];
+  function tierOf(l) { var t = LEVEL_TIERS[0]; LEVEL_TIERS.forEach(function (x) { if (l >= x.from) t = x; }); return t; }
+  function levelStartXP(l) { var floor = 0; for (var k = 1; k < l; k++) floor += Math.round(20 * Math.pow(1.25, k - 1)); return floor; }
+  var LB_SEQ = 0;
+  function levelBadge(l, size, state) {
+    var t = tierOf(l), id = 'lb' + (++LB_SEQ), locked = state === 'locked';
+    var a = locked ? '#3A3275' : t.a, b = locked ? '#2F2862' : t.b, ink = locked ? '#8C85C4' : t.ink;
+    var fs = l >= 100 ? 15 : l >= 10 ? 19 : 23;
+    var star = l >= 5 && !locked ? '<path d="M24 5.5l1.6 3.3 3.6.5-2.6 2.5.6 3.6-3.2-1.7-3.2 1.7.6-3.6-2.6-2.5 3.6-.5z" fill="' + ink + '" opacity="0.55"></path>' : '';
+    return '<svg class="lbadge' + (locked ? ' locked' : '') + '" width="' + size + '" height="' + size + '" viewBox="0 0 48 48" aria-hidden="true">' +
+      '<defs><linearGradient id="' + id + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="' + a + '"></stop><stop offset="1" stop-color="' + b + '"></stop></linearGradient></defs>' +
+      '<path d="M24 2.5l18 6.5v13.5c0 11.2-7.6 19.4-18 23-10.4-3.6-18-11.8-18-23V9z" fill="url(#' + id + ')" stroke="' + (locked ? '#4A4288' : 'rgba(255,255,255,0.55)') + '" stroke-width="1.5"></path>' +
+      '<path d="M24 7l13.5 4.9v10.6c0 8.6-5.7 15-13.5 18-7.8-3-13.5-9.4-13.5-18V11.9z" fill="none" stroke="' + ink + '" stroke-opacity="0.22" stroke-width="1.2"></path>' + star +
+      '<text x="24" y="' + (l >= 10 ? 31 : 32.5) + '" text-anchor="middle" font-family="Bungee, Rubik, sans-serif" font-size="' + fs + '" fill="' + ink + '">' + l + '</text></svg>';
+  }
+  function levelPathSheet(pid, s) {
+    var who = s.who, xp = totalXP(who), li = levelInfo(xp), top = Math.max(li.lvl + 5, 17), rowH = 104;
+    var mine = who === pid, nm = mine ? 'Your' : esc(nameOf(who)) + "'s";
+    var pts = [], nodes = '';
+    for (var l = 1; l <= top; l++) {
+      var i = l - 1, x = 50 + Math.sin(i * 1.15) * 28, y = (top - l) * rowH + rowH / 2;
+      pts.push([x, y]);
+      var st = l < li.lvl ? 'done' : l === li.lvl ? 'here' : 'locked', need = levelStartXP(l);
+      var sub = st === 'done' ? 'Reached' : st === 'here' ? (mine ? 'You are here' : esc(nameOf(who)) + ' is here') : (l === li.lvl + 1 ? li.toNext + ' XP to go' : need + ' XP');
+      var side = x > 50 ? 'left' : 'right';
+      nodes += '<div class="lp-node ' + st + ' ' + side + '" style="left:' + x + '%;top:' + y + 'px">' +
+        (st === 'here' ? '<span class="lp-dog">' + dogAvatar(who, pid) + '</span>' : '') +
+        '<span class="lp-badge">' + levelBadge(l, st === 'here' ? 64 : 52, st === 'locked' ? 'locked' : '') + '</span>' +
+        '<span class="lp-label"><b>' + esc(levelTitle(l)) + '</b><span>Lvl ' + l + ' · ' + sub + '</span></span></div>';
+    }
+    // the trail: a smooth curve through the badges; walked part solid gold, the rest dashed
+    function curve(list) {
+      var d = 'M' + list[0][0] + ' ' + list[0][1];
+      for (var k = 1; k < list.length; k++) { var p0 = list[k - 1], p1 = list[k], my = (p0[1] + p1[1]) / 2; d += ' C' + p0[0] + ' ' + my + ',' + p1[0] + ' ' + my + ',' + p1[0] + ' ' + p1[1]; }
+      return d;
+    }
+    var H = top * rowH, walked = pts.slice(0, li.lvl), ahead = pts.slice(li.lvl - 1);
+    var svg = '<svg class="lp-trail" viewBox="0 0 100 ' + H + '" preserveAspectRatio="none" style="height:' + H + 'px" aria-hidden="true">' +
+      (ahead.length > 1 ? '<path d="' + curve(ahead) + '" fill="none" stroke="#5A5296" stroke-width="5" stroke-dasharray="2 9" stroke-linecap="round" vector-effect="non-scaling-stroke"></path>' : '') +
+      (walked.length > 1 ? '<path d="' + curve(walked) + '" fill="none" stroke="#FFC93C" stroke-width="5" stroke-linecap="round" vector-effect="non-scaling-stroke"></path>' : '') + '</svg>';
+    var inner = '<div class="sheet-top"><span class="ttl">' + nm.toUpperCase() + ' PATH</span><button class="iconbtn" data-act="close-sheet" aria-label="Close">' + IC.close + '</button></div>' +
+      '<p class="muted" style="margin:0">' + xp + ' XP in total. Every quest moves ' + (mine ? 'you' : esc(nameOf(who))) + ' along the trail.</p>' +
+      '<div class="lp-map" style="height:' + H + 'px"><div class="lp-flag">' + IC.flag + '<span>…and beyond</span></div>' + svg + nodes + '</div>';
+    return sheetWrap(pid, inner, s.fresh, 'Level path');
+  }
   function personHTML(pid) {
     var ui = UI[pid], o = other(pid), hasP = hasPartner(pid), who = ui.badgeOwner === 'me' || !hasP ? pid : o;
     var xp = totalXP(who), li = levelInfo(xp);
     var sw = hasP ? '<div class="toggle person-sw" role="tablist" aria-label="Whose score"><button role="tab" class="' + (who === pid ? 'on' : '') + '" data-act="score-who" data-who="me" aria-selected="' + (who === pid) + '">You</button><button role="tab" class="' + (who === o ? 'on' : '') + '" data-act="score-who" data-who="partner" aria-selected="' + (who === o) + '">' + esc(nameOf(o)) + '</button></div>' : '';
-    return sw + '<section class="pcard">' + dogAvatar(who, pid) + '<div class="pc-body"><b>' + esc(nameOf(who)) + '</b><span class="pc-lvl">Lvl ' + li.lvl + ' · ' + esc(levelTitle(li.lvl)) + '</span>' +
-      '<div class="bar"><i style="width:' + Math.round(li.into / li.need * 100) + '%"></i></div><span class="pc-xp">' + xp + ' XP in total · ' + li.toNext + ' XP to Lvl ' + (li.lvl + 1) + '</span></div></section>';
+    return sw + '<button class="pcard" data-act="levels-open" data-who="' + who + '" aria-label="Show the level path">' + levelBadge(li.lvl, 60) + '<span class="pc-body"><b>' + esc(nameOf(who)) + '</b><span class="pc-lvl">Lvl ' + li.lvl + ' · ' + esc(levelTitle(li.lvl)) + '</span>' +
+      '<span class="bar"><i style="width:' + Math.round(li.into / li.need * 100) + '%"></i></span><span class="pc-xp">' + xp + ' XP in total · ' + li.toNext + ' XP to Lvl ' + (li.lvl + 1) + '</span></span><span class="pc-go">' + IC.chev + '</span></button>';
   }
   function rewardsSection(pid) {
     var list = (S.owed || []).filter(function (w) { return w.from === pid || w.to === pid; }).slice().reverse();
@@ -1063,6 +1192,7 @@ export function startGame(SYNCAPI) {
       case 'challenge': return challengeSheet(pid, s);
       case 'gift': return giftSheet(pid, s);
       case 'reply': return replySheet(pid, s);
+      case 'levels': return levelPathSheet(pid, s);
       case 'comment': return commentSheet(pid, s);
     }
     return '';
@@ -1521,6 +1651,7 @@ export function startGame(SYNCAPI) {
     setTimeout(function () { bars.forEach(function (b) { b[0].style.transition = ''; }); if (r) { r.style.flex = ''; r.style.width = ''; } if (tug) tug.classList.remove('fx-bulge'); }, 1150);
   }
   function applyFx(pid, root) {
+    Array.prototype.forEach.call(root.querySelectorAll('.vs .score-num'), function (el) { el.classList.toggle('long', el.textContent.trim().length >= 3); });
     var ui = UI[pid], hdr = root.querySelector('.hdr');
     if (hdr) {
       var meEl = hdr.querySelector('.player:not(.right) .score-num'), pEl = hdr.querySelector('[data-pscore]');
@@ -1605,6 +1736,7 @@ export function startGame(SYNCAPI) {
     Array.prototype.forEach.call(root.querySelectorAll('[data-scroll]'), function (el) { var k = el.getAttribute('data-scroll'); if (scrolls[k] != null) { el.scrollTop = scrolls[k][0]; el.scrollLeft = scrolls[k][1]; } });
     var ch = root.querySelector('.chips'); if (ch) wireChips(ch);
     wireSheets(root, pid);
+    if (ui.sheet && ui.sheet.kind === 'levels' && !ui.sheet.scrolled) { ui.sheet.scrolled = true; var here = root.querySelector('.lp-node.here'), shl = root.querySelector('.sheet'); if (here && shl) shl.scrollTop = Math.max(0, here.offsetTop - shl.clientHeight / 2 + 120); }
     if (ui.intro) { ui.intro = false; ui.introAt = Date.now(); introBars(root); }
     applyFx(pid, root);
     if (typeof syncBack === 'function') syncBack();
@@ -1712,6 +1844,7 @@ export function startGame(SYNCAPI) {
       /* navigation */
       case 'tab': ui.tab = ds.tab; ui.sheet = null; ui.badgeOpen = null; if (ds.tab === 'score') ui.badgeOwner = 'me'; break;
       case 'open-score': ui.tab = 'score'; ui.settings = false; ui.sheet = null; ui.badgeOpen = null; ui.badgeOwner = ds.who === 'partner' && hasPartner(pid) ? 'partner' : 'me'; break;
+      case 'levels-open': openSheet(pid, { kind: 'levels', who: ds.who === other(pid) ? other(pid) : pid }); break;
       case 'score-who': ui.badgeOwner = ds.who === 'partner' && hasPartner(pid) ? 'partner' : 'me'; ui.badgeOpen = null; break;
       case 'filter': ui.filter = ds.f; break;
       case 'open-settings': ui.settings = true; ui.sheet = null; ui.nameDraft = null; ui.pauseCompose = null; break;
@@ -1915,6 +2048,18 @@ export function startGame(SYNCAPI) {
       case 'add-discard': ui.sheet = null; ui.dogPicker = null; infoToast(pid, s && s.editId ? 'Changes discarded.' : 'Quest discarded.'); break;
       case 'tip-close': var tst = tipState(pid); tst.hidden = sod(now()); saveTipState(pid, tst); break;
       case 'tip-next': nextTip(pid); break;
+      case 'sugg-more': ui.suggOff = (ui.suggOff || 0) + 3; break;
+      case 'sugg-hide': ui.suggHidden = true; infoToast(pid, 'Suggestions hidden until you open the app again.'); break;
+      case 'sugg-add':
+        var sga = suggFind(pid, ds.k); if (!sga || isPaused()) break;
+        var dsa = newDraft(); dsa.title = sga.title; dsa.size = sga.size; dsa.who = 'any'; dsa.repeat = 'none';
+        createTask(pid, dsa); infoToast(pid, 'Added "' + sga.title + '" for anyone.'); break;
+      case 'sugg-edit':
+        var sge = suggFind(pid, ds.k); if (!sge || isPaused()) break;
+        var dse = newDraft(), base = JSON.stringify(dse); dse.title = sge.title; dse.size = sge.size; dse.who = 'any'; dse.repeat = 'none';
+        openSheet(pid, { kind: 'add', step: 'summary', draft: dse, orig: base, more: false, editId: null, from: null, c: newComposer(), exSeed: 0 }); break;
+      case 'sugg-snooze': S.sugg = S.sugg || {}; S.sugg.snooze = S.sugg.snooze || {}; S.sugg.snooze[ds.k] = now() + 7 * DAY; infoToast(pid, 'OK. Not for a week.'); break;
+      case 'sugg-never': S.sugg = S.sugg || {}; S.sugg.never = S.sugg.never || {}; S.sugg.never[ds.k] = 1; infoToast(pid, "Got it. Won't suggest that again."); break;
       case 'score-edit': ui.scoreEdit = {}; ui.scoreEdit[pid] = weekXP(pid, now()); if (hasPartner(pid)) ui.scoreEdit[o] = weekXP(o, now()); break;
       case 'score-step': if (ui.scoreEdit) ui.scoreEdit[ds.p] = Math.max(0, ui.scoreEdit[ds.p] + parseInt(ds.d, 10)); break;
       case 'score-step-all': if (ui.scoreEdit) ui.scoreEdit[pid] = Math.max(0, ui.scoreEdit[pid] + parseInt(ds.d, 10)); break;

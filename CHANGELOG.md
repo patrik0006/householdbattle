@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.4.0 · 4 Nov 2026
+- New header: big dogs at the edges behind the score bar, scores beside them, names under the bar. Bar has a dark rim and shadow so it stands out from the dogs.
+- "Suggested for you" on Mine: your rhythm (overdue compared to how often you usually do it), jobs not done in 6+ months, end-of-month bills, seasonal ideas for Sweden and easy-to-forget classics. Add, Not now (a week), Never.
+- Level badges (Bronze, Silver, Gold, Ruby, Amethyst, Legend) and a level path: tap the level card on Score.
+- New 17-level ladder, from Couch Potato to Immortal Housekeeper.
+
 ## v0.3.0 · 4 Nov 2026 · commit 0fdcee7
 - Tips: new, easier-to-read card; 18 tips that rotate each time you open the app (plus Next tip). Closing hides tips until midnight.
 - The score bar fills up when the app opens, then bulges.
