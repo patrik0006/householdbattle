@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.2.0 · 4 Nov 2026
+## v0.2.0 · 4 Nov 2026 · commit 2c07add
 - New font scale (12 · 14 · 16 · 18 · 22 · 32 · 56). Body text is 14, nothing is smaller than 12.
 - Page titles: QUESTS, SCORE · WEEK n, ACTIVITY in one consistent style.
 - Tap an avatar to open the Score page for that person (You / partner switch, level card, badges).
@@ -12,5 +12,5 @@
 - Delete / discard buttons now sit on the right.
 - "Install" banner and a Settings button to put the app on the home screen.
 
-## v0.1.0 · 4 Nov 2026
+## v0.1.0 · 4 Nov 2026 · commit 048c79e
 - First real version: Google sign-in, household invite code, live sync between both phones, works offline, installable.
