@@ -134,7 +134,7 @@ button:disabled { cursor: not-allowed; }
 .player-meta small { font-size: var(--fs-xs); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .score-num { font-family: var(--display); font-size: var(--fs-2xl); line-height: 1; font-variant-numeric: tabular-nums; }
 .vs-word { font-family: var(--display); font-size: var(--fs-xs); color: var(--grey); padding-bottom: 6px; }
-.tug { position: relative; height: 12px; border-radius: 6px; overflow: hidden; display: flex; background: var(--card-2); }
+.tug { position: relative; height: 12px; border-radius: 6px; overflow: hidden; display: flex; justify-content: space-between; background: var(--card-2); }
 .tug .l { background: var(--gold); transition: width 0.9s cubic-bezier(.2,.8,.2,1); }
 .tug .r { flex: 1; background: var(--coral); }
 .tug .mid { position: absolute; left: 50%; top: 0; bottom: 0; width: 3px; margin-left: -1px; background: var(--bg-deep); }
@@ -519,6 +519,44 @@ button, [data-act]:not(input):not(textarea) { transition: scale 0.25s cubic-bezi
 .sheet.dragging { transition: none !important; user-select: none; }
 .grab { margin: 2px auto 0; cursor: grab; }
 
+/* ---------- 0.3.0: score bar fills on open, then bulges ---------- */
+@keyframes fxBulge { 0% { scale: 1 1; } 35% { scale: 1.04 1.7; } 65% { scale: 0.99 0.85; } 100% { scale: 1 1; } }
+.tug.fx-bulge { animation: fxBulge 0.32s cubic-bezier(.3,1.4,.6,1); }
+/* ---------- 0.3.0: settings sections are clearly separated ---------- */
+.full-body { gap: 0; }
+.full-body > .sect { padding: 20px 0; }
+.full-body > .sect + .sect { border-top: 1px solid var(--line); }
+.full-body > .sect:first-child { padding-top: 8px; }
+.full-body > .sect h4 { margin-bottom: 4px; }
+/* ---------- 0.3.0: tips ---------- */
+.tipcard { display: flex; gap: 12px; align-items: flex-start; background: rgba(255,201,60,0.12); border-left: 4px solid var(--gold); border-radius: 14px; padding: 12px 6px 12px 12px; }
+.tipcard .ticon { width: 36px; height: 36px; flex: none; border-radius: 11px; background: rgba(255,201,60,0.18); display: flex; align-items: center; justify-content: center; }
+.tipcard .ticon svg { width: 20px; height: 20px; }
+.tip-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.tip-head { font-size: var(--fs-md); font-weight: 700; color: var(--gold); line-height: 1.25; }
+.tip-body { color: var(--ink); line-height: 1.4; }
+.tip-pills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.tip-pills span { background: rgba(255,255,255,0.08); border-radius: 999px; padding: 3px 10px; color: var(--soft); }
+.tip-pills b { color: var(--gold); font-weight: 700; }
+.tip-foot { display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
+.tbtn2 { height: 34px; border: 1px solid var(--gold); background: transparent; color: var(--gold); border-radius: 9px; padding: 0 12px; font-weight: 500; }
+.tbtn2.plain { border-color: transparent; color: var(--soft); padding: 0 6px; }
+.tipcard .tipx { width: 44px; height: 44px; margin: -10px 0 0; flex: none; }
+.tipcard .tipx svg { width: 18px; height: 18px; }
+
+/* ---------- 0.3.0: one top bar style on every page ---------- */
+.hdr { padding: 0 18px 12px; }
+.hdr-top { min-height: 52px; }
+.topbar { flex: none; min-height: 52px; padding: 0 18px; background: var(--bg-deep); display: flex; align-items: center; justify-content: space-between; gap: 10px; box-sizing: border-box; }
+.topbar h2, .eyebrow, .full-top h2 { margin: 0; font-family: var(--display); font-weight: 400; font-size: var(--fs-md); letter-spacing: 1.5px; color: var(--muted); }
+.full-top { min-height: 52px; padding: 0 18px 0 8px; background: var(--bg-deep); box-sizing: border-box; }
+.full-body { padding-top: 16px; }
+.page { padding-top: 16px; }
+/* ---------- 0.3.0: system events span the full width ---------- */
+.act-row.sys .act-body { flex: 1; max-width: 100%; background: rgba(255,255,255,0.05); border-radius: 12px; padding: 8px 12px; align-items: center; text-align: center; }
+.act-row.sys .act-txt { color: var(--soft); }
+.act-row.sys .act-btns { justify-content: center; }
+
 /* ---------- Real app: one full-screen phone instead of the test bench ---------- */
 html, body { height: 100%; }
 body { background: var(--bg); overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
@@ -541,8 +579,8 @@ body { background: var(--bg); overscroll-behavior: none; -webkit-tap-highlight-c
 <div id="phone" class="phone" role="application" aria-label="HouseholdBattle"></div>
 <noscript>HouseholdBattle needs JavaScript.</noscript>
 <script type="module">
-import { createSync } from './sync.js?v=0.2.0';
-import { startGame } from './app.js?v=0.2.0';
+import { createSync } from './sync.js?v=0.3.0';
+import { startGame } from './app.js?v=0.3.0';
 createSync().then(startGame).catch(function (e) {
   document.getElementById('phone').innerHTML = '<div class="app"><div class="ob"><div class="logo">HOUSEHOLD<br>BATTLE</div><p>Couldn\'t start. Check your connection and try again.</p><button class="btn gold" onclick="location.reload()">TRY AGAIN</button></div></div>';
   console.error(e);
