@@ -51,6 +51,9 @@ export function startGame(SYNCAPI) {
     pause: ['Mercy, please.', 'Exam week.', 'We deserve a break.', 'Holiday mode.'],
     resume: ['Ready to crush you again.', "Break's over.", "Let's go.", "I'm back. Fear me."],
     showoff: ['Check it out', 'Behold.', 'Busy day. Bow.', 'Productivity unlocked.', 'Read it and weep.'],
+    helpdone: ['Check it out', 'You owe me.', 'Done. You\'re welcome.', 'Saved your bacon.'],
+    helpask: ['Pretty please?', "I'll owe you.", 'Save me.', "I'll make dinner."],
+    helpoffer: ['Let me take this one.', 'I got you.', 'Go rest.', 'Consider it done.'],
     challenge: ["Bet you won't.", 'Prove me wrong.', 'Today or never.', 'Easy points. Allegedly.'],
     chwin: ['Check it out', 'Challenge: crushed.', 'Was that supposed to be hard?', 'Pay up.', 'Next time, try harder.'],
     chcollect: ['Check it out', 'Thanks for the bonus.', 'Should have accepted less.', 'Your loss, my points.'],
@@ -60,36 +63,60 @@ export function startGame(SYNCAPI) {
     reply: ["You sure you're done?", '…so proud', 'Thank you!', 'At once, my lord.', 'Seriously..?', 'Impressive. Mildly.', 'Finally!', 'About time.', 'My hero.', 'Show-off.']
   };
   var REWARD_IDEAS = ["I'll buy that dress for you", 'Breakfast in bed', "I'll cook your favourite dinner", 'Movie night, you pick', 'A real massage'];
+  // Badges come in tiers: bronze (1), silver (2), gold (3). value() measures progress; tiers[] are the thresholds.
+  // xp[] is what each tier pays when you collect it. Rare badges stay hidden until earned.
+  function weekly(list) { var m = {}, best = 0; list.forEach(function (t) { var k = weekStart(t); m[k] = (m[k] || 0) + 1; if (m[k] > best) best = m[k]; }); return best; }
+  function actsBy(pid, kinds) { return S.activity.filter(function (a) { return a.actor === pid && kinds.indexOf(a.kind) >= 0; }); }
+  // One version per badge. metal (1 bronze, 2 silver, 3 gold) shows how hard it is and sets the XP.
+  var METAL_XP = [0, 5, 15, 30];
+  function streakDays(cs) { var days = {}; cs.forEach(function (c) { days[sod(c.at)] = 1; }); var ks = Object.keys(days).map(Number).sort(function (a, b) { return a - b; }), best = 0, run = 0, prev = null; ks.forEach(function (k) { run = prev != null && addDays(prev, 1) === k ? run + 1 : 1; prev = k; if (run > best) best = run; }); return best; }
+  function twoDayMax(cs) { var m = {}; cs.forEach(function (c) { var k = sod(c.at); m[k] = (m[k] || 0) + 1; }); var best = 0; Object.keys(m).forEach(function (k) { var n = m[k] + (m[addDays(+k, 1)] || 0); if (n > best) best = n; }); return best; }
   var BADGES = [
-    { id: 'first', name: 'First Blood', desc: 'Complete your first quest.', test: function (cs) { return cs.length >= 1; } },
-    { id: 'roll', name: 'On a Roll', desc: '5 quests in one day.', test: function (cs) { return maxPerDay(cs) >= 5; } },
-    { id: 'tenacious', name: 'Tenacious', desc: '50 quests completed.', test: function (cs) { return cs.length >= 50; } },
-    { id: 'hardlab', name: 'Hard Labour', desc: '10 Hard or Epic quests completed.', test: function (cs) { return cs.filter(isHate).length >= 10; } },
-    { id: 'epic', name: 'Epic Win', desc: 'Complete your first Epic quest.', test: function (cs) { return cs.some(function (c) { return c.size === 5; }); } },
-    { id: 'chacc', name: 'Challenge Accepted', desc: 'Win a challenge.', test: function (cs) { return cs.some(function (c) { return c.challengeWon; }); } },
-    { id: 'lvl5', name: 'Level 5', desc: 'Reach level 5.', test: function (cs, pid) { return levelInfo(totalXP(pid)).lvl >= 5; } },
-    { id: 'lvl10', name: 'Level 10', desc: 'Reach level 10.', test: function (cs, pid) { return levelInfo(totalXP(pid)).lvl >= 10; } },
-    { id: 'lvl20', name: 'Level 20', desc: 'Reach level 20.', test: function (cs, pid) { return levelInfo(totalXP(pid)).lvl >= 20; } },
-    { id: 'archaeo', name: 'Archaeologist', rare: true, desc: 'Finish a quest that waited 30+ days.', test: function (cs) { return cs.some(function (c) { return c.waitedDays >= 30; }); } },
-    { id: 'masochist', name: 'Masochist', rare: true, desc: '3 Hard or Epic quests in one day.', test: function (cs) { return maxPerDay(cs.filter(isHate)) >= 3; } },
-    { id: 'bluff', name: 'Called Your Bluff', rare: true, desc: 'Collect the bonus from a challenge your partner failed.', test: function (cs) { return cs.some(function (c) { return c.challengeCollect; }); } },
-    { id: 'bounty', name: 'Bounty Hunter', rare: true, desc: 'Collect a maxed-out bounty.', test: function (cs) { return cs.some(function (c) { return c.bounty && c.bounty >= SIZES[c.size].xp; }); } },
-    { id: 'early', name: 'Early Bird', rare: true, desc: 'Complete a quest before 07:00.', test: function (cs) { return cs.some(function (c) { return c.hour < 7; }); } },
-    { id: 'comeback', name: 'Comeback Kid', rare: true, desc: "Overtake your partner's weekly score on a Sunday.", test: function (cs) { return cs.some(function (c) { return c.comeback; }); } },
-    { id: 'boomerang', name: 'Boomerang', rare: true, desc: 'Complete a quest your partner handed back to you.', test: function (cs) { return cs.some(function (c) { return c.boomerang; }); } },
-    { id: 'thief', name: 'Quest Thief', rare: true, desc: "Steal 5 of your partner's quests.", test: function (cs) { return cs.filter(function (c) { return c.stolen; }).length >= 5; } }
+    { id: 'begins', name: 'Now it begins', icon: 'flag', metal: 1, need: 1, desc: 'Create your first task.', value: function (cs, pid) { return actsBy(pid, ['add', 'assign']).length; } },
+    { id: 'first', name: 'First Blood', icon: 'drop', metal: 1, need: 1, desc: 'Complete your first task.', value: function (cs) { return cs.length; } },
+    { id: 'roll', name: 'On a Roll', icon: 'flame', metal: 1, need: 5, desc: '5 tasks in one day.', value: function (cs) { return maxPerDay(cs); } },
+    { id: 'tenacious', name: 'Busy Body', icon: 'check', metal: 2, need: 10, desc: '10 or more tasks in two days.', value: function (cs) { return twoDayMax(cs); } },
+    { id: 'hardlab', name: 'Beast of Burden', icon: 'weight', metal: 2, need: 5, desc: '5 Hard or Epic tasks in one week.', value: function (cs) { return weekly(cs.filter(isHate).map(function (c) { return c.at; })); } },
+    { id: 'slaver', name: "Slaver's Dog", icon: 'chain', metal: 2, need: 11, noXp: true, desc: 'Assign more than 10 tasks to your partner in one week.', value: function (cs, pid) { return weekly(actsBy(pid, ['assign']).map(function (a) { return a.at; })); } },
+    { id: 'bloodhound', name: 'Blood Hound', icon: 'paw', metal: 1, need: 11, noXp: true, desc: 'Create more than 10 tasks in one week.', value: function (cs, pid) { return weekly(actsBy(pid, ['add', 'assign']).filter(function (a) { return !a.reassign; }).map(function (a) { return a.at; })); } },
+    { id: 'epic', name: 'Epic Win', icon: 'crown', metal: 2, need: 1, desc: 'Complete your first Epic task.', value: function (cs) { return cs.filter(function (c) { return c.size === 5; }).length; } },
+    { id: 'chacc', name: 'Are you not entertained!?', icon: 'swords', metal: 2, need: 1, desc: 'Win a challenge.', value: function (cs) { return cs.filter(function (c) { return c.challengeWon; }).length; } },
+    { id: 'walkies', name: 'Daily Walkies', icon: 'paw', metal: 2, need: 7, desc: 'Complete at least one task every day for 7 days in a row.', value: function (cs) { return streakDays(cs); } },
+    { id: 'thief', name: 'Snatch!', icon: 'claw', metal: 3, need: 5, desc: "Steal 5 of your partner's tasks.", value: function (cs) { return cs.filter(function (c) { return c.stolen; }).length; } },
+    { id: 'archaeo', name: 'Bone Finder', icon: 'bone', metal: 2, rare: true, need: 30, desc: 'Finish a task that waited 30 days or more.', value: function (cs) { return cs.reduce(function (m, c) { return Math.max(m, c.alreadyDone ? 0 : (c.waitedDays || 0)); }, 0); } },
+    { id: 'masochist', name: 'Hound Dog', icon: 'bolt', metal: 3, rare: true, need: 3, desc: '3 Hard or Epic tasks in one day.', value: function (cs) { return maxPerDay(cs.filter(isHate)); } },
+    { id: 'argos', name: 'Argos', icon: 'house', metal: 1, rare: true, need: 7, desc: 'Come back to the app after a week or more away.', value: function (cs, pid) { return (S.argos && S.argos[pid]) || 0; } },
+    { id: 'bluff', name: 'Alpha', icon: 'cards', metal: 2, rare: true, need: 1, desc: 'Collect the bonus from a challenge your partner failed.', value: function (cs) { return cs.filter(function (c) { return c.challengeCollect; }).length; } },
+    { id: 'bounty', name: 'Bounty Hunter', icon: 'target', metal: 2, rare: true, need: 1, desc: 'Collect a maxed-out bounty.', value: function (cs) { return cs.filter(function (c) { return c.bounty && c.bounty >= SIZES[c.size].xp; }).length; } },
+    { id: 'early', name: 'Early Bird', icon: 'sun', metal: 2, rare: true, need: 1, desc: 'Complete a task before 07:00.', value: function (cs) { return cs.filter(function (c) { return c.hour < 7; }).length; } },
+    { id: 'comeback', name: 'Comeback Kid', icon: 'up', metal: 1, rare: true, need: 1, desc: "Overtake your partner's weekly score on a Sunday.", value: function (cs) { return cs.filter(function (c) { return c.comeback; }).length; } },
+    { id: 'boomerang', name: 'Smash!', icon: 'boom', metal: 1, rare: true, need: 1, desc: 'Finish a task your partner handed back to you.', value: function (cs) { return cs.filter(function (c) { return c.boomerang; }).length; } },
+    { id: 'fetch', name: 'Fetch', icon: 'bone', metal: 2, rare: true, need: 1, desc: 'Complete a task within 10 minutes of your partner assigning it to you.', value: function (cs) { return cs.filter(function (c) { return c.fetch; }).length; } },
+    { id: 'dodger', name: 'Chore Dodger', icon: 'zzz', shame: true, need: 1, noXp: true, desc: 'Less than 5 XP in a whole week.', value: function () { return 0; } }
   ];
+  // keep the older helpers working
+  BADGES.forEach(function (b) { b.tiers = [b.need]; b.xp = [b.noXp ? 0 : METAL_XP[b.metal || 1]]; });
+  var TIER_NAME = ['', 'Bronze', 'Silver', 'Gold'];
+  function badgeRule(b) { return b.desc; }
+
   function isHate(c) { return c.size >= 4; }
 
   var IC = {
     gear: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"></path><circle cx="9" cy="6" r="2" fill="#1E1942"></circle><circle cx="15" cy="12" r="2" fill="#1E1942"></circle><circle cx="7" cy="18" r="2" fill="#1E1942"></circle></svg>',
-    quests: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3 8-8"></path><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"></path></svg>',
+    tasks: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3 8-8"></path><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"></path></svg>',
     trophy: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"></path><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"></path></svg>',
     chat: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>',
     plus: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>',
     pencil: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"></path></svg>',
     back: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg>',
     close: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>',
+    check: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+    boltSm: '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"/></svg>',
+    boltBig: '<svg width="56" height="56" viewBox="0 0 24 24" aria-hidden="true"><path fill="#4FB4FF" d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"/></svg>',
+    crown: '<svg width="38" height="30" viewBox="0 0 38 30" aria-hidden="true"><path d="M3 26 L1 6 L11 14 L19 2 L27 14 L37 6 L35 26 Z" fill="#FFC93C" stroke="#7A4A08" stroke-width="2" stroke-linejoin="round"/><circle cx="19" cy="18" r="3" fill="#FF7A59"/></svg>',
+    fire: '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2c1 3.5 6 5.5 6 11a6 6 0 0 1-12 0c0-3 1.6-4.6 3-6 0 2.2 1.1 3.4 2.2 3.4C10.6 7 11 4.5 12 2z"/></svg>',
+    fireSm: '<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="margin-right:2px;vertical-align:-1px"><path d="M12 2c1 3.5 6 5.5 6 11a6 6 0 0 1-12 0c0-3 1.6-4.6 3-6 0 2.2 1.1 3.4 2.2 3.4C10.6 7 11 4.5 12 2z"/></svg>',
+    fireBig: '<svg width="64" height="64" viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="fg" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#FF7A59"/><stop offset="1" stop-color="#FFC93C"/></linearGradient></defs><path fill="url(#fg)" d="M12 2c1 3.5 6 5.5 6 11a6 6 0 0 1-12 0c0-3 1.6-4.6 3-6 0 2.2 1.1 3.4 2.2 3.4C10.6 7 11 4.5 12 2z"/></svg>',
     spark: '<svg width="16" height="16" viewBox="0 0 24 24" fill="#FFC93C" aria-hidden="true" style="flex:none"><path d="M12 2l1.8 5.6L19.5 9.5l-5.7 1.9L12 17l-1.8-5.6L4.5 9.5l5.7-1.9z"></path><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"></path></svg>',
     flag: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFC93C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 22V3"></path><path d="M5 4h11l-2 4 2 4H5"></path></svg>',
     bulb: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFC93C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6M10 22h4"></path><path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.3h6c0-1 .4-1.8 1-2.3A7 7 0 0 0 12 2z"></path></svg>',
@@ -220,31 +247,102 @@ export function startGame(SYNCAPI) {
     if (!isActive(t) || isPaused()) return false;
     var st = chState(t), c = t.challenge;
     if (st === 'accepted') return pid === c.to;
+    if (helpingMe(t, pid)) return true;
     if (st === 'failed' && pid === c.from) return true;
     if (t.assignee === 'any' || t.assignee === pid) return true;
     return hasPartner(pid) && !inGrace(t);
   }
   function canChallenge(t, pid) { return hasPartner(pid) && !isPaused() && isActive(t) && (t.assignee === 'any' || t.assignee === other(pid)) && (!t.challenge || chState(t) === 'expired'); }
+  /* ---------- 0.6.2: help ---------- */
+  // Ask your partner to help with one of your tasks, or offer to help with one of theirs.
+  // Once accepted, the helper can finish it. They get no XP now, but bank 1.5x the task's base XP as a comeback boost.
+  var HELP_MULT = 1.5;
+  function helpBank(t) { return Math.round(SIZES[t.size].xp * HELP_MULT); }
+  function helpOn(t) { return t.help && (t.help.status === 'pending' || t.help.status === 'accepted') ? t.help : null; }
+  function helpingMe(t, pid) { var h = helpOn(t); return !!(h && h.status === 'accepted' && h.helper === pid); }
+  function canHelp(t, pid) {
+    var st = chState(t);
+    return hasPartner(pid) && !isPaused() && isActive(t) && !helpOn(t) && st !== 'pending' && st !== 'accepted' && (t.assignee === pid || t.assignee === other(pid));
+  }
   function rwOpen(t) { return !!(t.reward && effNow() < t.reward.deadline); }
   function canReward(t, pid) { return hasPartner(pid) && !isPaused() && isActive(t) && (t.assignee === 'any' || t.assignee === other(pid)) && !rwOpen(t); }
-  function xpFor(t, pid) { return SIZES[t.size].xp + bountyFor(t, pid) + challengeBonusFor(t, pid); }
+  var UNDERDOG_ON = false, UNDERDOG_GAP = 20, UNDERDOG_PCT = 25; // replaced by comeback boosts in 0.6.1
+  function isUnderdog(pid, T) { T = T || effNow(); return !!(UNDERDOG_ON && S.members[pid] && hasPartner(pid) && !isPaused() && weekXP(other(pid), T) - weekXP(pid, T) > UNDERDOG_GAP); }
+  function underdogExtra(x) { return Math.max(1, Math.round(x * UNDERDOG_PCT / 100)); }
+  function xpFor(t, pid) { var x = SIZES[t.size].xp + bountyFor(t, pid) + challengeBonusFor(t, pid); return isUnderdog(pid) ? x + underdogExtra(x) : x; }
   function isActive(t) { return t.status === 'open' && (!t.repeat || t.dueAt <= effNow()); }
   function isUpcoming(t) { return t.status === 'open' && t.repeat && t.dueAt > effNow(); }
   function sortTasks(list, pid) { return list.sort(function (a, b) { return (xpFor(b, pid) - xpFor(a, pid)) || (a.ageStart - b.ageStart); }); }
   function fmtDeadline(t) { var d = sod(t - 1); return (d === sod(effNow()) ? 'today' : d === addDays(sod(effNow()), 1) ? 'tomorrow' : fmtDate(d)) + ' 23:59'; }
   function getTask(id) { for (var i = 0; i < S.tasks.length; i++) if (S.tasks[i].id === id) return S.tasks[i]; return null; }
   function badgeDef(id) { for (var i = 0; i < BADGES.length; i++) if (BADGES[i].id === id) return BADGES[i]; return null; }
-  function hasBadge(pid, id) { return S.badges[pid].some(function (b) { return b.id === id; }); }
+  function badgeTier(pid, id) { return (S.badges[pid] || []).reduce(function (m, b) { return b.id === id ? Math.max(m, b.tier || 1) : m; }, 0); }
+  function hasBadge(pid, id) { return badgeTier(pid, id) > 0; }
+  function dodgeCount(pid) { return (S.badges[pid] || []).filter(function (b) { return b.id === 'dodger'; }).length; }
 
   function log(text) { S.log = S.log || []; S.log.push({ at: now(), text: text }); while (S.log.length > 60) S.log.shift(); }
   function addAct(a) { a.id = uid(); a.at = a.at || now(); S.activity.push(a); return a; }
 
   function awardBadges(pid, compId, at) {
+    if (!S.members[pid]) return [];
     var cs = compsBy(pid), got = [];
     BADGES.forEach(function (b) {
-      if (!hasBadge(pid, b.id) && b.test(cs, pid)) { S.badges[pid].push({ id: b.id, at: at, compId: compId }); got.push(b.id); }
+      if (b.shame) return;
+      var v = b.value(cs, pid), cur = badgeTier(pid, b.id), tier = 0;
+      b.tiers.forEach(function (th, k) { if (v >= th) tier = k + 1; });
+      for (var t = cur + 1; t <= tier; t++) { S.badges[pid].push({ key: uid(), id: b.id, tier: t, at: at, compId: compId, revealed: false }); got.push({ id: b.id, tier: t }); }
     });
+    got.forEach(function (g) { addAct({ kind: 'badge', actor: pid, badge: g.id, tier: g.tier, compId: compId, at: at }); log('<b>' + esc(nameOf(pid)) + '</b> earned ' + badgeDef(g.id).name); });
     return got;
+  }
+  // Collecting a badge pays its XP (only then, so an undone task never pays out).
+  function collectBadge(pid, key) {
+    var e = (S.badges[pid] || []).find(function (b) { return b.key === key; }); if (!e || e.revealed) return null;
+    e.revealed = true;
+    var b = badgeDef(e.id), xp = b ? (b.xp[Math.min(b.xp.length, e.tier || 1) - 1] || 0) : 0;
+    if (xp) { S.adjust = S.adjust || []; S.adjust.push({ id: uid(), pid: pid, by: 'badge', badge: e.id, delta: xp, at: now() }); }
+    return xp;
+  }
+  // Week-end check: Chore Dodger for anyone who earned less than 5 XP in a full, unpaused week.
+  function checkWeekEnd() {
+    var ws = weekStart(now());
+    if (S.dodgeChecked == null) { S.dodgeChecked = ws; return; }
+    if (S.dodgeChecked >= ws) return;
+    var w = Math.max(S.dodgeChecked, addDays(ws, -28));
+    for (; w < ws; w = addDays(w, 7)) {
+      var we = addDays(w, 7) - 1;
+      var pausedInWeek = (S.household.paused && S.household.pausedAt < we) || S.activity.some(function (a) { return (a.kind === 'pause_ok' || a.kind === 'resume_ok') && a.at >= w && a.at <= we; });
+      if (pausedInWeek || S.household.createdAt > w) continue;
+      var win = weekWinner(w);
+      if (win) {
+        S.boosts = S.boosts || { A: [], B: [] }; S.boosts[win.pid] = S.boosts[win.pid] || [];
+        S.boosts[win.pid].push({ id: uid(), xp: WIN_BOOST, source: 'win', label: 'Won week ' + isoWeek(w), from: addDays(w, 7), until: addDays(w, 7 + BOOST_WEEKS * 7), used: false });
+        addAct({ kind: 'week_won', actor: win.pid, week: isoWeek(w), me: win.xp, p: win.other, at: we + 1 });
+      }
+      ['A', 'B'].forEach(function (p) {
+        var m = S.members[p]; if (!m || m.joinedAt > w) return;
+        if (weekXP(p, we) < 5) { S.badges[p].push({ key: uid(), id: 'dodger', tier: 1, at: we + 1, compId: null, revealed: false }); addAct({ kind: 'badge', actor: p, badge: 'dodger', tier: 1, at: we + 1 }); }
+      });
+    }
+    S.dodgeChecked = ws;
+  }
+  var WIN_BOOST = 10, BOOST_WEEKS = 4;
+  function isBehind(pid, T) { T = T || now(); return hasPartner(pid) && weekXP(pid, T) < weekXP(other(pid), T); }
+  // Who won the week starting at ws? null for a tie, a paused week, or before both of you were in.
+  function weekWinner(ws) {
+    var we = addDays(ws, 7) - 1;
+    if (!S.members.A || !S.members.B || S.members.A.joinedAt > we || S.members.B.joinedAt > we) return null;
+    var a = weekXP('A', we), b = weekXP('B', we);
+    if (a === b) return null;
+    return a > b ? { pid: 'A', xp: a, other: b } : { pid: 'B', xp: b, other: a };
+  }
+  function boostsAvail(pid) { var T = now(); return ((S.boosts && S.boosts[pid]) || []).filter(function (b) { return !b.used && b.from <= T && T < b.until; }).sort(function (a, b) { return a.until - b.until; }); }
+  function boostsBanked(pid) { var T = now(); return ((S.boosts && S.boosts[pid]) || []).filter(function (b) { return !b.used && b.from > T; }); }
+  function boostUsedThisWeek(pid, T) { var ws = weekStart(T); return adjFor(pid).reduce(function (n, a) { return n + (a.by === 'boost' && a.at >= ws && a.at <= T ? a.delta : 0); }, 0); }
+  function noteReturn(pid, awayMs) {
+    var d = Math.floor(awayMs / DAY); if (d < 7) return;
+    S.argos = S.argos || {}; if (d > (S.argos[pid] || 0)) S.argos[pid] = d;
+    awardBadges(pid, null, now());
   }
 
   function completeTask(pid, taskId, opts) {
@@ -264,16 +362,29 @@ export function startGame(SYNCAPI) {
     var xp = base, breakdown = [size.label + ' ' + base], parts = [base + ' (' + size.label + ')'];
     if (bounty) { xp += bounty; breakdown.push('Bounty +' + bounty); parts.push('+' + bounty + ' (bounty, ' + bountyDays(t, pid) + ' d)'); }
     if (chBonus) { xp += chBonus; breakdown.push((challengeWon ? 'Challenge won +' : 'Challenge bonus +') + chBonus); parts.push('+' + chBonus + (challengeWon ? ' (challenge won)' : ' (failed challenge bonus)')); }
-    var todayCount = S.completions.filter(function (c) { return c.by === pid && c.at >= sod(T); }).length;
+    var udXp = isUnderdog(pid, T) ? underdogExtra(xp) : 0;
+    if (udXp) { xp += udXp; breakdown.push('Underdog +' + UNDERDOG_PCT + '% +' + udXp); parts.push('+' + udXp + ' (underdog)'); }
+    var helping = helpingMe(t, pid), helpOwner = helping ? t.assignee : null, banked = helping ? helpBank(t) : 0;
+    var todayCount = S.completions.filter(function (c) { return c.by === pid && c.at >= sod(T) && !c.help; }).length;
     var combo = 0;
     if (todayCount === 0) { xp += 2; breakdown.push('First today +2'); parts.push('+2 (first today)'); }
     else { combo = size.combo; xp += combo; breakdown.push('Combo ×' + (todayCount + 1) + ' +' + combo); parts.push('+' + combo + ' (combo ×' + (todayCount + 1) + ')'); }
-    var stolen = hasP && t.assignee === o && !challengeCollect;
+    if (helping) { xp = 0; combo = 0; bounty = 0; breakdown = ['Helped ' + nameOf(helpOwner) + ' · +' + banked + ' boost banked']; parts = ['0 (helping, +' + banked + ' boost banked)']; }
+    var stolen = hasP && t.assignee === o && !challengeCollect && !helping;
     var boomerang = t.assignee === pid && t.handedBackBy === o;
     var myB = weekXP(pid, T), pB = hasP ? weekXP(o, T) : 0;
     var lvlB = levelInfo(totalXP(pid)).lvl;
     var tookLead = hasP && myB <= pB && myB + xp > pB;
     var comp = { id: uid(), taskId: t.id, title: t.title, size: t.size, by: pid, at: T, xp: xp, breakdown: breakdown, stolen: stolen, waitedDays: waited, alreadyDone: !!opts.alreadyDone, boomerang: boomerang, hour: new Date(T).getHours(), comeback: tookLead && wdIdx(T) === 6 && myB < pB, bounty: bounty, combo: combo, comboN: todayCount + 1, challengeWon: challengeWon, challengeCollect: challengeCollect };
+    comp.underdog = udXp;
+    if (helping) {
+      comp.help = { owner: helpOwner, banked: banked };
+      var wsN = addDays(weekStart(T), 7);
+      S.boosts = S.boosts || { A: [], B: [] }; S.boosts[pid] = S.boosts[pid] || [];
+      S.boosts[pid].push({ id: uid(), xp: banked, source: 'help', label: 'Helped with ' + t.title, from: wsN, until: addDays(wsN, BOOST_WEEKS * 7), used: false, compId: comp.id });
+    }
+    t.help = null;
+    comp.fetch = !!(t.assignedBy === other(pid) && t.assignedAt && T - t.assignedAt <= 10 * MIN && !opts.alreadyDone);
     var rw = rwOpen(t) ? t.reward : null;
     if (rw && rw.to === pid) comp.gift = { from: rw.from, text: rw.text };
     S.completions.push(comp);
@@ -283,7 +394,7 @@ export function startGame(SYNCAPI) {
       t.dueAt = next; t.ageStart = next; t.thread = []; t.handedBackBy = null;
     } else { t.status = 'done'; t.doneAt = T; t.doneBy = pid; }
     var actIds = [];
-    var a = addAct({ kind: stolen ? 'steal' : 'complete', actor: pid, taskId: t.id, title: t.title, xp: xp, owner: stolen ? o : null, compId: comp.id, already: !!opts.alreadyDone, challenge: challengeWon ? 'won' : challengeCollect ? 'collect' : null, chFrom: ch ? ch.from : null });
+    var a = addAct({ kind: helping ? 'helped' : stolen ? 'steal' : 'complete', banked: banked, owner2: helpOwner, actor: pid, taskId: t.id, title: t.title, xp: xp, owner: stolen ? o : null, compId: comp.id, already: !!opts.alreadyDone, challenge: challengeWon ? 'won' : challengeCollect ? 'collect' : null, chFrom: ch ? ch.from : null });
     actIds.push(a.id);
     if (rw && rw.to === pid) {
       S.owed.push({ id: uid(), compId: comp.id, from: rw.from, to: pid, text: rw.text, title: t.title, at: T, delivered: false });
@@ -295,21 +406,91 @@ export function startGame(SYNCAPI) {
     }
     var lvlA = levelInfo(totalXP(pid)).lvl;
     if (lvlA > lvlB) actIds.push(addAct({ kind: 'level', actor: pid, level: lvlA }).id);
-    var newB = awardBadges(pid, comp.id, T);
-    newB.forEach(function (b) { actIds.push(addAct({ kind: 'badge', actor: pid, badge: b }).id); });
-    log('<b>' + esc(nameOf(pid)) + '</b> ' + (stolen ? 'stole' : 'completed') + ' "' + esc(t.title) + '" · +' + xp + ' XP = ' + parts.join(' ') + (opts.alreadyDone ? ' · logged as already done (no bounty)' : ''));
+    var nAct = S.activity.length, newB = awardBadges(pid, comp.id, T);
+    S.activity.slice(nAct).forEach(function (a) { actIds.push(a.id); });
+    log('<b>' + esc(nameOf(pid)) + '</b> ' + (helping ? 'helped ' + esc(nameOf(helpOwner)) + ' with' : stolen ? 'stole' : 'completed') + ' "' + esc(t.title) + '" · +' + xp + ' XP = ' + parts.join(' ') + (opts.alreadyDone ? ' · logged as already done (no bounty)' : ''));
     if (tookLead) log('<b>' + esc(nameOf(pid)) + '</b> takes the weekly lead: ' + (myB + xp) + ' vs ' + pB + (comp.comeback ? ' (Sunday comeback)' : ''));
     if (lvlA > lvlB) log('<b>' + esc(nameOf(pid)) + '</b> reached level ' + lvlA + ' (' + levelTitle(lvlA) + ')');
-    newB.forEach(function (b) { log('<b>' + esc(nameOf(pid)) + '</b> earned badge: ' + badgeDef(b).name); });
+
     if (t.repeat) log('Recurring "' + esc(t.title) + '" next due ' + fmtDate(t.dueAt));
     var undo = { compId: comp.id, taskBefore: taskBefore, actIds: actIds, removeTask: false };
-    var big = t.size >= 3 || tookLead || lvlA > lvlB || newB.length > 0 || stolen || challengeWon || challengeCollect || !!comp.gift;
+    var big = t.size >= 3 || tookLead || lvlA > lvlB || stolen || challengeWon || challengeCollect || !!comp.gift;
     return { gift: comp.gift || null, comp: comp, undo: undo, big: big, tookLead: tookLead, before: { me: myB, p: pB }, after: { me: myB + xp, p: pB }, levelUp: lvlA > lvlB ? lvlA : null, badges: newB, stolen: stolen, challengeWon: challengeWon, challengeCollect: challengeCollect, actId: a.id };
   }
 
   // Challenge deadlines: turn pending into expired and accepted into failed, once, with activity at the deadline.
+  /* ---------- 0.6.3: nudges ---------- */
+  // At most one nudge a day per person, around the hour they usually finish tasks, never in quiet hours.
+  // Gentle: only when something actually needs you. Push me: also when you're behind, idle or tasks are rotting.
+  var NUDGE_WHEN = [['morning', 'Morning', 8], ['lunch', 'Lunch', 12], ['afternoon', 'Afternoon', 16], ['evening', 'Evening', 19], ['varies', 'It varies', 18]];
+  var NUDGE_LEVELS = [['off', 'Leave me alone', 'No nudges at all.'], ['gentle', 'Gentle', 'Only when something needs you: a request, a deadline, a Sunday comeback.'], ['push', 'Push me', 'Also when you fall behind, do nothing all day or let tasks rot. Cheeky.']];
+  var QUIET_PRESETS = [[21, 7], [22, 7], [23, 8], [0, 9]];
+  function hh(h) { return (h < 10 ? '0' : '') + h + ':00'; }
+  function nudgePrefs(pid) { return (S.members[pid] && S.members[pid].nudge) || null; }
+  function learnedHour(pid) {
+    var hs = S.completions.filter(function (c) { return c.by === pid && !c.alreadyDone && c.hour != null; }).slice(-30).map(function (c) { return c.hour; }).sort(function (a, b) { return a - b; });
+    return hs.length >= 5 ? hs[Math.floor(hs.length / 2)] : null;
+  }
+  function inQuiet(h, q) { return q[0] <= q[1] ? h >= q[0] && h < q[1] : h >= q[0] || h < q[1]; }
+  function nudgeHour(pid) {
+    var n = nudgePrefs(pid); if (!n) return null;
+    var h = learnedHour(pid); if (h == null) h = (NUDGE_WHEN.filter(function (w) { return w[0] === n.when; })[0] || NUDGE_WHEN[4])[2];
+    return inQuiet(h, n.quiet) ? n.quiet[1] : h;
+  }
+  function pickLine(arr, T) { return arr[Math.floor(T / DAY) % arr.length]; }
+  // What would we nudge this person about right now? Most important first.
+  function nudgeFor(pid, T, any) {
+    var n = nudgePrefs(pid), o = other(pid), on = nameOf(o), hasP = hasPartner(pid), push = any || (n && n.level === 'push');
+    var open = S.tasks.filter(function (t) { return t.status === 'open' && isActive(t); });
+    var mk = function (kind, title, body, go) { return { kind: kind, title: title, body: body, go: go || { tab: 'tasks', filter: 'mine' } }; };
+    var hp = open.filter(function (t) { var h = helpOn(t); return h && h.status === 'pending' && h.to === pid; })[0];
+    if (hp) return mk('help', on + (hp.help.kind === 'ask' ? ' needs a hand' : ' wants to help'), (hp.help.kind === 'ask' ? 'Help with “' + hp.title + '” and bank a +' + helpBank(hp) + ' XP boost.' : 'Let them take “' + hp.title + '”? Say yes or no.'), { taskId: hp.id });
+    var chq = open.filter(function (t) { return t.challenge && chState(t) === 'pending' && t.challenge.to === pid; })[0];
+    if (chq) return mk('challenge', on + ' challenged you', '“' + chq.title + '” for +' + chq.challenge.bonus + '. Accept or chicken out.', { taskId: chq.id });
+    if (S.household.request && S.household.request.from === o) return mk('request', on + ' is waiting for you', 'Answer the ' + (S.household.request.type === 'pause' ? 'pause' : 'request') + ' in Settings.', { settings: true });
+    var chd = open.filter(function (t) { return t.challenge && chState(t) === 'accepted' && t.challenge.to === pid && t.challenge.deadline - T <= DAY; })[0];
+    if (chd) return mk('deadline', 'Challenge ends tonight', '“' + chd.title + '”. +' + chd.challenge.bonus + ' XP, or ' + on + ' collects.', { taskId: chd.id });
+    var me = weekXP(pid, T), them = hasP ? weekXP(o, T) : 0, gap = them - me;
+    if (hasP && gap > 0 && wdIdx(T) === 6) return mk('sunday', 'Last day. You’re ' + gap + ' behind.', boostsAvail(pid).length ? 'You have a boost waiting. Just saying.' : pickLine(['Comebacks happen on Sundays.', 'Still time. Barely.', on + ' is already celebrating.'], T));
+    if (!push) return null;
+    if (hasP && gap > 10) return mk('behind', on + ' is ' + gap + ' XP ahead', boostsAvail(pid).length ? 'Your boost is ready to play.' : pickLine(['Your dog is starting to look worried.', 'This will not stand. Will it?', 'Just so you know.', 'Get your act together.'], T));
+    var steal = hasP ? open.filter(function (t) { return t.assignee === o && canComplete(t, pid); }).sort(function (a, b) { return xpFor(b, pid) - xpFor(a, pid); })[0] : null;
+    if (steal) return mk('steal', 'Up for grabs: ' + steal.title, on + ' let it slide. +' + xpFor(steal, pid) + ' XP if you take it.', { filter: 'partner', taskId: steal.id });
+    var mine = open.filter(function (t) { return t.assignee === pid; }).sort(function (a, b) { return ageDays(b) - ageDays(a); })[0];
+    if (mine && ageDays(mine) >= 7) return mk('old', '“' + mine.title + '” is getting lonely', 'It has waited ' + ageDays(mine) + ' days. Put it out of its misery.', { taskId: mine.id });
+    var today = S.completions.filter(function (c) { return c.by === pid && c.at >= sod(T); }).length;
+    if (!today && open.length) return mk('idle', pickLine(['Zero tasks today. Bold strategy.', 'The chores miss you.', 'Nothing done yet today', 'Your couch called. It wants a break.'], T), 'One quick task grabs the +2 first-of-the-day bonus.');
+    return null;
+  }
+  function sendNudge(pid, nd, T, debug) {
+    S.nudges = S.nudges || [];
+    var rec = { id: uid(), pid: pid, at: T, kind: nd.kind, title: nd.title, body: nd.body, go: nd.go, debug: !!debug };
+    S.nudges.push(rec); if (S.nudges.length > 40) S.nudges = S.nudges.slice(-40);
+    if (!debug) S.members[pid].lastNudge = T;
+    log('Nudge to <b>' + esc(nameOf(pid)) + '</b>: ' + esc(nd.title) + ' · ' + esc(nd.body) + (debug ? ' (debug)' : ''));
+    return rec;
+  }
+  function checkNudges() {
+    var T = now();
+    if (isPaused()) return;
+    ['A', 'B'].forEach(function (p) {
+      var m = S.members[p], n = nudgePrefs(p); if (!m || !n || n.level === 'off' || n.perm !== 'granted') return;
+      if (m.lastNudge && m.lastNudge >= sod(T)) return;
+      var h = new Date(T).getHours(), at = nudgeHour(p);
+      if (h < at || inQuiet(h, n.quiet)) return;
+      var nd = nudgeFor(p, T); if (nd) sendNudge(p, nd, T);
+    });
+  }
   function sweep() {
     if (!S || !S.household) return;
+    ['A', 'B'].forEach(function (p) { if (S.badges[p]) S.badges[p] = S.badges[p].filter(function (b) { return !!badgeDef(b.id); }).map(function (b) { if (!b.tier) { b.tier = 1; b.revealed = true; } if (!b.key) b.key = 'k' + b.id + (b.tier || 1); return b; }); });
+    checkWeekEnd();
+    S.ud = S.ud || {};
+    ['A', 'B'].forEach(function (p) {
+      if (!S.members[p]) return;
+      var on = isUnderdog(p, now());
+      if (on !== !!S.ud[p]) { S.ud[p] = on; addAct({ kind: on ? 'underdog_on' : 'underdog_off', actor: p }); }
+    });
     S.tasks.forEach(function (t) {
       if (t.reward && t.status === 'open' && !rwOpen(t)) {
         addAct({ kind: 'reward_expired', actor: t.reward.to, from: t.reward.from, taskId: t.id, title: t.title, text: t.reward.text, at: t.reward.deadline });
@@ -339,7 +520,7 @@ export function startGame(SYNCAPI) {
       else if (i >= 0) S.tasks[i] = u.taskBefore; else S.tasks.push(u.taskBefore);
       S.activity = S.activity.filter(function (a) { return u.actIds.indexOf(a.id) < 0; });
       S.owed = S.owed.filter(function (o) { return o.compId !== u.compId; });
-      ['A', 'B'].forEach(function (p) { S.badges[p] = S.badges[p].filter(function (b) { return b.compId !== u.compId; }); });
+      ['A', 'B'].forEach(function (p) { S.badges[p] = S.badges[p].filter(function (b) { return b.compId !== u.compId; }); if (S.boosts && S.boosts[p]) S.boosts[p] = S.boosts[p].filter(function (b) { return b.compId !== u.compId; }); });
       if (c) log('<b>' + esc(nameOf(c.by)) + '</b> undid "' + esc(c.title) + '" (−' + c.xp + ' XP)');
     });
   }
@@ -361,7 +542,7 @@ export function startGame(SYNCAPI) {
     var T = now(), o = other(pid);
     var assignee = assigneeFromWho(pid, d.who);
     var rep = repFromDraft(d, T);
-    var t = { id: uid(), title: d.title.trim(), size: d.size, assignee: assignee, assignedBy: assignee === o ? pid : null, createdBy: pid, createdAt: T, ageStart: T, repeat: rep, dueAt: null, status: 'open', thread: [], handedBackBy: null, grace: d.grace != null ? d.grace : 1, challenge: null };
+    var t = { id: uid(), title: d.title.trim(), size: d.size, assignee: assignee, assignedBy: assignee === o ? pid : null, assignedAt: assignee === o ? T : null, createdBy: pid, createdAt: T, ageStart: T, repeat: rep, dueAt: null, status: 'open', thread: [], handedBackBy: null, grace: d.grace != null ? d.grace : 1, challenge: null };
     if (rep) { t.dueAt = nextOcc(rep, T); t.ageStart = Math.max(t.dueAt, T); }
     if (opts.alreadyDone && rep) { t.dueAt = sod(T); t.ageStart = T; }
     var note = (d.note || '').trim();
@@ -371,6 +552,7 @@ export function startGame(SYNCAPI) {
       ? addAct({ kind: 'assign', actor: pid, target: o, taskId: t.id, title: t.title, size: t.size, note: note || null, gif: d.gif || null })
       : addAct({ kind: 'add', actor: pid, taskId: t.id, title: t.title, size: t.size, assignee: assignee });
     log('<b>' + esc(nameOf(pid)) + '</b> added "' + esc(t.title) + '" · ' + SIZES[t.size].label + ' ' + SIZES[t.size].xp + ' XP · for ' + (assignee === 'any' ? 'Anyone' : esc(nameOf(assignee))) + (rep ? ' · ' + repLabel(rep) + ', first due ' + fmtDate(t.dueAt) : '') + (assignee !== 'any' ? ' · grace ' + graceLabel(t.grace) : ''));
+    awardBadges(pid, null, T);
     return { task: t, actId: act ? act.id : null };
   }
 
@@ -380,8 +562,8 @@ export function startGame(SYNCAPI) {
     var T = Date.now(), today = sod(T);
     var created = addDays(today, -45) + 19 * HOUR;
     S.household = { code: 'K7M2QX', createdBy: 'A', createdAt: created, paused: false, pausedAt: null, request: null, declined: null };
-    S.members.A = { id: 'A', name: 'Patrik', joinedAt: created, dogStyle: 'frenchie' };
-    S.members.B = { id: 'B', name: 'Emelie', joinedAt: created + HOUR, dogStyle: 'spaniel' };
+    S.members.A = { id: 'A', name: 'Patrik', joinedAt: created, sumSeen: weekStart(T), nudge: { when: 'evening', level: 'push', quiet: [22, 7], perm: 'granted' }, dogStyle: 'frenchie' };
+    S.members.B = { id: 'B', name: 'Emelie', joinedAt: created + HOUR, sumSeen: weekStart(T), nudge: { when: 'morning', level: 'gentle', quiet: [23, 8], perm: 'granted' }, dogStyle: 'spaniel' };
     addAct({ kind: 'join', actor: 'B', at: created + HOUR });
 
     function hist(pid, at, title, size, extra) {
@@ -403,7 +585,7 @@ export function startGame(SYNCAPI) {
     hist('A', at(-21, 20), 'Laundry', 2);
     hist('A', at(-20, 10), 'Clean the pipes', 4);
     hist('A', at(-20, 11), 'Weed the bushes', 4);
-    hist('A', at(-20, 13), 'Defrost the freezer', 4, { note: 'Three Hard quests in one day. Call me Masochist.' });
+    hist('A', at(-20, 13), 'Defrost the freezer', 4, { note: 'Three Hard tasks in one day. Call me Masochist.' });
     hist('A', at(-16, 18), 'Vacuum downstairs', 3);
     hist('A', at(-15, 21), 'Take out the trash', 2);
     hist('A', at(-13, 19), 'Grocery shopping', 2);
@@ -435,7 +617,7 @@ export function startGame(SYNCAPI) {
     eToday.forEach(function (it, i) { var t = Math.max(today + 60 * MIN, T - (eToday.length - i) * 35 * MIN); if (t < T) hist('B', t, it[0], it[1]); });
 
     var lastAt = S.completions.reduce(function (m, c) { return Math.max(m, c.at); }, 0);
-    ['A', 'B'].forEach(function (p) { awardBadges(p, 'sample', lastAt); S.badges[p].forEach(function (b) { b.compId = 'sample'; }); });
+    ['A', 'B'].forEach(function (p) { awardBadges(p, 'sample', lastAt); S.badges[p].forEach(function (b) { b.compId = 'sample'; b.revealed = true; }); });
 
     function task(o) {
       var t = { id: uid(), title: o.title, size: o.size, assignee: o.assignee, assignedBy: o.assignedBy || null, createdBy: o.createdBy, createdAt: o.createdAt, ageStart: o.ageStart || o.createdAt, repeat: o.repeat || null, dueAt: null, status: 'open', thread: o.thread || [], handedBackBy: o.handedBackBy || null, grace: o.grace != null ? o.grace : 1, challenge: o.challenge || null };
@@ -499,6 +681,10 @@ export function startGame(SYNCAPI) {
     for (var i = 0; i < MOOD_BANDS.length; i++) if (share < MOOD_BANDS[i][0]) return MOOD_BANDS[i][1];
     return 'happy';
   }
+  var GHOST_DOG = 'data:image/webp;base64,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';
+  function ghostDog() {
+    return '<span class="avatar dogav ghostdog" aria-hidden="true"><img src="' + GHOST_DOG + '" alt=""></span>';
+  }
   function dogAvatar(pid, viewer) {
     if (!S.members[pid]) return avatar(pid, viewer);
     var mood = moodFor(pid), st = styleById(styleOf(pid));
@@ -510,10 +696,13 @@ export function startGame(SYNCAPI) {
     var known = !!S.members[pid];
     return '<span class="avatar ' + (cls || '') + ' ' + (known ? (mine ? 'me' : 'them') : 'ghost') + '" aria-hidden="true">' + (known ? esc(initial(pid)) : '?') + '</span>';
   }
-  function tugHTML(me, p, hasP) {
-    if (!hasP) return '';
+  function tugHTML(me, p, hasP, bMe, bP) {
+    if (!hasP) return '<div class="tug nop" role="img" aria-label="Waiting for your partner"><div class="l" style="width:0%"></div><div class="r"></div></div>';
     var total = me + p, pct = total === 0 ? 50 : Math.round(me / total * 100);
-    return '<div class="tug' + (hasP ? '' : ' empty') + '" role="img" aria-label="You ' + me + ', partner ' + p + '"><div class="l" style="width:' + pct + '%"></div><div class="r"></div><div class="mid"></div></div>';
+    var lb = bMe && me ? Math.round((me - bMe) / me * 100) : 100, rb = bP && p ? Math.round(bP / p * 100) : 0;
+    var lStyle = lb < 100 ? ';background:linear-gradient(90deg,var(--gold) 0 ' + lb + '%,var(--boost) ' + lb + '% 100%)' : '';
+    var rStyle = rb > 0 ? ' style="background:linear-gradient(90deg,var(--boost) 0 ' + rb + '%,var(--coral) ' + rb + '% 100%)"' : '';
+    return '<div class="tug' + (hasP ? '' : ' empty') + '" role="img" aria-label="You ' + me + ', partner ' + p + (bMe || bP ? ', boosts used ' + (bMe || 0) + ' and ' + (bP || 0) : '') + '"><div class="l" style="width:' + pct + '%' + lStyle + '"></div><div class="r"' + rStyle + '></div><div class="mid"></div></div>';
   }
   function rivalLine(pid) {
     var o = other(pid);
@@ -523,8 +712,11 @@ export function startGame(SYNCAPI) {
     var dayIx = Math.floor(sod(T) / DAY);
     if (d > 0) {
       var need = d + 1, how;
-      if (need <= 1) how = 'One Trivial quest'; else if (need <= 3) how = 'One Easy quest'; else if (need <= 5) how = 'One Annoying quest';
-      else if (need <= 10) how = 'One Hard quest'; else if (need <= 20) how = 'One Epic quest'; else how = Math.ceil(need / 20) + ' Epic quests';
+      if (need <= 1) how = 'One Trivial task'; else if (need <= 3) how = 'One Easy task'; else if (need <= 5) how = 'One Annoying task';
+      else if (need <= 10) how = 'One Hard task'; else if (need <= 20) how = 'One Epic task'; else how = Math.ceil(need / 20) + ' Epic tasks';
+      if (d > 30) return pn + ' leads by ' + d + '. This is pathetic.. sorry but it is';
+      if (d > 20) return pn + ' leads by ' + d + '. Get your act together.. ffs';
+      if (d > 10) return pn + ' leads by ' + d + '. This will not stand.. will it?';
       return pn + ' leads by ' + d + '. ' + how + (/^One /.test(how) ? ' puts' : ' put') + ' you ahead.';
     }
     if (d === 0) return me === 0 ? 'Fresh week. Nobody has done anything. Yet.' : 'Dead even. Tense.';
@@ -532,6 +724,12 @@ export function startGame(SYNCAPI) {
     return lines[dayIx % lines.length];
   }
 
+  function hdrChips(pid, T) {
+    var ud = isUnderdog(pid, T), bs = boostsAvail(pid), bx = bs.reduce(function (n, b) { return n + b.xp; }, 0);
+    if (!ud && !bx) return '';
+    return '<div class="hdr-chips">' + (ud ? '<button class="ud-chip" data-act="ud-info">' + IC.fire + 'UNDERDOG +' + UNDERDOG_PCT + '%</button>' : '') +
+      (bx && !isPaused() ? '<button class="boost-chip' + (isBehind(pid, T) ? ' live' : '') + '" data-act="boost-open">' + IC.boltSm + (bs.length > 1 ? bs.length + ' BOOSTS' : 'BOOST +' + bx) + '</button>' : '') + '</div>';
+  }
   function headerHTML(pid) {
     var o = other(pid), hasP = hasPartner(pid), T = effNow();
     var me = weekXP(pid, T), p = hasP ? weekXP(o, T) : 0;
@@ -539,14 +737,15 @@ export function startGame(SYNCAPI) {
     if (cu && hasP) p = cu.from;
     var li = levelInfo(totalXP(pid)), lo = levelInfo(hasP ? totalXP(o) : 0);
     return '<header class="hdr">' +
-      '<div class="hdr-top"><span class="eyebrow">QUESTS' + (isPaused() ? ' · FROZEN' : '') + '</span>' +
+      '<div class="hdr-top"><span class="eyebrow">TASKS' + (isPaused() ? ' · FROZEN' : '') + '</span>' +
       '<button class="iconbtn" data-act="open-settings" aria-label="Settings">' + IC.gear + '</button></div>' +
       '<div class="vs">' +
         '<div class="player"><button class="avbtn" data-act="open-score" data-who="me" aria-label="Your score">' + dogAvatar(pid, pid) + '</button><div class="player-meta"><small>' + esc(nameOf(pid)) + ' · Lvl ' + li.lvl + '</small><span class="score-num gold">' + me + '</span></div></div>' +
         '<span class="vs-word">VS</span>' +
-        '<div class="player right">' + (hasP ? '<button class="avbtn" data-act="open-score" data-who="partner" aria-label="' + esc(nameOf(o)) + '\'s score">' + dogAvatar(o, pid) + '</button>' : dogAvatar(o, pid)) + '<div class="player-meta"><small>' + (hasP ? 'Lvl ' + lo.lvl + ' · ' + esc(nameOf(o)) : 'Not joined') + '</small><span class="score-num coral" data-pscore="1">' + (hasP ? p : '–') + '</span></div></div>' +
+        '<div class="player right">' + (hasP ? '<button class="avbtn" data-act="open-score" data-who="partner" aria-label="' + esc(nameOf(o)) + '\'s score">' + dogAvatar(o, pid) + '</button>' : '<button class="avbtn" data-act="open-settings" aria-label="Invite your partner">' + ghostDog() + '</button>') + '<div class="player-meta"><small>' + (hasP ? 'Lvl ' + lo.lvl + ' · ' + esc(nameOf(o)) : 'Not joined') + '</small>' + (hasP ? '<span class="score-num coral" data-pscore="1">' + p + '</span>' : '<span class="waiting">Waiting…</span>') + '</div></div>' +
       '</div>' +
-      tugHTML(me, p, hasP) +
+      tugHTML(me, p, hasP, boostUsedThisWeek(pid, T), hasP ? boostUsedThisWeek(o, T) : 0) +
+      hdrChips(pid, T) +
       '<span class="cheeky">' + rivalLine(pid) + '</span>' +
       '<div class="lvlrow"><span>Lvl ' + li.lvl + '</span><div class="bar"><i style="width:' + Math.round(li.into / li.need * 100) + '%"></i></div><span>' + li.toNext + ' XP to Lvl ' + (li.lvl + 1) + '</span></div>' +
     '</header>';
@@ -555,7 +754,7 @@ export function startGame(SYNCAPI) {
   function navHTML(pid) {
     var ui = UI[pid], unseen = unseenCount(pid);
     function b(tab, label, icon) { return '<button class="' + (ui.tab === tab ? 'on' : '') + '" data-act="tab" data-tab="' + tab + '"' + (ui.tab === tab ? ' aria-current="page"' : '') + '>' + icon + label + (tab === 'activity' && unseen && ui.tab !== 'activity' ? '<span class="dot" aria-label="' + unseen + ' new">' + unseen + '</span>' : '') + '</button>'; }
-    return '<nav class="nav" aria-label="Main">' + b('tasks', 'Quests', IC.quests) + b('score', 'Score', IC.trophy) + b('activity', 'Activity', IC.chat) + '</nav>';
+    return '<nav class="nav" aria-label="Main">' + b('tasks', 'Tasks', IC.tasks) + b('score', 'Score', IC.trophy) + b('activity', 'Activity', IC.chat) + '</nav>';
   }
   function unseenCount(pid) {
     var n = 0;
@@ -586,6 +785,11 @@ export function startGame(SYNCAPI) {
       if (!c || t.status !== 'open' || c.to !== pid || chState(t) !== 'pending') return;
       out += '<div class="banner" role="status"><div class="brow"><span class="btxt">' + pn + ' challenges you: <b>' + esc(t.title) + '</b> · +' + c.bonus + ' if done by ' + fmtDeadline(c.deadline) + '</span></div>' + (c.note || c.gif ? msgHTML('them', c.gif, c.note) : '') + '<div class="brow"><button class="bbtn gold" data-act="ch-accept" data-id="' + t.id + '">Accept</button><button class="bbtn" data-act="ch-decline" data-id="' + t.id + '">Decline</button><button class="bbtn" data-act="open-task" data-id="' + t.id + '">Details</button></div></div>';
     });
+    if (!h.paused) S.tasks.forEach(function (t) {
+      var hp = helpOn(t);
+      if (!hp || t.status !== 'open' || hp.status !== 'pending' || hp.to !== pid) return;
+      out += '<div class="banner boost" role="status"><div class="brow"><span class="btxt">' + (hp.kind === 'ask' ? pn + ' asks for help: <b>' + esc(t.title) + '</b> · you bank a +' + helpBank(t) + ' XP boost' : pn + ' offers to help with <b>' + esc(t.title) + '</b> · you get no XP for it') + '</span></div>' + (hp.note || hp.gif ? msgHTML('them', hp.gif, hp.note) : '') + '<div class="brow"><button class="bbtn gold" data-act="help-accept" data-id="' + t.id + '">Accept</button><button class="bbtn" data-act="help-decline" data-id="' + t.id + '">' + (hp.kind === 'ask' ? 'Not now' : 'No thanks') + '</button><button class="bbtn" data-act="open-task" data-id="' + t.id + '">Details</button></div></div>';
+    });
     (S.owed || []).forEach(function (w) {
       if (w.from !== pid || w.delivered) return;
       out += '<div class="banner" role="status"><div class="brow"><span class="btxt">You owe ' + pn + ': <b>\u201C' + esc(w.text) + '\u201D</b> for finishing ' + esc(w.title) + '.</span><button class="bbtn gold" data-act="owed-delivered" data-id="' + w.id + '">Delivered</button></div></div>';
@@ -607,6 +811,11 @@ export function startGame(SYNCAPI) {
     if (c && st === 'accepted' && c.from === pid) return { sub: on + ' accepted your challenge · locked until ' + fmtDeadline(c.deadline), cls: '' };
     if (c && st === 'failed' && c.from === pid) return { sub: on + ' missed the challenge · +' + c.bonus + ' bonus is yours', cls: 'gold', hot: true };
     if (c && st === 'failed' && c.to === pid) return { sub: 'Missed the challenge · the bonus went to ' + on, cls: 'coral' };
+    var hp = helpOn(t);
+    if (hp && hp.status === 'pending' && hp.to === pid) return { sub: on + (hp.kind === 'ask' ? ' asks for your help · bank +' + helpBank(t) + ' boost' : ' offers to help with this'), cls: 'boost', hot: true };
+    if (hp && hp.status === 'pending' && hp.from === pid) return { sub: (hp.kind === 'ask' ? 'You asked ' + on + ' for help' : 'You offered to help') + ' · waiting for an answer', cls: '' };
+    if (hp && hp.status === 'accepted' && hp.helper === pid) return { sub: 'Helping ' + on + ' · banks a +' + helpBank(t) + ' XP boost', cls: 'boost', hot: true };
+    if (hp && hp.status === 'accepted') return { sub: on + ' is helping you with this', cls: 'boost' };
     if (rwOpen(t) && t.reward.to === pid) return { sub: 'Special reward from ' + on + ': \u201C' + esc(t.reward.text) + '\u201D if done by ' + fmtDeadline(t.reward.deadline), cls: 'gold', hot: true };
     if (rwOpen(t) && t.reward.from === pid) return { sub: 'Your reward for ' + on + ': \u201C' + esc(t.reward.text) + '\u201D · until ' + fmtDeadline(t.reward.deadline), cls: '' };
     if (t.assignee === o && hasPartner(pid) && inGrace(t)) return { sub: on + "'s until " + fmtGrace(t) + ' · then you can steal it', cls: '' };
@@ -623,7 +832,7 @@ export function startGame(SYNCAPI) {
     return '<div class="task' + (rs.hot ? ' old' : '') + (can ? '' : ' locked') + '">' +
       '<button class="tick" data-act="complete" data-id="' + t.id + '" aria-label="Complete ' + esc(t.title) + '"' + (can ? '' : ' disabled') + '><i></i></button>' +
       '<button class="row-body" data-act="open-task" data-id="' + t.id + '"><span class="row-title">' + esc(t.title) + '</span><span class="row-sub ' + rs.cls + '">' + rs.sub + '</span></button>' +
-      '<span class="xp">+' + x + '</span></div>';
+      (helpingMe(t, pid) ? '<span class="xp bst">' + IC.boltSm + '+' + helpBank(t) + '</span></div>' : '<span class="xp' + (isUnderdog(pid) ? ' ud' : '') + '">' + (isUnderdog(pid) ? IC.fireSm : '') + '+' + x + '</span></div>');
   }
 
   /* ---------- 0.3.0: rotating tips ---------- */
@@ -636,24 +845,25 @@ export function startGame(SYNCAPI) {
   }
   function comboPills() { return '<span class="tip-pills">' + SIZE_KEYS.map(function (n) { return '<span>' + SIZES[n].label + ' <b>+' + SIZES[n].combo + '</b></span>'; }).join('') + '</span>'; }
   var TIPS = [
-    { id: 'first', icon: 'clock', ok: function (p, c) { return !c.claimed; }, head: function () { return 'First quest of the day: +2 XP'; }, body: function () { return 'Finish any quest today to grab the bonus.'; } },
-    { id: 'combo', icon: 'clock', ok: function (p, c) { return c.claimed; }, head: function (p, c) { return c.n === 1 ? 'Combo unlocked' : 'Combo ×' + c.n + ' · +' + c.combo + ' XP so far'; }, body: function (p, c) { return (c.n === 1 ? 'Every quest you finish before midnight earns a bonus on top:' : 'Keep going until midnight. Each quest adds:') + comboPills(); } },
-    { id: 'steal', icon: 'bolt', ok: function (p, c) { return c.steal > 0; }, head: function (p, c) { return c.steal + ' of ' + esc(nameOf(c.o)) + (c.steal === 1 ? "'s quests is" : "'s quests are") + ' up for grabs'; }, body: function () { return 'Their grace period is over. Finish one and the points are yours, bounty included.'; }, action: { act: 'filter', f: 'partner', label: 'Show them' } },
-    { id: 'bounty', ok: function () { return true; }, head: function () { return 'Waiting pays'; }, body: function () { return 'Quests for Anyone gain a bounty of +10% per day they wait, up to double points.'; } },
+    { id: 'first', icon: 'clock', ok: function (p, c) { return !c.claimed; }, head: function () { return 'First task of the day: +2 XP'; }, body: function () { return 'Finish any task today to grab the bonus.'; } },
+    { id: 'combo', icon: 'clock', ok: function (p, c) { return c.claimed; }, head: function (p, c) { return c.n === 1 ? 'Combo unlocked' : 'Combo ×' + c.n + ' · +' + c.combo + ' XP so far'; }, body: function (p, c) { return (c.n === 1 ? 'Every task you finish before midnight earns a bonus on top:' : 'Keep going until midnight. Each task adds:') + comboPills(); } },
+    { id: 'steal', icon: 'bolt', ok: function (p, c) { return c.steal > 0; }, head: function (p, c) { return c.steal + ' of ' + esc(nameOf(c.o)) + (c.steal === 1 ? "'s tasks is" : "'s tasks are") + ' up for grabs'; }, body: function () { return 'Their grace period is over. Finish one and the points are yours, bounty included.'; }, action: { act: 'filter', f: 'partner', label: 'Show them' } },
+    { id: 'bounty', ok: function () { return true; }, head: function () { return 'Waiting pays'; }, body: function () { return 'Tasks for Anyone gain a bounty of +10% per day they wait, up to double points.'; } },
     { id: 'avatar', ok: function (p, c) { return c.hasP; }, head: function () { return 'Check the competition'; }, body: function (p, c) { return "Tap " + esc(nameOf(c.o)) + "'s dog at the top to see their level, stats and badges."; } },
-    { id: 'grace', ok: function (p, c) { return c.hasP; }, head: function () { return 'Grace period'; }, body: function () { return 'When you assign a quest, the grace period decides how long it is protected before it can be stolen.'; } },
-    { id: 'already', ok: function () { return true; }, head: function () { return 'Already did it?'; }, body: function () { return 'When adding a quest, tap I already did it to log it and get the points straight away.'; } },
-    { id: 'challenge', ok: function (p, c) { return c.hasP; }, head: function () { return 'Challenge your partner'; }, body: function () { return 'Open one of their quests and tap Challenge. If they finish in time they get +10. If not, you collect.'; } },
+    { id: 'grace', ok: function (p, c) { return c.hasP; }, head: function () { return 'Grace period'; }, body: function () { return 'When you assign a task, the grace period decides how long it is protected before it can be stolen.'; } },
+    { id: 'already', ok: function () { return true; }, head: function () { return 'Already did it?'; }, body: function () { return 'When adding a task, tap I already did it to log it and get the points straight away.'; } },
+    { id: 'challenge', ok: function (p, c) { return c.hasP; }, head: function () { return 'Challenge your partner'; }, body: function () { return 'Open one of their tasks and tap Challenge. If they finish in time they get +10. If not, you collect.'; } },
     { id: 'mood', ok: function (p, c) { return c.hasP; }, head: function () { return 'Watch your dog'; }, body: function () { return "Your dog's mood follows your share of this week's points. Fall behind and it starts looking suspicious."; } },
-    { id: 'reward', ok: function (p, c) { return c.hasP; }, head: function () { return 'Sweeten the deal'; }, body: function () { return 'Open a quest and tap Reward to promise something real, like dinner or a massage, for getting it done.'; } },
-    { id: 'repeat', ok: function () { return true; }, head: function () { return 'Set it and forget it'; }, body: function () { return 'Recurring quests come back by themselves: daily, every other day, weekly, every other week or monthly.'; } },
-    { id: 'handback', ok: function (p, c) { return c.hasP; }, head: function () { return 'Not your job?'; }, body: function () { return 'Hand an assigned quest back with a note. Finishing one that was handed back to you earns a rare badge.'; } },
+    { id: 'reward', ok: function (p, c) { return c.hasP; }, head: function () { return 'Sweeten the deal'; }, body: function () { return 'Open a task and tap Reward to promise something real, like dinner or a massage, for getting it done.'; } },
+    { id: 'repeat', ok: function () { return true; }, head: function () { return 'Set it and forget it'; }, body: function () { return 'Recurring tasks come back by themselves: daily, every other day, weekly, every other week or monthly.'; } },
+    { id: 'handback', ok: function (p, c) { return c.hasP; }, head: function () { return 'Not your job?'; }, body: function () { return 'Hand an assigned task back with a note. Finishing one that was handed back to you earns a rare badge.'; } },
     { id: 'showoff', ok: function (p, c) { return c.hasP; }, head: function () { return 'Brag a little'; }, body: function () { return 'On the Done tab, Show off sends your partner a list of what you got done today or this week.'; } },
-    { id: 'comment', ok: function (p, c) { return c.hasP; }, head: function () { return 'Nudge without nagging'; }, body: function () { return 'Open any quest and tap Comment to send a message about it, with a dog if you like.'; } },
+    { id: 'comment', ok: function (p, c) { return c.hasP; }, head: function () { return 'Nudge without nagging'; }, body: function () { return 'Open any task and tap Comment to send a message about it, with a dog if you like.'; } },
     { id: 'week', ok: function () { return true; }, head: function () { return 'New week, new battle'; }, body: function () { return 'Weekly scores reset on Monday at 00:00. Your level and badges stay.'; } },
     { id: 'secret', ok: function () { return true; }, head: function () { return 'Secret badges'; }, body: function () { return 'Some badges stay hidden until you earn them. Early birds and thieves have an advantage.'; } },
     { id: 'pause', ok: function (p, c) { return c.hasP; }, head: function () { return 'Going away?'; }, body: function () { return 'Propose a pause in Settings. Once your partner accepts, everything freezes until you both restart.'; } },
-    { id: 'coming', ok: function () { return true; }, head: function () { return 'Peek ahead'; }, body: function () { return 'Coming up, at the bottom of your list, shows recurring quests before they are due.'; } },
+    { id: 'coming', ok: function () { return true; }, head: function () { return 'Peek ahead'; }, body: function () { return 'Coming up, at the bottom of your list, shows recurring tasks before they are due.'; } },
+    { id: 'help', icon: 'bolt', ok: function (p, c) { return c.hasP; }, head: function () { return 'Lend a paw'; }, body: function () { return 'Open a task and tap Ask for help or Offer help. The helper gets no XP now, but banks 1.5× as a boost for when they fall behind.'; } },
     { id: 'drag', ok: function () { return true; }, head: function () { return 'Swipe it away'; }, body: function () { return 'Drag any panel that slides up from the bottom down to close it.'; } }
   ];
   function tipKey(pid) { return 'hb-tips-' + pid; }
@@ -729,9 +939,13 @@ export function startGame(SYNCAPI) {
     var d = new Date(T), dim = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
     var billsDone = (hist['pay the bills'] || { at: [] }).at.some(function (a) { return T - a < 20 * DAY; });
     if (d.getDate() >= dim - 6 && !billsDone) push('Pay the bills', 2, 'End of the month is coming up.', 'Calendar');
-    // 4. ideas: season first, then household classics never done
-    (SEASON_IDEAS[d.getMonth()] || []).forEach(function (x) { push(x[0], x[1], 'A good one for ' + MON_LONG[d.getMonth()] + '.', 'Season'); });
-    CLASSIC_IDEAS.forEach(function (x) { if (!hist[normT(x[0])]) push(x[0], x[1], 'Easy to forget. You haven’t logged it yet.', 'Idea'); });
+    // 4. ideas: from Gemini when available (S.aiIdeas, shared by both phones), otherwise the built-in lists
+    var ai = S.aiIdeas && S.aiIdeas.items && S.aiIdeas.items.length ? S.aiIdeas.items : null;
+    if (ai) ai.forEach(function (x) { if (x && x.title && SIZES[x.size]) push(String(x.title).slice(0, 60), x.size, String(x.reason || '').slice(0, 140), 'Idea'); });
+    else {
+      (SEASON_IDEAS[d.getMonth()] || []).forEach(function (x) { push(x[0], x[1], 'A good one for ' + MON_LONG[d.getMonth()] + '.', 'Season'); });
+      CLASSIC_IDEAS.forEach(function (x) { if (!hist[normT(x[0])]) push(x[0], x[1], 'Easy to forget. You haven’t logged it yet.', 'Idea'); });
+    }
     return out;
   }
   var MON_LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -742,9 +956,9 @@ export function startGame(SYNCAPI) {
     if (list.length < 3 && all.length > list.length) list = list.concat(all.slice(0, Math.min(3, all.length) - list.length));
     var rows = list.map(function (g) {
       return '<div class="sg-row"><button class="sg-main" data-act="sugg-edit" data-k="' + esc(g.key) + '"><span class="sg-title">' + esc(g.title) + '</span><span class="sg-why"><span class="sg-tag">' + esc(g.tag) + '</span>' + esc(g.reason) + '</span></button>' +
-        '<div class="sg-acts"><button class="sg-add" data-act="sugg-add" data-k="' + esc(g.key) + '" aria-label="Add ' + esc(g.title) + '">+ Add · ' + SIZES[g.size].xp + ' XP</button><button class="sg-btn" data-act="sugg-snooze" data-k="' + esc(g.key) + '">Not now</button><button class="sg-btn" data-act="sugg-never" data-k="' + esc(g.key) + '">Never</button></div></div>';
+        '<div class="sg-acts"><button class="sg-add" data-act="sugg-add" data-k="' + esc(g.key) + '" aria-label="Add ' + esc(g.title) + '">Add</button><button class="sg-btn" data-act="sugg-snooze" data-k="' + esc(g.key) + '">Not now</button><button class="sg-btn" data-act="sugg-never" data-k="' + esc(g.key) + '">Never</button></div></div>';
     }).join('');
-    return '<section class="sgcard"><div class="sg-head"><span class="sg-h">' + IC.spark + 'SUGGESTED FOR YOU</span><button class="iconbtn sg-x" data-act="sugg-hide" aria-label="Hide suggestions">' + IC.close + '</button></div>' + rows +
+    return '<section class="sgcard"><div class="sg-head"><span class="sg-h">SUGGESTED FOR YOU' + IC.spark + '</span><button class="iconbtn sg-x" data-act="sugg-hide" aria-label="Hide suggestions">' + IC.close + '</button></div>' + rows +
       (all.length > 3 ? '<div class="sg-foot"><button class="sg-more" data-act="sugg-more">New ideas ›</button></div>' : '') + '</section>';
   }
   function suggFind(pid, k) { var l = suggestions(pid); for (var i = 0; i < l.length; i++) if (l[i].key === k) return l[i]; return null; }
@@ -753,9 +967,9 @@ export function startGame(SYNCAPI) {
     var ui = UI[pid], o = other(pid), T = effNow();
     var active = S.tasks.filter(isActive);
     var lists = {
-      mine: sortTasks(active.filter(function (t) { return t.assignee === pid; }), pid),
+      mine: sortTasks(active.filter(function (t) { return t.assignee === pid || helpingMe(t, pid); }), pid),
       any: sortTasks(active.filter(function (t) { return t.assignee === 'any'; }), pid),
-      partner: sortTasks(active.filter(function (t) { return t.assignee === o; }), pid)
+      partner: sortTasks(active.filter(function (t) { return t.assignee === o && !helpingMe(t, pid); }), pid)
     };
     var doneToday = S.completions.filter(function (c) { return c.at >= sod(T) && c.at <= T; }).sort(function (a, b) { return b.at - a.at; });
     var upcoming = S.tasks.filter(isUpcoming).sort(function (a, b) { return a.dueAt - b.dueAt; });
@@ -776,10 +990,11 @@ export function startGame(SYNCAPI) {
       var list = lists[ui.filter];
       var todayList = S.completions.filter(function (c) { return c.by === pid && c.at >= sod(T); }), nToday = todayList.length;
       var comboToday = todayList.reduce(function (n, c) { return n + (c.combo || 0); }, 0);
-      if (ui.filter === 'mine' && !isPaused()) body += tipHTML(pid) + suggHTML(pid);
+      var sgBox = ui.filter === 'mine' && !isPaused() ? suggHTML(pid) : '';
+      if (ui.filter === 'mine' && !isPaused()) body += tipHTML(pid) + sgBox;
       if (!list.length) {
-        if (ui.filter === 'mine') body += '<div class="empty"><span class="disp">NOTHING LEFT FOR YOU</span><span>Suspicious.</span></div>';
-        else if (ui.filter === 'any') body += '<div class="empty"><span class="disp">NO OPEN QUESTS</span><span>Add one with the + button.</span></div>';
+        if (ui.filter === 'mine' && !sgBox) body += '<div class="empty"><span class="disp">NOTHING LEFT FOR YOU</span><span>Suspicious.</span></div>';
+        else if (ui.filter === 'any') body += '<div class="empty"><span class="disp">NO OPEN TASKS</span><span>Add one with the + button.</span></div>';
         else body += '<div class="empty"><span class="disp">' + (hasPartner(pid) ? esc(nameOf(o)).toUpperCase() + ' IS ALL CLEAR' : 'NO PARTNER YET') + '</span><span>' + (hasPartner(pid) ? 'Nothing to steal. Annoying.' : 'Share your invite code from Settings.') + '</span></div>';
       }
       list.forEach(function (t) { body += taskRow(pid, t); });
@@ -789,6 +1004,65 @@ export function startGame(SYNCAPI) {
   }
 
   /* ================= Score tab ================= */
+  function nudgeSheet(pid, s) {
+    var d = s.d, steps = d.level === 'off' ? 3 : 4, step = Math.min(s.step, steps - 1), body;
+    function seg(act, list, cur) { return '<div class="ns-opts">' + list.map(function (x) { return '<button class="ns-opt' + (cur === x[0] ? ' on' : '') + '" data-act="' + act + '" data-v="' + x[0] + '"><b>' + x[1] + '</b>' + (x[2] && typeof x[2] === 'string' ? '<small>' + x[2] + '</small>' : '') + '</button>'; }).join('') + '</div>'; }
+    if (step === 0) body = '<h3>When do you usually get things done?</h3><p class="muted">We’ll nudge you around then. After a few tasks, we learn your real rhythm.</p>' + seg('ns-when', NUDGE_WHEN, d.when);
+    else if (step === 1) body = '<h3>How pushy should we be?</h3><p class="muted">Never more than one nudge a day.</p>' + seg('ns-level', NUDGE_LEVELS, d.level);
+    else if (step === 2) body = '<h3>Quiet hours</h3><p class="muted">No nudges between these times.</p>' + '<div class="ns-opts two">' + QUIET_PRESETS.map(function (q) { var on = d.quiet[0] === q[0] && d.quiet[1] === q[1]; return '<button class="ns-opt' + (on ? ' on' : '') + '" data-act="ns-quiet" data-v="' + q.join('-') + '"><b>' + hh(q[0]) + '–' + hh(q[1]) + '</b></button>'; }).join('') + '</div>';
+    else body = '<h3>Allow notifications</h3><p class="muted">Nudges arrive as notifications, even when the app is closed. Android will ask you once.</p>' + (s.pushErr ? '<p class="coral" style="margin:0">' + esc(s.pushErr) + '</p>' : '') +
+      (d.perm === 'granted' ? '<div class="ns-ok">' + IC.check + ' Notifications are on</div>' : d.perm === 'denied' ? '<div class="ns-ok off">Blocked. You can turn them on later in Android settings.</div><button class="btn ghost" data-act="ns-perm">Try again</button>' : '<button class="btn gold" data-act="ns-perm">ALLOW NOTIFICATIONS</button>');
+    var dots = ''; for (var i = 0; i < steps; i++) dots += '<i class="' + (i === step ? 'on' : '') + '"></i>';
+    var inner = '<div class="sheet-top">' + (step > 0 ? '<button class="iconbtn" data-act="ns-prev" aria-label="Back">' + IC.back + '</button>' : '') + '<span class="ttl">NUDGES</span><button class="iconbtn" data-act="close-sheet" aria-label="Close">' + IC.close + '</button></div>' +
+      body + '<div class="ws-dots ns-dots">' + dots + '</div>' +
+      '<div class="btn-row">' + (s.first && step === 0 ? '<button class="btn plain" data-act="ns-skip">Not now</button>' : '') +
+      (step < steps - 1 ? '<button class="btn gold" data-act="ns-next">NEXT</button>' : '<button class="btn gold" data-act="ns-save">' + (s.first ? 'DONE' : 'SAVE') + '</button>') + '</div>' +
+      (s.sys ? '<div class="sysdlg-wrap"><div class="sysdlg" role="dialog"><span class="sys-ic">' + IC.paw + '</span><p>Allow <b>HouseholdBattle</b> to send you notifications?</p><button data-act="ns-sys" data-v="granted">Allow</button><button data-act="ns-sys" data-v="denied">Don’t allow</button></div></div>' : '');
+    return sheetWrap(pid, inner, s.fresh, 'Nudges');
+  }
+  function nudgeDefaults() { return { when: 'evening', level: 'gentle', quiet: [22, 7], perm: 'default' }; }
+  function maybeAskNudges(pid) {
+    var ui = UI[pid], m = S.members[pid];
+    if (window.__noChest || !m || m.nudge || ui.nudgeAsked || ui.sheet || ui.settings || ui.summary || ui.chest || ui.closed || ui.animLock || (ui.ob.step !== 'done' && ui.ob.step !== 'welcome')) return; // sample data skips onboarding
+    ui.nudgeAsked = true;
+    openSheet(pid, { kind: 'nudge', step: 0, d: nudgeDefaults(), first: true });
+  }
+  function helpSheet(pid, s) {
+    var t = getTask(s.id); if (!t) return '';
+    var o = other(pid), on = esc(nameOf(o)), ask = t.assignee === pid, n = helpBank(t);
+    var inner = '<div class="sheet-top"><button class="iconbtn" data-act="ch-back" aria-label="Back">' + IC.back + '</button><span class="ttl">' + (ask ? 'ASK FOR HELP' : 'OFFER HELP') + '</span><button class="iconbtn" data-act="close-sheet" aria-label="Close">' + IC.close + '</button></div>' +
+      '<h3>' + esc(t.title) + '</h3>' +
+      '<div class="help-deal"><div><span class="lbl">' + (ask ? on : 'You') + '</span><b class="bst">' + IC.boltSm + '+' + n + ' boost</b><small>No XP now. A comeback card for when they fall behind.</small></div>' +
+      '<div><span class="lbl">' + (ask ? 'You' : on) + '</span><b>0 XP</b><small>The task gets done, but no points for it.</small></div></div>' +
+      '<span class="lbl">Note to ' + on + ' (optional)</span>' + composerHTML(pid, 'sheet', ask ? 'helpask' : 'helpoffer', 'select') +
+      '<button class="btn gold" data-act="help-send">' + (ask ? 'ASK ' + on.toUpperCase() : 'OFFER TO HELP') + '</button>';
+    return sheetWrap(pid, inner, s.fresh, ask ? 'Ask for help' : 'Offer help');
+  }
+  function boostSheet(pid, s) {
+    var bs = boostsAvail(pid), behind = isBehind(pid), o = other(pid), gap = weekXP(o, now()) - weekXP(pid, now());
+    var inner = '<div class="sheet-top"><span class="ttl">BOOSTS</span><button class="iconbtn" data-act="close-sheet" aria-label="Close">' + IC.close + '</button></div>' +
+      '<div class="boost-big">' + IC.boltBig + '</div>' +
+      '<p class="muted" style="margin:0;text-align:center">' + (behind ? 'You are <b>' + gap + ' XP</b> behind ' + esc(nameOf(o)) + '. Play a boost to catch up.' : 'Boosts are comeback cards. You can only play one when you are behind ' + esc(nameOf(o)) + ' this week.') + '</p>' +
+      bs.map(function (b) { return '<div class="boost-row">' + IC.boltSm + '<span>' + esc(b.label) + '<small>Expires ' + fmtDate(b.until - 1) + '</small></span><button class="btn sm' + (behind ? ' gold' : '') + '" data-act="boost-use" data-id="' + b.id + '"' + (behind && !isPaused() ? '' : ' disabled') + '>+' + b.xp + ' XP</button></div>'; }).join('');
+    return sheetWrap(pid, inner, s.fresh, 'Boosts');
+  }
+  function badgeModalHTML(pid, owner, id) {
+    var bd = badgeDef(id); if (!bd) return '';
+    var t = badgeTier(owner, id), hid = !t && (bd.rare || bd.shame);
+    var mine = (S.badges[owner] || []).filter(function (b) { return b.id === id; });
+    var last = mine.slice().sort(function (a, b) { return b.at - a.at; })[0];
+    var xpEarned = mine.reduce(function (n, b) { return n + (b.revealed ? (bd.xp[Math.min(bd.xp.length, b.tier || 1) - 1] || 0) : 0); }, 0);
+    var desc = hid ? 'A rare badge. Keep playing to find out.' : badgeRule(bd, Math.max(1, t)) + (bd.shame ? ' The dog is disappointed.' : '');
+    var xpLine = hid ? '' : t ? (xpEarned ? '+' + xpEarned + ' XP' : 'No XP for this one') : (bd.xp[0] ? '+' + bd.xp[0] + ' XP' : '');
+    return '<div class="bmodal" role="dialog" aria-label="' + (hid ? 'Hidden rare badge' : esc(bd.name)) + '"><button class="overlay-hit" data-act="badge-close" aria-label="Close" tabindex="-1"></button>' +
+      '<div class="bm-card"><button class="iconbtn bm-x" data-act="badge-close" aria-label="Close">' + IC.close + '</button>' +
+      '<div class="bm-img">' + badgeMedal(bd, t, 170) + '</div>' +
+      '<h3>' + (hid ? '???' : esc(bd.name)) + (bd.shame && dodgeCount(owner) > 1 ? ' ×' + dodgeCount(owner) : '') + '</h3>' +
+      '<p class="bm-why">' + esc(desc) + '</p>' +
+      (t && last ? '<p class="bm-date">' + fmtDate(last.at) + '</p>' : '') +
+      (xpLine ? '<p class="bm-xp' + (t ? '' : ' muted') + '">' + xpLine + '</p>' : '') + '</div></div>';
+  }
+
   function scoreHTML(pid) {
     var ui = UI[pid], o = other(pid), hasP = hasPartner(pid), T = effNow();
     var from = ui.scorePeriod === 'week' ? weekStart(T) : 0;
@@ -812,30 +1086,27 @@ export function startGame(SYNCAPI) {
     var ownerP = ui.badgeOwner === 'me' ? pid : o;
     var earned = S.badges[ownerP] || [];
     var grid = BADGES.map(function (b) {
-      var e = earned.find(function (x) { return x.id === b.id; });
-      var cls = 'badge' + (e ? ' earned' + (b.rare ? ' rare' : '') : (b.rare ? ' hidden' : '')) + (ui.badgeOpen === b.id ? ' sel' : '');
-      var icon = e ? IC.hex(b.rare ? '#FF7A59' : '#FFC93C', '<path d="M11 16l3.5 3.5L21 12" fill="none" stroke="#241E4E" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"></path>') : IC.hex('#3A3275', b.rare ? '<text x="16" y="21" text-anchor="middle" font-family="Bungee, sans-serif" font-size="12" fill="#FF9A80">?</text>' : '');
-      var label = e || !b.rare ? esc(b.name) + (e && b.rare ? ' · rare' : '') : '???';
-      return '<button class="' + cls + '" data-act="badge-open" data-id="' + b.id + '" aria-label="' + (e || !b.rare ? esc(b.name) : 'Hidden rare badge') + (e ? ', earned' : ', not earned') + '">' + icon + label + '</button>';
+      var tier = badgeTier(ownerP, b.id), got = tier > 0, hidden = !got && (b.rare || b.shame);
+      if (b.shame && !got) return '';
+      var cls = 'badge' + (got ? ' earned' : '') + (hidden ? ' hidden' : '') + (b.rare && got ? ' rare' : '') + (ui.badgeOpen === b.id ? ' sel' : '');
+      var label = hidden ? '???' : esc(b.name) + (b.shame && dodgeCount(ownerP) > 1 ? ' ×' + dodgeCount(ownerP) : '');
+      var sub = got ? (b.tiers.length > 1 ? TIER_NAME[tier] : b.shame ? 'Shame' : 'Earned') : hidden ? 'Rare' : 'Not yet';
+      return '<button class="' + cls + '" data-act="badge-open" data-id="' + b.id + '" aria-label="' + (hidden ? 'Hidden rare badge' : esc(b.name)) + (got ? ', ' + sub : ', not earned') + '">' + badgeMedal(b, got ? tier : 0, 80) + (b.shame && dodgeCount(ownerP) > 1 ? '<span class="bcount">×' + dodgeCount(ownerP) + '</span>' : '') + '</button>';
     }).join('');
-    var pop = '';
-    if (ui.badgeOpen) {
-      var bd = badgeDef(ui.badgeOpen), e2 = earned.find(function (x) { return x.id === ui.badgeOpen; });
-      pop = '<div class="badge-pop" role="status"><b>' + (e2 || !bd.rare ? esc(bd.name) : 'Hidden rare badge') + '</b><span>' + (e2 || !bd.rare ? esc(bd.desc) : 'A rare badge. Keep playing to find out.') + '</span><span>' + (e2 ? 'Earned ' + fmtDate(e2.at) : 'Not earned yet') + '</span></div>';
-    }
+    var pop = ui.badgeOpen ? badgeModalHTML(pid, ownerP, ui.badgeOpen) : '';
     return '<div class="topbar page-title"><h2>SCORE · ' + (ui.scorePeriod === 'week' ? 'WEEK ' + isoWeek(T) : 'ALL TIME') + '</h2><div class="toggle" role="tablist"><button role="tab" class="' + (ui.scorePeriod === 'week' ? 'on' : '') + '" data-act="score-period" data-p="week" aria-selected="' + (ui.scorePeriod === 'week') + '">This week</button><button role="tab" class="' + (ui.scorePeriod === 'all' ? 'on' : '') + '" data-act="score-period" data-p="all" aria-selected="' + (ui.scorePeriod === 'all') + '">All time</button></div></div><div class="scroll" data-scroll="score"><div class="page">' +
-      '<section class="panel"><div class="vs"><div class="player"><button class="avbtn" data-act="score-who" data-who="me" aria-label="Show your score">' + dogAvatar(pid, pid) + '</button>' + '<div class="player-meta"><small>' + esc(nameOf(pid)) + ' · Lvl ' + li.lvl + '</small><span class="score-num gold">' + me + '</span></div></div><div class="player right">' + (hasP ? '<button class="avbtn" data-act="score-who" data-who="partner" aria-label="Show ' + esc(nameOf(o)) + '\'s score">' + dogAvatar(o, pid) + '</button>' : dogAvatar(o, pid)) + '<div class="player-meta"><small>' + (hasP ? 'Lvl ' + lo.lvl + ' · ' + esc(nameOf(o)) : 'Not joined') + '</small><span class="score-num coral">' + (hasP ? p : '–') + '</span></div></div></div>' + tugHTML(me, p, hasP) + '<span class="cheeky">' + cap + '</span></section>' +
+
       personHTML(pid) +
       '<section class="stats" aria-label="Stats"><div class="r h"><span></span><span>You</span><span>' + (hasP ? esc(nameOf(o)) : 'Partner') + '</span></div>' +
-        '<div class="r"><span>Quests done</span><span class="gold"' + hi(sm.n, sp.n, true) + '>' + sm.n + '</span><span class="coral"' + hi(sm.n, sp.n, false) + '>' + sp.n + '</span></div>' +
+        '<div class="r"><span>Tasks done</span><span class="gold"' + hi(sm.n, sp.n, true) + '>' + sm.n + '</span><span class="coral"' + hi(sm.n, sp.n, false) + '>' + sp.n + '</span></div>' +
         '<div class="r"><span>Hard + Epic</span><span class="gold"' + hi(sm.hate, sp.hate, true) + '>' + sm.hate + '</span><span class="coral"' + hi(sm.hate, sp.hate, false) + '>' + sp.hate + '</span></div>' +
-        '<div class="r"><span>Oldest quest finished</span><span class="gold"' + hi(num(sm.oldest), num(sp.oldest), true) + '>' + sm.oldest + '</span><span class="coral"' + hi(num(sm.oldest), num(sp.oldest), false) + '>' + sp.oldest + '</span></div>' +
+        '<div class="r"><span>Oldest task finished</span><span class="gold"' + hi(num(sm.oldest), num(sp.oldest), true) + '>' + sm.oldest + '</span><span class="coral"' + hi(num(sm.oldest), num(sp.oldest), false) + '>' + sp.oldest + '</span></div>' +
         '<div class="r"><span>Challenges won</span><span class="gold"' + hi(sm.cw, sp.cw, true) + '>' + sm.cw + '</span><span class="coral"' + hi(sm.cw, sp.cw, false) + '>' + sp.cw + '</span></div>' +
         '<div class="r"><span>Handed back</span><span class="gold">' + sm.hb + '</span><span class="coral">' + sp.hb + '</span></div>' +
       '</section>' +
       rewardsSection(pid) +
-      '<section class="sect"><div class="page-title"><h4>' + (ui.badgeOwner === 'me' ? 'YOUR BADGES' : esc(nameOf(o)).toUpperCase() + "'S BADGES") + ' · ' + earned.length + ' / ' + BADGES.length + '</h4></div><div class="badges">' + grid + '</div>' + pop + '</section>' +
-    '</div></div>';
+      '<section class="sect"><div class="page-title"><h4>' + (ui.badgeOwner === 'me' ? 'YOUR BADGES' : esc(nameOf(o)).toUpperCase() + "'S BADGES") + ' · ' + BADGES.filter(function (b) { return !b.shame && badgeTier(ownerP, b.id) > 0; }).length + ' / ' + BADGES.filter(function (b) { return !b.shame; }).length + '</h4></div><div class="badges">' + grid + '</div>' + '</section>' +
+    '</div></div>' + pop;
   }
 
   // Score page: whose page is it? (You / partner switch + level card)
@@ -851,6 +1122,252 @@ export function startGame(SYNCAPI) {
   function tierOf(l) { var t = LEVEL_TIERS[0]; LEVEL_TIERS.forEach(function (x) { if (l >= x.from) t = x; }); return t; }
   function levelStartXP(l) { var floor = 0; for (var k = 1; k < l; k++) floor += Math.round(20 * Math.pow(1.25, k - 1)); return floor; }
   var LB_SEQ = 0;
+  // World-of-Tanks-style metal medals: bronze / silver / gold, embossed icon, laurels, ribbon bar.
+  var METALS = {
+    1: { hi: '#F6C9A0', mid: '#C27A45', lo: '#6E3B1A', deep: '#4A250F', rib: ['#7A2E2E', '#E8B07A', '#7A2E2E'] },
+    2: { hi: '#FFFFFF', mid: '#B8C0D0', lo: '#6C7488', deep: '#3E4456', rib: ['#2E3E7A', '#E4E9F4', '#2E3E7A'] },
+    3: { hi: '#FFF3B8', mid: '#F2B632', lo: '#9A6510', deep: '#5E3A06', rib: ['#7A1E2E', '#FFC93C', '#1E2E7A'] },
+    shame: { hi: '#B9B6C4', mid: '#7D7A8C', lo: '#4A4858', deep: '#2C2A36', rib: ['#4A4858', '#7D7A8C', '#4A4858'] },
+    locked: { hi: '#4A4288', mid: '#3A3275', lo: '#2F2862', deep: '#241E4E', rib: ['#2F2862', '#3A3275', '#2F2862'] }
+  };
+  var MEDAL_ICONS = {
+    bone: '<g transform="rotate(-30 90 96)"><rect x="70" y="90" width="40" height="12" rx="4"/><circle cx="70" cy="89" r="7"/><circle cx="70" cy="103" r="7"/><circle cx="110" cy="89" r="7"/><circle cx="110" cy="103" r="7"/></g>',
+    drop: '<path d="M90 70 C80 86 75 94 75 102 a15 15 0 0 0 30 0 c0-8-5-16-15-32z"/>',
+    flame: '<path d="M90 68 c4 12 18 18 18 34 a18 18 0 0 1-36 0 c0-8 4-12 8-16 0 6 3 9 6 9-2-10 0-18 4-27z"/>',
+    check: '<path d="M70 96 l13 13 27-27 7 7-34 34-20-20z"/>',
+    weight: '<rect x="66" y="88" width="48" height="16" rx="3"/><rect x="60" y="80" width="10" height="32" rx="3"/><rect x="110" y="80" width="10" height="32" rx="3"/>',
+    chain: '<path d="M68 88 a10 10 0 0 1 10-10 h10 a10 10 0 0 1 0 20 h-4 v-6 h4 a4 4 0 0 0 0-8 h-10 a4 4 0 0 0 0 8 h2 v6 h-2 a10 10 0 0 1-10-10z"/><path d="M112 104 a10 10 0 0 1-10 10 h-10 a10 10 0 0 1 0-20 h4 v6 h-4 a4 4 0 0 0 0 8 h10 a4 4 0 0 0 0-8 h-2 v-6 h2 a10 10 0 0 1 10 10z"/>',
+    paw: '<ellipse cx="90" cy="104" rx="13" ry="11"/><circle cx="74" cy="90" r="6"/><circle cx="84" cy="80" r="6"/><circle cx="96" cy="80" r="6"/><circle cx="106" cy="90" r="6"/>',
+    crown: '<path d="M68 112 l-4-30 14 12 12-20 12 20 14-12-4 30z"/>',
+    swords: '<path d="M70 72 l6-2 36 36 4 10-10-4-36-36z"/><path d="M110 72 l-6-2-36 36-4 10 10-4 36-36z"/>',
+    bolt: '<path d="M96 68 l-22 32 h14 l-6 26 24-34 h-14z"/>',
+    house: '<path d="M90 70 l26 22 h-7 v24 h-12 v-14 h-14 v14 h-12 v-24 h-7z"/>',
+    cards: '<rect x="70" y="76" width="26" height="36" rx="4" transform="rotate(-12 83 94)"/><rect x="86" y="78" width="26" height="36" rx="4" transform="rotate(10 99 96)"/>',
+    target: '<path fill-rule="evenodd" d="M90 72 a24 24 0 1 1 0 48 a24 24 0 1 1 0-48z m0 8 a16 16 0 1 0 0 32 a16 16 0 1 0 0-32z m0 8 a8 8 0 1 1 0 16 a8 8 0 1 1 0-16z"/>',
+    sun: '<circle cx="90" cy="96" r="12"/><g stroke-width="5" stroke-linecap="round" fill="none" class="rays"><path d="M90 70v8M90 114v8M64 96h8M108 96h8M72 78l6 6M102 108l6 6M108 78l-6 6M78 108l-6 6"/></g>',
+    up: '<path d="M90 68 l20 22 h-12 v26 h-16 v-26 h-12z"/>',
+    boom: '<path d="M90 70 l6 14 15-6-6 15 14 6-14 6 6 15-15-6-6 14-6-14-15 6 6-15-14-6 14-6-6-15 15 6z"/>',
+    claw: '<path d="M72 76 l8-2 8 40-6 2z M86 74 l8-1 4 42-6 1z M100 76 l8 1-2 40-6-1z"/>',
+    zzz: '<text x="90" y="106" text-anchor="middle" font-family="Bungee, Rubik, sans-serif" font-size="26">Zzz</text>'
+  };
+  var MEDAL_SEQ = 0;
+  function medalSVG(icon, metalKey, size) {
+    var m = METALS[metalKey] || METALS[1], k = 'm' + (++MEDAL_SEQ), ic = MEDAL_ICONS[icon] || MEDAL_ICONS.check, locked = metalKey === 'locked';
+    var leaves = '';
+    for (var i = 0; i < 7; i++) [-1, 1].forEach(function (side) {
+      var a = (side < 0 ? 200 - i * 19 : -20 + i * 19) * Math.PI / 180, cx = 90 + 62 * Math.cos(a), cy = 96 + 63 * Math.sin(a);
+      var rot = a * 180 / Math.PI + (side < 0 ? 115 : -115);
+      leaves += '<ellipse cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" rx="5" ry="11" transform="rotate(' + rot.toFixed(1) + ' ' + cx.toFixed(1) + ' ' + cy.toFixed(1) + ')" fill="url(#g' + k + ')" stroke="' + m.deep + '" stroke-width="1.2"/>';
+    });
+    var dots = ''; for (var d = 0; d < 360; d += 20) { var r = d * Math.PI / 180; dots += '<circle cx="' + (90 + 49 * Math.cos(r)).toFixed(1) + '" cy="' + (96 + 49 * Math.sin(r)).toFixed(1) + '" r="1.6"/>'; }
+    var face = locked ? '<text x="90" y="110" text-anchor="middle" font-family="Bungee, Rubik, sans-serif" font-size="38" fill="#5A5296">?</text>'
+      : '<g transform="translate(1.6 2)" fill="' + m.deep + '" stroke="' + m.deep + '" opacity=".8">' + ic + '</g><g transform="translate(-1 -1.2)" fill="' + m.hi + '" stroke="' + m.hi + '" opacity=".9">' + ic + '</g><g fill="url(#g' + k + ')" stroke="url(#g' + k + ')">' + ic + '</g>';
+    var crack = metalKey === 'shame' ? '<path d="M70 62 l10 16-6 8 12 14-4 10" fill="none" stroke="' + m.deep + '" stroke-width="2.5" stroke-linecap="round"/>' : '';
+    return '<svg class="medal" width="' + size + '" height="' + Math.round(size * 210 / 180) + '" viewBox="0 0 180 210" aria-hidden="true"><defs>' +
+      '<linearGradient id="g' + k + '" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="' + m.hi + '"/><stop offset=".45" stop-color="' + m.mid + '"/><stop offset="1" stop-color="' + m.lo + '"/></linearGradient>' +
+      '<linearGradient id="h' + k + '" x1="1" y1="1" x2="0" y2="0"><stop offset="0" stop-color="' + m.hi + '"/><stop offset=".5" stop-color="' + m.mid + '"/><stop offset="1" stop-color="' + m.lo + '"/></linearGradient>' +
+      '<radialGradient id="d' + k + '" cx=".4" cy=".35" r=".75"><stop offset="0" stop-color="' + m.mid + '"/><stop offset=".7" stop-color="' + m.lo + '"/><stop offset="1" stop-color="' + m.deep + '"/></radialGradient></defs>' +
+      '<rect x="62" y="6" width="56" height="26" rx="3" fill="' + m.rib[0] + '"/><rect x="74" y="6" width="32" height="26" fill="' + m.rib[1] + '"/><rect x="86" y="6" width="8" height="26" fill="' + m.rib[2] + '"/><rect x="62" y="6" width="56" height="26" rx="3" fill="none" stroke="' + m.deep + '" stroke-width="1.5"/>' +
+      '<rect x="84" y="30" width="12" height="12" rx="2" fill="url(#g' + k + ')" stroke="' + m.deep + '" stroke-width="1.2"/>' + (locked ? '' : leaves) +
+      '<circle cx="90" cy="96" r="52" fill="url(#g' + k + ')" stroke="' + m.deep + '" stroke-width="2"' + (locked ? ' stroke-dasharray="5 5"' : '') + '/><circle cx="90" cy="96" r="46" fill="url(#h' + k + ')"/><circle cx="90" cy="96" r="41" fill="url(#d' + k + ')" stroke="' + m.deep + '" stroke-width="1.5"/>' +
+      '<g fill="' + m.hi + '" opacity="' + (locked ? 0 : 0.7) + '">' + dots + '</g>' + face + crack +
+      (locked ? '' : '<path d="M50 80 A44 44 0 0 1 130 80 Q90 66 50 80Z" fill="#fff" opacity=".18"/><path d="M90 150 l4 8 9 1-7 6 2 9-8-5-8 5 2-9-7-6 9-1z" fill="url(#g' + k + ')" stroke="' + m.deep + '" stroke-width="1.2"/>') + '</svg>';
+  }
+  var BADGE_ART = {
+    first: 'data:image/webp;base64,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',
+    chacc: 'data:image/webp;base64,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'
+  };
+  // Your artwork wins over the placeholder medal. Multi-tier badges get a bronze/silver/gold coin in the corner.
+  // Badges without finished art all share one placeholder.
+  var BADGE_PLACEHOLDER = "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20100%20114%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%234A4270%22/%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%232A2450%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath%20d%3D%22M50%204%20L92%2018%20V56%20C92%2082%2074%20100%2050%20110%20C26%20100%208%2082%208%2056%20V18%20Z%22%20fill%3D%22url%28%23g%29%22%20stroke%3D%22%238C84B8%22%20stroke-width%3D%223%22/%3E%3Cpath%20d%3D%22M50%2013%20L84%2024%20V56%20C84%2077%2070%2092%2050%20101%20C30%2092%2016%2077%2016%2056%20V24%20Z%22%20fill%3D%22none%22%20stroke%3D%22%238C84B8%22%20stroke-width%3D%221.5%22%20stroke-dasharray%3D%224%204%22%20opacity%3D%22.6%22/%3E%3Cg%20fill%3D%22%23B9B2E0%22%3E%3Cellipse%20cx%3D%2250%22%20cy%3D%2266%22%20rx%3D%2212%22%20ry%3D%2210%22/%3E%3Ccircle%20cx%3D%2235%22%20cy%3D%2251%22%20r%3D%225.5%22/%3E%3Ccircle%20cx%3D%2245%22%20cy%3D%2244%22%20r%3D%225.5%22/%3E%3Ccircle%20cx%3D%2255%22%20cy%3D%2244%22%20r%3D%225.5%22/%3E%3Ccircle%20cx%3D%2265%22%20cy%3D%2251%22%20r%3D%225.5%22/%3E%3C/g%3E%3C/svg%3E";
+  function badgeMedal(b, tier, size) {
+    var art = BADGE_ART[b.id] || BADGE_PLACEHOLDER;
+    var multi = false, h = Math.round(size * 1.14);
+    return '<span class="bart' + (tier ? '' : ' locked') + '" style="width:' + size + 'px;height:' + h + 'px"><img src="' + art + '" alt="">' +
+      (multi && tier ? '<i class="tcoin t' + Math.min(3, tier) + '" aria-hidden="true">' + ['', 'I', 'II', 'III'][Math.min(3, tier)] + '</i>' : '') + '</span>';
+  }
+
+  /* ---------- the chest: badges are revealed after the task is confirmed ---------- */
+  function undoableCompIds(pid) {
+    var ui = UI[pid], ids = {};
+    if (ui.toast && ui.toast.kind === 'done') ui.toast.items.forEach(function (c) { ids[c.id] = 1; });
+    if (ui.sheet && ui.sheet.kind === 'reward' && ui.sheet.comp) ids[ui.sheet.comp.id] = 1;
+    return ids;
+  }
+  function nextChest(pid) {
+    if (!S.members[pid]) return null;
+    var hold = undoableCompIds(pid);
+    return (S.badges[pid] || []).filter(function (b) { return !b.revealed && !(b.compId && hold[b.compId]); }).sort(function (a, b) { return a.at - b.at; })[0] || null;
+  }
+  /* ---------- end-of-week summary ---------- */
+  var SUM_TAUNTS = { win: ['Scoreboard. Look at it.', 'Better luck next week.', "I'll take my boost now, thanks."], lose: ['Enjoy it while it lasts.', 'Next week is mine.', 'I let you win.'], tie: ['Dead even. Rematch?', 'Next week, someone wins.'] };
+  function weekStats(ws) {
+    var we = addDays(ws, 7) - 1, out = {};
+    ['A', 'B'].forEach(function (p) {
+      var cs = S.completions.filter(function (c) { return c.by === p && c.at >= ws && c.at <= we; });
+      var oldest = cs.reduce(function (m, c) { return !c.alreadyDone && c.waitedDays > (m ? m.waitedDays : -1) ? c : m; }, null);
+      out[p] = { xp: S.members[p] ? weekXP(p, we) : 0, n: cs.length, hard: cs.filter(isHate).length, steals: cs.filter(function (c) { return c.stolen; }).length, streak: streakDays(cs), oldest: oldest,
+        badges: (S.badges[p] || []).filter(function (b) { return b.at >= ws && b.at <= we + 1; }) };
+    });
+    var days = {}; S.completions.forEach(function (c) { if (c.at >= ws && c.at <= we) { var k = wdIdx(c.at); days[k] = (days[k] || 0) + 1; } });
+    var busy = Object.keys(days).sort(function (a, b) { return days[b] - days[a]; })[0];
+    out.busy = busy != null ? { day: WD_LONG[busy], n: days[busy] } : null;
+    var tally = { A: 0, B: 0 };
+    for (var w = weekStart(S.household.createdAt); w <= ws; w = addDays(w, 7)) { var win = weekWinner(w); if (win) tally[win.pid]++; }
+    out.tally = tally; out.win = weekWinner(ws);
+    return out;
+  }
+  function maybeOpenSummary(pid) {
+    if (window.__noChest) return; // test switch
+    var ui = UI[pid], m = S.members[pid];
+    if (ui.summary || !m || !hasPartner(pid) || ui.sheet || ui.settings || ui.closed || ui.animLock || isPaused()) return;
+    var last = addDays(weekStart(now()), -7);
+    if ((m.sumSeen || 0) >= addDays(last, 1)) return;
+    if (S.members[other(pid)].joinedAt > addDays(last, 7)) return;
+    ui.summary = { ws: last, step: 0 };
+  }
+  function weekSumHTML(pid) {
+    var ui = UI[pid], sm = ui.summary; if (!sm) return '';
+    var o = other(pid), st = weekStats(sm.ws), me = st[pid], th = st[o], win = st.win, wk = isoWeek(sm.ws);
+    var cards = [];
+    function cmp(title, a, b, unit) { var mx = Math.max(a, b, 1); return '<div class="ws-card"><span class="ws-kick">' + title + '</span><div class="ws-cmp"><div><b>' + esc(nameOf(pid)) + '</b><i style="width:' + Math.round(a / mx * 100) + '%"></i><span>' + a + unit + '</span></div><div class="them"><b>' + esc(nameOf(o)) + '</b><i style="width:' + Math.round(b / mx * 100) + '%"></i><span>' + b + unit + '</span></div></div></div>'; }
+    cards.push(cmp('TASKS DONE', me.n, th.n, ''));
+    if (me.hard + th.hard) cards.push(cmp('HARD + EPIC', me.hard, th.hard, ''));
+    if (me.steals + th.steals) cards.push('<div class="ws-card"><span class="ws-kick">STEALS</span><p class="ws-big">' + (me.steals >= th.steals ? 'You stole ' + me.steals : esc(nameOf(o)) + ' stole ' + th.steals) + '</p><p class="ws-sub">' + (me.steals >= th.steals ? esc(nameOf(o)) + ' stole ' + th.steals + '. Guard your stuff.' : 'You stole ' + me.steals + '. Guard your stuff.') + '</p></div>');
+    if (st.busy) cards.push('<div class="ws-card"><span class="ws-kick">BUSIEST DAY</span><p class="ws-big">' + st.busy.day + '</p><p class="ws-sub">' + st.busy.n + ' tasks between you</p></div>');
+    var old = [me.oldest, th.oldest].filter(Boolean).sort(function (a, b) { return b.waitedDays - a.waitedDays; })[0];
+    if (old && old.waitedDays >= 3) cards.push('<div class="ws-card"><span class="ws-kick">FINALLY DONE</span><p class="ws-big">' + esc(old.title) + '</p><p class="ws-sub">after ' + old.waitedDays + ' days · by ' + (old.by === pid ? 'you' : esc(nameOf(old.by))) + '</p></div>');
+    if (Math.max(me.streak, th.streak) >= 2) cards.push(cmp('LONGEST STREAK', me.streak, th.streak, ' d'));
+    cards = cards.slice(0, 4);
+    var steps = 2 + cards.length, step = Math.min(sm.step, steps - 1), body;
+    if (step === 0) {
+      var iWon = win && win.pid === pid, crown = win ? (iWon ? 'me' : 'them') : '';
+      body = '<span class="ws-kick">WEEK ' + wk + ' RESULTS</span>' +
+        '<div class="ws-duel"><div class="ws-side' + (crown === 'me' ? ' won' : '') + '">' + (crown === 'me' ? '<span class="ws-crown">' + IC.crown + '</span>' : '') + dogAvatar(pid, pid) + '<b class="ws-score" data-to="' + me.xp + '">0</b><span>' + esc(nameOf(pid)) + '</span></div>' +
+        '<span class="ws-vs">VS</span><div class="ws-side them' + (crown === 'them' ? ' won' : '') + '">' + (crown === 'them' ? '<span class="ws-crown">' + IC.crown + '</span>' : '') + dogAvatar(o, pid) + '<b class="ws-score" data-to="' + th.xp + '">0</b><span>' + esc(nameOf(o)) + '</span></div></div>' +
+        '<h2 class="ws-result">' + (!win ? 'DEAD EVEN' : iWon ? 'YOU WIN!' : esc(nameOf(o)).toUpperCase() + ' WINS') + '</h2>' +
+        (win ? '<p class="ws-sub">' + (iWon ? 'You banked a <b>+' + WIN_BOOST + ' XP boost</b>. Play it whenever you fall behind.' : esc(nameOf(o)) + ' banked a +' + WIN_BOOST + ' XP comeback boost. Stay ahead.') + '</p>' : '<p class="ws-sub">Nobody gets the boost. Tense.</p>');
+    } else if (step < steps - 1) body = cards[step - 1];
+    else {
+      var bs = me.badges.concat(th.badges);
+      var mood = !win ? 'tie' : win.pid === pid ? 'win' : 'lose';
+      body = '<span class="ws-kick">THE RECORD</span><p class="ws-big">' + st.tally[pid] + ' – ' + st.tally[o] + '</p><p class="ws-sub">weeks won, you vs ' + esc(nameOf(o)) + '</p>' +
+        (bs.length ? '<div class="ws-badges">' + bs.slice(0, 6).map(function (b) { var bd = badgeDef(b.id); return bd ? '<span title="' + esc(bd.name) + '">' + badgeMedal(bd, b.tier || 1, 44) + '</span>' : ''; }).join('') + '</div><p class="ws-sub">' + bs.length + (bs.length === 1 ? ' badge' : ' badges') + ' earned this week</p>' : '') +
+        '<span class="lbl" style="margin-top:6px">Send ' + esc(nameOf(o)) + ' a word</span><div class="ws-taunts">' + SUM_TAUNTS[mood].map(function (l) { return '<button class="nchip" data-act="sum-taunt" data-text="' + esc(l) + '">' + esc(l) + '</button>'; }).join('') + '</div>';
+    }
+    var dots = ''; for (var i = 0; i < steps; i++) dots += '<i class="' + (i === step ? 'on' : '') + '"></i>';
+    return '<div class="wsum" role="dialog" aria-label="Week ' + wk + ' results"><div class="ws-body" data-step="' + step + '">' + body + '</div>' +
+      '<div class="ws-foot"><div class="ws-dots">' + dots + '</div><div class="btn-row">' + (step > 0 ? '<button class="btn ghost" data-act="sum-prev">Back</button>' : '') +
+      (step < steps - 1 ? '<button class="btn gold" data-act="sum-next">NEXT</button>' : '<button class="btn gold" data-act="sum-close">DONE</button>') + '</div></div></div>';
+  }
+  function wireSummary(root, pid) {
+    var sm = UI[pid].summary, el = root.querySelector('.wsum'); if (!sm || !el) return;
+    if (sm.step === 0 && !sm.counted) { sm.counted = true; Array.prototype.forEach.call(el.querySelectorAll('.ws-score'), function (n) { if (reduceMotion) n.textContent = n.getAttribute('data-to'); else tween(n, 0, +n.getAttribute('data-to'), 900); }); if (!reduceMotion) setTimeout(function () { var w = el.querySelector('.ws-side.won .dogav'); if (w) fxPlay(w, 'level', pid); }, 950); }
+    else if (sm.step === 0) Array.prototype.forEach.call(el.querySelectorAll('.ws-score'), function (n) { n.textContent = n.getAttribute('data-to'); });
+    var body = el.querySelector('.ws-body'), x0 = null;
+    body.addEventListener('pointerdown', function (e) { x0 = e.clientX; });
+    body.addEventListener('pointerup', function (e) { if (x0 == null) return; var dx = e.clientX - x0; x0 = null; if (Math.abs(dx) > 50) { var b = el.querySelector(dx < 0 ? '[data-act="sum-next"]' : '[data-act="sum-prev"]'); if (b) b.click(); } });
+  }
+  function notifHTML(pid) {
+    return ''; // real app: nudges arrive as Android notifications
+    var ui = UI[pid]; if (window.__noChest || ui.closed) return '';
+    var last = (S.nudges || []).filter(function (r) { return r.pid === pid; }).slice(-1)[0];
+    if (!last || ui.notifDone === last.id) return '';
+    if (!ui.notifShown || ui.notifShown.id !== last.id) ui.notifShown = { id: last.id, until: Date.now() + 8000 };
+    if (Date.now() > ui.notifShown.until) { ui.notifDone = last.id; return ''; }
+    return '<div class="notif" role="alert"><button class="n-main" data-act="nudge-open" data-id="' + last.id + '"><span class="n-top"><span class="n-ic">' + IC.paw + '</span>HouseholdBattle · ' + fmtTime(last.at) + '</span><b>' + esc(last.title) + '</b><span>' + esc(last.body) + '</span></button><button class="n-x" data-act="nudge-x" data-id="' + last.id + '" aria-label="Dismiss">' + IC.close + '</button></div>';
+  }
+  function wireNotif(root, pid) {
+    var el = root.querySelector('.notif'), ui = UI[pid]; if (!el || !ui.notifShown) return;
+    clearTimeout(ui.notifTimer);
+    ui.notifTimer = setTimeout(function () { ui.notifDone = ui.notifShown && ui.notifShown.id; renderPhone(pid); }, Math.max(0, ui.notifShown.until - Date.now()));
+    var y0 = null;
+    el.addEventListener('pointerdown', function (e) { y0 = e.clientY; });
+    el.addEventListener('pointerup', function (e) { if (y0 != null && y0 - e.clientY > 30) { ui.notifDone = ui.notifShown.id; renderPhone(pid); } y0 = null; });
+  }
+  function underdogNotice(pid) {
+    var ui = UI[pid]; if (!S.members[pid] || !S.ud) return;
+    var on = !!S.ud[pid];
+    if (ui.udSeen === undefined) { ui.udSeen = on; if (on) ui.udModal = true; return; }
+    if (window.__noChest) { ui.udSeen = on; return; } // test switch
+    if (on !== ui.udSeen) { ui.udSeen = on; if (on) { ui.udModal = true; buzz('steal'); } else infoToast(pid, 'Back in the fight. Underdog bonus off.'); }
+  }
+  function udModalHTML(pid) {
+    var ui = UI[pid]; if (!ui.udModal || ui.chest || ui.closed || ui.summary) return '';
+    var T = effNow(), gap = weekXP(other(pid), T) - weekXP(pid, T);
+    return '<div class="bmodal ud-modal" role="dialog" aria-label="Underdog bonus"><button class="overlay-hit" data-act="ud-close" aria-label="Close" tabindex="-1"></button><div class="bm-card">' +
+      '<div class="ud-flame">' + IC.fireBig + '</div><span class="bm-kind">UNDERDOG BONUS</span><h3>+' + UNDERDOG_PCT + '% XP</h3>' +
+      '<p class="bm-why">You\'re ' + Math.max(gap, UNDERDOG_GAP + 1) + ' behind ' + esc(nameOf(other(pid))) + '. Every task gives ' + UNDERDOG_PCT + '% extra until you\'re within ' + UNDERDOG_GAP + '.</p>' +
+      '<button class="btn gold" data-act="ud-close">LET\'S GO</button></div></div>';
+  }
+  function maybeOpenChest(pid) {
+    var ui = UI[pid];
+    if (ui.udModal) return;
+    if (window.__noChest) return; // test switch
+    if (ui.summary) return;
+    if (ui.chest || ui.sheet || ui.settings || ui.closed || ui.animLock || ui.ob.step !== 'done' && !S.members[pid]) return;
+    var e = nextChest(pid); if (!e) return;
+    ui.chest = { key: e.key, stage: 'drop' };
+  }
+  function chestHTML(pid) {
+    var ui = UI[pid], c = ui.chest; if (!c) return '';
+    var e = (S.badges[pid] || []).find(function (b) { return b.key === c.key; }); if (!e) { ui.chest = null; return ''; }
+    var b = badgeDef(e.id), tier = e.tier || 1, multi = b.tiers.length > 1, rareish = b.rare || tier === 3;
+    var xp = b.xp[Math.min(b.xp.length, tier) - 1] || 0, cls = b.shame ? 'shame' : rareish ? 'rare' : 'common';
+    if (c.stage !== 'open') {
+      return '<div class="chest-ov ' + cls + '" role="dialog" aria-label="You found a badge"><div class="chest-wrap">' +
+        '<span class="chest-kick">' + (b.shame ? 'Oh no…' : 'You found something!') + '</span>' +
+        '<div class="chest-hold" data-hold="' + (b.shame ? 0 : rareish ? 1500 : 900) + '">' +
+          '<svg class="chest-ring" viewBox="0 0 220 220" aria-hidden="true"><circle cx="110" cy="110" r="100" class="track"/><circle cx="110" cy="110" r="100" class="prog" pathLength="100"/></svg>' + chestSVG(cls) + '</div>' +
+        '<span class="chest-hint">' + (b.shame ? 'It creaks open by itself…' : 'Press and hold to open') + '</span>' +
+        (rareish && !b.shame ? '<span class="chest-rare">RARE!</span>' : '') + '</div></div>';
+    }
+    return '<div class="chest-ov ' + cls + ' opened" role="dialog" aria-label="' + esc(b.name) + '"><div class="chest-wrap">' +
+      '<div class="rays"></div>' + confetti(b.shame) +
+      '<div class="medal-pop">' + badgeMedal(b, tier, 150) + '</div>' +
+      '<span class="chest-tier">' + (b.shame ? 'HALL OF SHAME' : (multi ? TIER_NAME[tier].toUpperCase() + ' · ' : '') + (b.rare ? 'RARE BADGE' : 'BADGE')) + '</span>' +
+      '<h3 class="chest-name">' + esc(b.name) + (b.shame && dodgeCount(pid) > 1 ? ' ×' + dodgeCount(pid) : '') + '</h3>' +
+      '<p class="chest-rule">' + esc(badgeRule(b, tier)) + (b.shame ? ' The dog is disappointed.' : '') + '</p>' +
+      (xp ? '<span class="chest-xp">+' + xp + ' XP</span>' : '') +
+      '<button class="btn gold" data-act="chest-collect">' + (b.shame ? 'FINE…' : 'COLLECT') + '</button></div></div>';
+  }
+  function confetti(sad) {
+    if (sad || reduceMotion) return '<div class="dust"></div>';
+    var cols = ['#FFC93C', '#FF7A59', '#F4F1FF', '#8B7BE0', '#5EE1C1'], h = '<div class="confetti">';
+    for (var i = 0; i < 26; i++) h += '<i style="--x:' + (Math.random() * 2 - 1).toFixed(2) + ';--d:' + (0.6 + Math.random() * 0.7).toFixed(2) + 's;--r:' + Math.round(Math.random() * 720 - 360) + 'deg;background:' + cols[i % cols.length] + '"></i>';
+    return h + '</div>';
+  }
+  function chestSVG(cls) {
+    var wood = cls === 'shame' ? ['#6E6A5E', '#4E4A40'] : ['#A0612E', '#6E3E18'], band = cls === 'rare' ? '#FFC93C' : cls === 'shame' ? '#8C8A80' : '#C9D1E0';
+    return '<svg class="chest" viewBox="0 0 160 140" aria-hidden="true">' +
+      '<g class="lid"><path d="M14 58 Q14 18 80 18 Q146 18 146 58 Z" fill="' + wood[0] + '" stroke="#2A1608" stroke-width="3"/><path d="M14 58 Q14 18 80 18 Q146 18 146 58" fill="none" stroke="' + band + '" stroke-width="7"/><rect x="70" y="18" width="20" height="40" fill="' + band + '" stroke="#2A1608" stroke-width="2"/></g>' +
+      '<rect class="glow" x="16" y="56" width="128" height="6" fill="#FFF3B8"/>' +
+      '<g class="box"><rect x="14" y="58" width="132" height="70" rx="6" fill="' + wood[1] + '" stroke="#2A1608" stroke-width="3"/><path d="M14 80 H146 M14 106 H146" stroke="#2A1608" stroke-opacity=".35" stroke-width="2"/><rect x="14" y="58" width="132" height="10" fill="' + band + '"/><rect x="70" y="58" width="20" height="70" fill="' + band + '" stroke="#2A1608" stroke-width="2"/><rect x="72" y="70" width="16" height="20" rx="3" fill="#3A2410"/><circle cx="80" cy="78" r="3" fill="' + band + '"/></g></svg>';
+  }
+  function wireChest(root, pid) {
+    var ui = UI[pid], c = ui.chest, ov = root.querySelector('.chest-ov'); if (!c || !ov) return;
+    if (c.stage === 'drop') { c.stage = 'closed'; ov.classList.add('drop'); buzz('done'); }
+    if (c.stage === 'open') { if (!c.burst) { c.burst = true; ov.classList.add('burst'); buzz('big'); } return; }
+    var hold = ov.querySelector('.chest-hold'), ms = parseInt(hold.getAttribute('data-hold'), 10), p = 0, holding = false, last = 0, raf = 0, lastBuzz = 0;
+    function set() { ov.style.setProperty('--p', p.toFixed(3)); ov.classList.toggle('shake1', p > 0.05); ov.classList.toggle('shake2', p > 0.45); ov.classList.toggle('shake3', p > 0.8); }
+    function tick(ts) {
+      var dt = last ? ts - last : 16; last = ts;
+      p = holding ? Math.min(1, p + dt / ms) : Math.max(0, p - dt / 400);
+      set();
+      if (holding && ts - lastBuzz > 140) { lastBuzz = ts; try { if (navigator.vibrate) navigator.vibrate(p > 0.7 ? 20 : 8); } catch (e) { } }
+      if (p >= 1) { c.stage = 'open'; renderPhone(pid); return; }
+      if (holding || p > 0) raf = requestAnimationFrame(tick); else { raf = 0; last = 0; }
+    }
+    function down(e) { if (e) e.preventDefault(); holding = true; if (!raf) { last = 0; raf = requestAnimationFrame(tick); } }
+    function up() { holding = false; }
+    if (!ms) { setTimeout(function () { if (ui.chest === c) { c.stage = 'open'; renderPhone(pid); } }, reduceMotion ? 300 : 1400); return; }
+    hold.addEventListener('pointerdown', down); window.addEventListener('pointerup', up, { once: false }); hold.addEventListener('pointerleave', up); hold.addEventListener('pointercancel', up);
+    hold.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+    hold.setAttribute('tabindex', '0'); hold.setAttribute('role', 'button'); hold.setAttribute('aria-label', 'Hold to open the chest');
+    hold.addEventListener('keydown', function (e) { if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) down(e); });
+    hold.addEventListener('keyup', function (e) { if (e.key === ' ' || e.key === 'Enter') up(); });
+  }
+
   function levelBadge(l, size, state) {
     var t = tierOf(l), id = 'lb' + (++LB_SEQ), locked = state === 'locked';
     var a = locked ? '#3A3275' : t.a, b = locked ? '#2F2862' : t.b, ink = locked ? '#8C85C4' : t.ink;
@@ -888,7 +1405,7 @@ export function startGame(SYNCAPI) {
       (ahead.length > 1 ? '<path d="' + curve(ahead) + '" fill="none" stroke="#5A5296" stroke-width="5" stroke-dasharray="2 9" stroke-linecap="round" vector-effect="non-scaling-stroke"></path>' : '') +
       (walked.length > 1 ? '<path d="' + curve(walked) + '" fill="none" stroke="#FFC93C" stroke-width="5" stroke-linecap="round" vector-effect="non-scaling-stroke"></path>' : '') + '</svg>';
     var inner = '<div class="sheet-top"><span class="ttl">' + nm.toUpperCase() + ' PATH</span><button class="iconbtn" data-act="close-sheet" aria-label="Close">' + IC.close + '</button></div>' +
-      '<p class="muted" style="margin:0">' + xp + ' XP in total. Every quest moves ' + (mine ? 'you' : esc(nameOf(who))) + ' along the trail.</p>' +
+      '<p class="muted" style="margin:0">' + xp + ' XP in total. Every task moves ' + (mine ? 'you' : esc(nameOf(who))) + ' along the trail.</p>' +
       '<div class="lp-map" style="height:' + H + 'px"><div class="lp-flag">' + IC.flag + '<span>…and beyond</span></div>' + svg + nodes + '</div>';
     return sheetWrap(pid, inner, s.fresh, 'Level path');
   }
@@ -932,9 +1449,9 @@ export function startGame(SYNCAPI) {
       case 'challenge_cancel': return who(a.actor) + ' cancelled the challenge: ' + t;
       case 'challenge_expired': return 'Challenge on ' + t + ' expired. ' + (a.actor === v ? 'You' : '<b>' + esc(nameOf(a.actor)) + '</b>') + ' never answered';
       case 'challenge_failed': return who(a.actor) + ' missed the challenge on ' + t + '. +' + a.bonus + ' bonus goes to ' + (a.from === v ? 'you' : '<b>' + esc(nameOf(a.from)) + '</b>');
-      case 'steal': return who(a.actor) + ' stole ' + (a.owner === v ? 'your' : '<b>' + esc(nameOf(a.owner)) + "'s</b>") + ' quest ' + t + ' · +' + a.xp;
+      case 'steal': return who(a.actor) + ' stole ' + (a.owner === v ? 'your' : '<b>' + esc(nameOf(a.owner)) + "'s</b>") + ' task ' + t + ' · +' + a.xp;
       case 'level': return who(a.actor) + ' reached level ' + a.level + ' · ' + levelTitle(a.level);
-      case 'badge': var b = badgeDef(a.badge); return who(a.actor) + ' earned the ' + (b.rare ? 'rare ' : '') + 'badge <b>' + esc(b.name) + '</b>';
+      case 'badge': var b = badgeDef(a.badge); if (!b) return who(a.actor) + ' earned a badge'; return b.shame ? who(a.actor) + ' earned <b>' + esc(b.name) + '</b>. Less than 5 XP all week.' : who(a.actor) + ' earned ' + (b.tiers.length > 1 ? TIER_NAME[a.tier || 1] + ' ' : '') + '<b>' + esc(b.name) + '</b>' + (b.rare ? ' · rare' : '');
       case 'edit': return who(a.actor) + ' changed ' + t + ': ' + esc(a.changes);
       case 'delete': return who(a.actor) + ' deleted ' + t;
       case 'pause_req': return who(a.actor) + ' proposed a pause';
@@ -944,10 +1461,20 @@ export function startGame(SYNCAPI) {
       case 'resume_ok': return who(a.actor) + ' accepted. Household active again.';
       case 'resume_no': return who(a.actor) + ' said not now to restarting';
       case 'req_cancel': return who(a.actor) + ' cancelled the request about ' + (REQ_WHAT[a.type] || 'the pause');
+      case 'helped': return who(a.actor) + ' helped ' + (a.owner2 === v ? 'you' : '<b>' + esc(nameOf(a.owner2)) + '</b>') + ' with ' + t + ' · banked a <b class="bst">+' + a.banked + ' XP boost</b>';
+      case 'help_req': return who(a.actor) + (a.ask ? ' asked ' + (a.target === v ? 'you' : '<b>' + esc(nameOf(a.target)) + '</b>') + ' for help with ' : ' offered to help ' + (a.target === v ? 'you' : '<b>' + esc(nameOf(a.target)) + '</b>') + ' with ') + t;
+      case 'help_ok': return who(a.actor) + ' said yes · ' + (a.helper === v ? 'you help' : '<b>' + esc(nameOf(a.helper)) + '</b> helps') + ' with ' + t;
+      case 'help_no': return who(a.actor) + ' said no to help with ' + t;
+      case 'help_stop': return who(a.actor) + ' called off the help with ' + t;
+      case 'week_won': return who(a.actor) + ' won week ' + a.week + ' · ' + a.me + '–' + a.p + ' · banked a +' + WIN_BOOST + ' XP boost';
+      case 'boost_used': return who(a.actor) + ' played a <b>+' + a.xp + ' XP boost</b>' + (a.lead ? ' and took the lead' : '');
+      case 'taunt': return who(a.actor) + ' about week ' + a.week + ':';
+      case 'underdog_on': return who(a.actor) + (a.actor === v ? ' are' : ' is') + ' the underdog now · +' + UNDERDOG_PCT + '% XP until ' + (a.actor === v ? 'you catch' : 'they catch') + ' up';
+      case 'underdog_off': return who(a.actor) + (a.actor === v ? ' are' : ' is') + ' back in the fight · underdog bonus off';
       case 'clear_req': return who(a.actor) + ' asked about ' + REQ_WHAT[a.type];
       case 'clear_no': return who(a.actor) + ' said not now to ' + REQ_WHAT[a.type];
       case 'cleared': return (a.type === 'clearweek' ? "This week's history was cleared" : 'All history was cleared') + (S.members[other(a.actor)] ? ' · accepted by ' + who(a.actor) : '');
-      case 'showoff': return who(a.actor) + ' showed off ' + a.items.length + (a.items.length === 1 ? ' quest' : ' quests') + ' · ' + a.total + ' XP';
+      case 'showoff': return who(a.actor) + ' showed off ' + a.items.length + (a.items.length === 1 ? ' task' : ' tasks') + ' · ' + a.total + ' XP';
       default: return '';
     }
   }
@@ -960,19 +1487,19 @@ export function startGame(SYNCAPI) {
       var c = t.challenge, st = chState(t);
       if (a.kind === 'challenge_req' && a.target === pid) {
         if (c && st === 'pending' && c.to === pid && !isPaused()) { b.push(btn('ch-accept', 'Accept', t.id, true)); b.push(btn('ch-decline', 'Decline', t.id)); b.push(btn('open-task', 'View challenge', t.id)); }
-        else b.push(btn('open-task', 'Open quest', t.id));
+        else b.push(btn('open-task', 'Open task', t.id));
       } else if (a.kind === 'reward_set' && a.target === pid) {
-        b.push(btn('open-task', rwOpen(t) && t.reward.to === pid ? 'View reward' : 'Open quest', t.id, rwOpen(t)));
+        b.push(btn('open-task', rwOpen(t) && t.reward.to === pid ? 'View reward' : 'Open task', t.id, rwOpen(t)));
       } else if (a.kind === 'comment' && a.actor !== pid) {
-        b.push(btn('open-task', 'Open quest', t.id));
+        b.push(btn('open-task', 'Open task', t.id));
       } else if ((a.kind === 'assign' && a.target === pid) || (a.kind === 'handback' && a.actor !== pid && t.assignee === pid)) {
-        b.push(btn('open-task', 'Open quest', t.id));
+        b.push(btn('open-task', 'Open task', t.id));
       }
     }
     return b.length ? '<span class="act-btns">' + b.join('') + '</span>' : '';
   }
 
-  var SYS_KINDS = ['join', 'pause_ok', 'resume_ok', 'cleared', 'challenge_expired', 'challenge_failed', 'reward_expired'];
+  var SYS_KINDS = ['week_won', 'join', 'pause_ok', 'resume_ok', 'cleared', 'challenge_expired', 'challenge_failed', 'reward_expired'];
   function activityHTML(pid) {
     var items = S.activity.slice().sort(function (a, b) { return b.at - a.at; }).slice(0, 150);
     var html = '', lastDay = null;
@@ -990,7 +1517,7 @@ export function startGame(SYNCAPI) {
       inner += '</span>';
       html += '<div class="act-row ' + side + (a.note || a.gif || (a.replies && a.replies.length) ? ' noted' : '') + '">' + inner + '</div>';
     });
-    if (!items.length) html = '<div class="empty"><span class="disp">QUIET HOUSEHOLD</span><span>Completed quests, notes and assignments show up here.</span></div>';
+    if (!items.length) html = '<div class="empty"><span class="disp">QUIET HOUSEHOLD</span><span>Completed tasks, notes and assignments show up here.</span></div>';
     return '<div class="topbar page-title"><h2>ACTIVITY</h2></div><div class="scroll" data-scroll="activity"><div class="page">' + html + '</div></div>';
   }
 
@@ -1000,7 +1527,7 @@ export function startGame(SYNCAPI) {
     var x = '<section class="sect"><h4>HISTORY</h4>';
     if (ask) {
       var week = ask === 'clearweek';
-      x += '<p>' + (week ? "Clear this week's scores and activity for both of you? Levels, badges and open quests stay." : 'Clear all history for both of you? Scores, levels, badges, activity, challenges and rewards are wiped. Open quests stay.') + '</p>' +
+      x += '<p>' + (week ? "Clear this week's scores and activity for both of you? Levels, badges and open tasks stay." : 'Clear all history for both of you? Scores, levels, badges, activity, challenges and rewards are wiped. Open tasks stay.') + '</p>' +
         (hasP ? '<p class="muted" style="margin:0">' + esc(nameOf(o)) + ' has to accept first.</p>' : '<p class="muted" style="margin:0">This can\'t be undone.</p>') +
         '<div class="btn-row"><button class="btn ghost" data-act="clear-cancel">Cancel</button><button class="btn danger" data-act="clear-go">' + (hasP ? 'Ask ' + esc(nameOf(o)) : (week ? 'Clear week' : 'Clear all')) + '</button></div>';
     } else if (h.request && (h.request.type === 'clearweek' || h.request.type === 'clearall')) {
@@ -1027,6 +1554,11 @@ export function startGame(SYNCAPI) {
     addAct({ kind: 'cleared', actor: by, type: type });
     log('<b>' + (type === 'clearweek' ? "This week's history" : 'All history') + '</b> cleared');
   }
+  function nudgeSettingsHTML(pid) {
+    var n = nudgePrefs(pid) || nudgeDefaults(), lh = learnedHour(pid), lvl = NUDGE_LEVELS.filter(function (l) { return l[0] === n.level; })[0];
+    var rows = '<dl class="kv"><dt>Pushiness</dt><dd>' + lvl[1] + '</dd>' + (n.level !== 'off' ? '<dt>Nudge time</dt><dd>Around ' + hh(nudgeHour(pid)) + (lh != null ? ' · learned from when you finish tasks' : ' · ' + (NUDGE_WHEN.filter(function (w) { return w[0] === n.when; })[0] || NUDGE_WHEN[4])[1].toLowerCase()) + '</dd><dt>Quiet hours</dt><dd>' + hh(n.quiet[0]) + '–' + hh(n.quiet[1]) + '</dd><dt>Notifications</dt><dd>' + (n.perm === 'granted' ? 'On' : n.perm === 'denied' ? 'Blocked on this phone' : 'Not allowed yet') + '</dd>' : '') + '</dl>';
+    return '<section class="sect"><h4>NUDGES</h4>' + rows + '<button class="btn ghost" data-act="ns-edit">Change nudges</button></section>';
+  }
   function settingsHTML(pid) {
     var ui = UI[pid], h = S.household, o = other(pid), hasP = hasPartner(pid), r = h.request;
     var nameVal = ui.nameDraft != null ? ui.nameDraft : nameOf(pid);
@@ -1036,7 +1568,7 @@ export function startGame(SYNCAPI) {
     else if (r) pause = '<p>' + esc(nameOf(o)) + REQ_WANT[r.type] + '</p><div class="btn-row"><button class="btn gold" data-act="req-accept">ACCEPT</button><button class="btn ghost" data-act="req-decline">Not now</button></div>';
     else if (ui.pauseCompose) {
       var type = ui.pauseCompose.type;
-      pause = '<p>' + (type === 'pause' ? 'Pausing freezes everything: no quests, no points, no recurring tasks. ' + esc(nameOf(o)) + ' has to accept.' : 'Restarting unfreezes the household. ' + esc(nameOf(o)) + ' has to accept.') + '</p><span class="lbl">Add a note (optional)</span>' + composerHTML(pid, 'pause', type === 'pause' ? 'pause' : 'resume', 'select') + '<div class="btn-row"><button class="btn gold" data-act="pause-send">SEND REQUEST</button><button class="btn ghost" data-act="pause-compose-cancel">Cancel</button></div>';
+      pause = '<p>' + (type === 'pause' ? 'Pausing freezes everything: no tasks, no points, no recurring tasks. ' + esc(nameOf(o)) + ' has to accept.' : 'Restarting unfreezes the household. ' + esc(nameOf(o)) + ' has to accept.') + '</p><span class="lbl">Add a note (optional)</span>' + composerHTML(pid, 'pause', type === 'pause' ? 'pause' : 'resume', 'select') + '<div class="btn-row"><button class="btn gold" data-act="pause-send">SEND REQUEST</button><button class="btn ghost" data-act="pause-compose-cancel">Cancel</button></div>';
     } else if (h.paused) pause = '<p>Paused since ' + fmtDate(h.pausedAt) + '. Everything before the pause is kept.</p><button class="btn gold" data-act="pause-compose" data-type="resume">PROPOSE RESTART</button>';
     else pause = '<p>Need a break? Propose a pause. Everything freezes until you both agree to restart.</p><button class="btn ghost" data-act="pause-compose" data-type="pause">Propose a pause</button>';
     if (h.declined && h.declined.to === pid && !r) pause = '<p class="coral">' + esc(nameOf(o)) + ' said not now to ' + REQ_WHAT[h.declined.type] + '.</p>' + pause;
@@ -1045,6 +1577,7 @@ export function startGame(SYNCAPI) {
       '<section class="sect"><h4>YOUR NAME</h4><div class="own"><input class="field" id="' + pid + '-name" aria-label="Your name" data-bind="nameDraft" maxlength="24" value="' + esc(nameVal) + '"><button class="btn ghost" data-act="save-name">Save</button></div></section>' +
       '<section class="sect"><h4>HOUSEHOLD</h4>' + (hasP ? '<p>You and ' + esc(nameOf(o)) + '. Joined ' + fmtDate(S.members[o].joinedAt) + '.</p>' : '<p>Your partner hasn\'t joined yet. Share this code:</p>') + '<div class="own"><div class="code" id="' + pid + '-setcode" style="font-size:var(--fs-xl);letter-spacing:4px;flex:1;padding:10px">' + esc(h.code) + '</div><button class="btn ghost" data-act="copy-code" style="min-height:52px">' + (UI[pid].copiedAt && Date.now() - UI[pid].copiedAt < 1800 ? 'Copied ✓' : 'Copy') + '</button></div></section>' +
       weekScoreHTML(pid) +
+      nudgeSettingsHTML(pid) +
       '<section class="sect"><h4>PAUSE</h4>' + pause + '</section>' +
       historyHTML(pid) +
       installSettingsHTML() +
@@ -1091,8 +1624,8 @@ export function startGame(SYNCAPI) {
   };
   var NOTE_MEDIA = {};
   Object.keys(DOG_FOR).forEach(function (id) { DOG_FOR[id].forEach(function (line) { NOTE_MEDIA[line] = { sticker: id }; }); });
-  var PINNED = { handback: 1, assign: 2, comment: 1, reply: 2, small: 2, big: 2, lead: 1, steal: 1, level: 1, chwin: 1, chcollect: 1, showoff: 1 }; // number of lines at the start of a pool that always show
-  var REPLYABLE = ['complete', 'steal', 'showoff', 'comment'];
+  var PINNED = { helpdone: 1, handback: 1, assign: 2, comment: 1, reply: 2, small: 2, big: 2, lead: 1, steal: 1, level: 1, chwin: 1, chcollect: 1, showoff: 1 }; // number of lines at the start of a pool that always show
+  var REPLYABLE = ['complete', 'steal', 'showoff', 'comment', 'taunt', 'boost_used', 'helped', 'help_req'];
   function canReply(a, pid) { return a && REPLYABLE.indexOf(a.kind) >= 0 && a.actor !== pid && hasPartner(pid) && !(a.replies || []).some(function (r) { return r.from === pid; }); }
   function repliesHTML(a, pid) {
     return (a.replies || []).map(function (r) { return '<div class="reply">' + avatar(r.from, pid, 'sm') + '<span class="msg">' + msgHTML(r.from === pid ? 'me' : 'them', r.gif, r.text) + '</span></div>'; }).join('');
@@ -1147,7 +1680,7 @@ export function startGame(SYNCAPI) {
             : '') + '</div>';
     }
     var h = '<section class="sect"><h4>THIS WEEK\'S SCORE</h4>' + row(pid, 'Your XP') + (hasP ? row(o, nameOf(o) + "'s XP") : '');
-    if (!ed) h += '<p>Fix a mistake, like a quest someone forgot to tick. Changes show up in Activity for both of you.</p><button class="btn ghost" data-act="score-edit"' + (isPaused() ? ' disabled' : '') + '>Edit week score</button>';
+    if (!ed) h += '<p>Fix a mistake, like a task someone forgot to tick. Changes show up in Activity for both of you.</p><button class="btn ghost" data-act="score-edit"' + (isPaused() ? ' disabled' : '') + '>Edit week score</button>';
     else h += '<div class="seg">' + [-5, -1, 1, 5].map(function (d) { return '<button data-act="score-step-all" data-d="' + d + '">' + (d > 0 ? '+' : '') + d + ' you</button>'; }).join('') + '</div><div class="btn-row"><button class="btn gold" data-act="score-save">SAVE</button><button class="btn ghost" data-act="score-cancel">Cancel</button></div>';
     return h + '</section>';
   }
@@ -1192,6 +1725,9 @@ export function startGame(SYNCAPI) {
       case 'challenge': return challengeSheet(pid, s);
       case 'gift': return giftSheet(pid, s);
       case 'reply': return replySheet(pid, s);
+      case 'boost': return boostSheet(pid, s);
+      case 'help': return helpSheet(pid, s);
+      case 'nudge': return nudgeSheet(pid, s);
       case 'levels': return levelPathSheet(pid, s);
       case 'comment': return commentSheet(pid, s);
     }
@@ -1200,7 +1736,7 @@ export function startGame(SYNCAPI) {
 
   function detailSheet(pid, s) {
     var t = getTask(s.id);
-    if (!t) return sheetWrap(pid, '<div class="sheet-top"><span class="ttl">QUEST</span><button class="iconbtn" data-act="close-sheet" aria-label="Close">' + IC.close + '</button></div><p class="muted">This quest no longer exists.</p>', s.fresh, 'Quest');
+    if (!t) return sheetWrap(pid, '<div class="sheet-top"><span class="ttl">TASK</span><button class="iconbtn" data-act="close-sheet" aria-label="Close">' + IC.close + '</button></div><p class="muted">This task no longer exists.</p>', s.fresh, 'Task');
     var o = other(pid), on = esc(nameOf(o)), age = ageDays(t), x = xpFor(t, pid), paused = isPaused(), open = t.status === 'open';
     var c = t.challenge, st = chState(t), bounty = bountyFor(t, pid), chB = challengeBonusFor(t, pid);
     var forTxt = t.assignee === 'any' ? 'Anyone' : t.assignee === pid ? 'You' : on;
@@ -1208,7 +1744,7 @@ export function startGame(SYNCAPI) {
     var graceTxt = '';
     if (t.assignee !== 'any') graceTxt = graceLabel(t.grace || 0) + (inGrace(t) ? ' · ' + (t.assignee === pid ? 'only you until ' : on + "'s until ") + fmtGrace(t) : ' · over, it can be stolen');
     var thread = t.thread.map(function (m) { return '<div class="tmsg ' + (m.from === pid ? 'mine' : 'theirs') + '">' + msgHTML(m.from === pid ? 'me' : 'them', m.gif, m.text) + '<small>' + (m.from === pid ? 'You' : esc(nameOf(m.from))) + ' · ' + (m.kind === 'handback' ? 'handed back' : m.kind === 'comment' ? 'commented' : m.kind === 'reply' ? 'replied' : 'assigned') + ' · ' + fmtDate(m.at) + '</small></div>'; }).join('');
-    var inner = '<div class="sheet-top"><span class="ttl">' + (t.assignee === o ? on.toUpperCase() + "'S QUEST" : t.assignee === 'any' ? "ANYONE'S QUEST" : 'YOUR QUEST') + '</span><button class="iconbtn" data-act="close-sheet" aria-label="Close">' + IC.close + '</button></div>' +
+    var inner = '<div class="sheet-top"><span class="ttl">' + (t.assignee === o ? on.toUpperCase() + "'S TASK" : t.assignee === 'any' ? "ANYONE'S TASK" : 'YOUR TASK') + '</span><button class="iconbtn" data-act="close-sheet" aria-label="Close">' + IC.close + '</button></div>' +
       '<h3>' + esc(t.title) + '</h3>' +
       '<dl class="kv"><dt>Worth</dt><dd>' + worth + '</dd><dt>Size</dt><dd>' + SIZES[t.size].label + ' · ' + SIZES[t.size].xp + ' XP</dd><dt>For</dt><dd>' + forTxt + '</dd>' +
       (graceTxt ? '<dt>Grace period</dt><dd>' + graceTxt + '</dd>' : '') +
@@ -1224,33 +1760,44 @@ export function startGame(SYNCAPI) {
       if (!paused && st === 'pending' && c.to === pid) inner += '<div class="btn-row"><button class="btn gold" data-act="ch-accept" data-id="' + t.id + '">ACCEPT</button><button class="btn ghost" data-act="ch-decline" data-id="' + t.id + '">Decline</button></div>';
       if (!paused && st === 'pending' && c.from === pid) inner += '<button class="btn ghost" data-act="ch-cancel" data-id="' + t.id + '">Cancel challenge</button>';
     }
+    var hp = helpOn(t);
+    if (hp) {
+      var hTxt = hp.status === 'pending'
+        ? (hp.from === pid ? (hp.kind === 'ask' ? 'You asked ' + on + ' for help.' : 'You offered to help ' + on + '.') + ' Waiting for an answer.' : (hp.kind === 'ask' ? on + ' asks for your help.' : on + ' offers to help you.'))
+        : (hp.helper === pid ? 'You are helping ' + on + '.' : on + ' is helping you.');
+      inner += '<div class="strip help-strip" style="align-items:flex-start">' + IC.boltSm + '<span class="tx"><b>HELP</b><span>' + hTxt + ' The helper gets no XP now, but banks a <b class="bst">+' + helpBank(t) + ' XP boost</b> for when they fall behind.' + (hp.status === 'accepted' && hp.helper !== pid ? ' You get no XP for it.' : '') + '</span>' + (hp.note || hp.gif ? msgHTML(hp.from === pid ? 'me' : 'them', hp.gif, hp.note) : '') + '</span></div>';
+      if (!paused && hp.status === 'pending' && hp.to === pid) inner += '<div class="btn-row"><button class="btn gold" data-act="help-accept" data-id="' + t.id + '">ACCEPT</button><button class="btn ghost" data-act="help-decline" data-id="' + t.id + '">' + (hp.kind === 'ask' ? 'Not now' : 'No thanks') + '</button></div>';
+      if (!paused && (hp.status === 'pending' && hp.from === pid || hp.status === 'accepted')) inner += '<button class="btn ghost" data-act="help-cancel" data-id="' + t.id + '">' + (hp.status === 'pending' ? 'Cancel' : hp.helper === pid ? 'Stop helping' : 'I\'ll do it myself') + '</button>';
+    }
     if (rwOpen(t)) {
       var r = t.reward;
       inner += '<div class="strip" style="align-items:flex-start">' + IC.gift.replace('width="40" height="40"', 'width="30" height="30"') + '<span class="tx"><b>SPECIAL REWARD</b><span>' + (r.from === pid ? 'Your reward for ' + on : 'From ' + on) + ': \u201C' + esc(r.text) + '\u201D · ' + (r.from === pid ? on + ' has' : 'you have') + ' until ' + fmtDeadline(r.deadline) + '.</span>' + (r.note ? '<span class="bubble ' + (r.from === pid ? 'me' : 'them') + '">' + esc(r.note) + '</span>' : '') + '</span></div>';
       if (!paused && r.from === pid && open) inner += '<button class="btn ghost" data-act="gift-cancel" data-id="' + t.id + '">Cancel reward</button>';
     }
     if (!open) inner += '<p class="muted">Already done.</p>';
-    else if (paused) inner += '<p class="muted">The household is paused. Quests can\'t be changed until you restart.</p>' + (hasPartner(pid) ? '<button class="btn ghost" data-act="comment-open">Comment</button>' : '');
+    else if (paused) inner += '<p class="muted">The household is paused. Tasks can\'t be changed until you restart.</p>' + (hasPartner(pid) ? '<button class="btn ghost" data-act="comment-open">Comment</button>' : '');
     else if (s.confirmDelete) inner += '<p>Delete "' + esc(t.title) + '"? ' + (hasPartner(pid) ? on + ' will see it in Activity.' : '') + '</p><div class="btn-row"><button class="btn ghost" data-act="detail-delete-no">Keep it</button><button class="btn danger" data-act="detail-delete-yes">Delete</button></div>';
     else {
       var can = canComplete(t, pid);
       var label = st === 'accepted' && c.to === pid ? 'COMPLETE CHALLENGE' : st === 'failed' && c.from === pid ? 'COLLECT THE BONUS' : t.assignee === o ? 'STEAL IT' : 'MARK DONE';
       if (!isActive(t)) inner += '<p class="muted">Not due yet. It shows up in the list on ' + fmtDate(t.dueAt) + '.</p>';
+      else if (helpingMe(t, pid)) inner += '<button class="btn boostbtn" data-act="detail-done">DONE · BANK +' + helpBank(t) + ' BOOST</button>';
       else if (can && !(t.assignee === o && st !== 'failed')) inner += '<button class="btn gold" data-act="detail-done">' + label + ' · +' + x + '</button>';
       else if (st === 'accepted') inner += '<p class="muted">Locked to ' + on + ' until the challenge deadline.</p>';
       else if (t.assignee === o && inGrace(t)) inner += '<p class="muted">' + on + ' has until ' + fmtGrace(t) + '. After that you can steal it, and the bounty grows every day.</p>';
       if (hasPartner(pid)) {
         var acts = [];
-        if (can && t.assignee === o && st !== 'failed') acts.push('<button class="btn gold sm3 stealbtn" data-act="detail-done">Steal (+' + x + ' XP)</button>');
+        if (can && t.assignee === o && st !== 'failed' && !helpingMe(t, pid)) acts.push('<button class="btn gold sm3 stealbtn" data-act="detail-done">Steal (+' + x + ' XP)</button>');
         acts.push('<button class="btn ghost sm3" data-act="comment-open">Comment</button>');
         if (canChallenge(t, pid)) acts.push('<button class="btn ghost sm3" data-act="ch-open">Challenge</button>');
         if (canReward(t, pid)) acts.push('<button class="btn ghost sm3" data-act="gift-open">Reward</button>');
-        inner += '<span class="lbl" style="margin-top:2px">' + (t.assignee === o ? on + "'s quest" : 'Talk to ' + on) + '</span><div class="btn-grid' + (acts.length === 4 ? ' four' : '') + '">' + acts.join('') + '</div>';
+        if (canHelp(t, pid)) acts.push('<button class="btn ghost sm3" data-act="help-open">' + (t.assignee === pid ? 'Ask for help' : 'Offer help') + '</button>');
+        inner += '<span class="lbl" style="margin-top:2px">' + (t.assignee === o ? on + "'s task" : 'Talk to ' + on) + '</span><div class="btn-grid' + (acts.length === 4 ? ' four' : '') + '">' + acts.join('') + '</div>';
       }
       inner += '<span class="lbl" style="margin-top:2px">Manage</span>';
       inner += '<div class="btn-row"><button class="btn ghost" data-act="detail-edit">Edit</button>' + (t.assignee === pid && t.assignedBy === o && st !== 'accepted' ? '<button class="btn ghost" data-act="detail-handback">Hand back</button>' : '') + '<button class="btn danger" data-act="detail-delete">Delete</button></div>';
     }
-    return sheetWrap(pid, inner, s.fresh, 'Quest details');
+    return sheetWrap(pid, inner, s.fresh, 'Task details');
   }
 
   function challengeSheet(pid, s) {
@@ -1294,7 +1841,7 @@ export function startGame(SYNCAPI) {
   function commentSheet(pid, s) {
     var t = getTask(s.id), on = esc(nameOf(other(pid)));
     var inner = '<div class="sheet-top"><button class="iconbtn" data-act="ch-back" aria-label="Back">' + IC.back + '</button><span class="ttl">COMMENT</span><button class="iconbtn" data-act="close-sheet" aria-label="Close">' + IC.close + '</button></div>' +
-      '<h3>' + esc(t ? t.title : '') + '</h3><p class="muted" style="margin:0">Send ' + on + ' a message about this quest. It shows on the quest and in Activity.</p>' +
+      '<h3>' + esc(t ? t.title : '') + '</h3><p class="muted" style="margin:0">Send ' + on + ' a message about this task. It shows on the task and in Activity.</p>' +
       '<span class="lbl">Tap a line to send it, add a dog, or write your own</span>' + composerHTML(pid, 'sheet', 'comment', 'send');
     return sheetWrap(pid, inner, s.fresh, 'Comment');
   }
@@ -1311,11 +1858,11 @@ export function startGame(SYNCAPI) {
     if (s.confirmClose) {
       var title = d.title.trim();
       return sheetWrap(pid, '<div class="confirm">' +
-        '<h3>' + (s.editId ? 'Discard your changes?' : 'Discard this quest?') + '</h3>' +
-        '<p class="muted" style="margin:0">' + (s.editId ? 'Your edits to ' + (title ? '"' + esc(title) + '"' : 'this quest') + ' won\'t be saved.' : (title ? '"' + esc(title) + '"' : 'This quest') + ' hasn\'t been added yet. Keep going, or throw it away?') + '</p>' +
-        '<div class="btn-row"><button class="btn gold" data-act="add-keep">KEEP EDITING</button><button class="btn plain" data-act="add-discard">Discard</button></div></div>', false, 'Discard quest');
+        '<h3>' + (s.editId ? 'Discard your changes?' : 'Discard this task?') + '</h3>' +
+        '<p class="muted" style="margin:0">' + (s.editId ? 'Your edits to ' + (title ? '"' + esc(title) + '"' : 'this task') + ' won\'t be saved.' : (title ? '"' + esc(title) + '"' : 'This task') + ' hasn\'t been added yet. Keep going, or throw it away?') + '</p>' +
+        '<div class="btn-row"><button class="btn gold" data-act="add-keep">KEEP EDITING</button><button class="btn plain" data-act="add-discard">Discard</button></div></div>', false, 'Discard task');
     }
-    var top = '<div class="sheet-top">' + (s.step !== 'what' && !(s.editId && s.step === 'summary') ? '<button class="iconbtn" data-act="add-back" aria-label="Back">' + IC.back + '</button>' : '') + '<span class="ttl">' + (s.editId ? 'EDIT QUEST' : 'NEW QUEST') + '</span>' + (s.editId ? '' : stepDots(s.step)) + '<button class="iconbtn" data-act="close-sheet" aria-label="Close">' + IC.close + '</button></div>';
+    var top = '<div class="sheet-top">' + (s.step !== 'what' && !(s.editId && s.step === 'summary') ? '<button class="iconbtn" data-act="add-back" aria-label="Back">' + IC.back + '</button>' : '') + '<span class="ttl">' + (s.editId ? 'EDIT TASK' : 'NEW TASK') + '</span>' + (s.editId ? '' : stepDots(s.step)) + '<button class="iconbtn" data-act="close-sheet" aria-label="Close">' + IC.close + '</button></div>';
     var skip = '<button class="textlink" data-act="add-skip">Skip to summary</button>';
     var inner = top;
     if (s.step === 'what') {
@@ -1338,13 +1885,13 @@ export function startGame(SYNCAPI) {
       if (d.who === 'partner') inner += '<span class="lbl">Grace period · how long only ' + esc(nameOf(o)) + ' can do it</span><div class="seg">' + GRACE.map(function (g) { return '<button class="' + (d.grace === g[0] ? 'on' : '') + '" data-act="sum-grace" data-g="' + g[0] + '">' + g[1] + '</button>'; }).join('') + '</div><span class="lbl">Note to ' + esc(nameOf(o)) + ' (optional)</span>' + composerHTML(pid, 'sheet', 'assign', 'select') + '<button class="btn gold" data-act="add-who-next">NEXT</button>';
       inner += skip;
     } else if (s.step === 'repeat') {
-      inner += '<h3>Does it repeat?</h3><div class="bigopts">' + [['none', 'No', 'One-off quest'], ['daily', 'Daily', 'Every day'], ['alternate', 'Every other day', 'Today, then every second day'], ['weekly', 'Weekly', 'On one weekday'], ['biweekly', 'Every 2 weeks', 'On one weekday, every other week'], ['monthly', 'Monthly', 'On one day of the month']].map(function (r) { return '<button class="bigopt' + (d.repeat === r[0] ? ' on' : '') + '" data-act="add-repeat" data-r="' + r[0] + '"><span class="bt"><b>' + r[1] + '</b><span>' + r[2] + '</span></span></button>'; }).join('') + '</div>';
+      inner += '<h3>Does it repeat?</h3><div class="bigopts">' + [['none', 'No', 'One-off task'], ['daily', 'Daily', 'Every day'], ['alternate', 'Every other day', 'Today, then every second day'], ['weekly', 'Weekly', 'On one weekday'], ['biweekly', 'Every 2 weeks', 'On one weekday, every other week'], ['monthly', 'Monthly', 'On one day of the month']].map(function (r) { return '<button class="bigopt' + (d.repeat === r[0] ? ' on' : '') + '" data-act="add-repeat" data-r="' + r[0] + '"><span class="bt"><b>' + r[1] + '</b><span>' + r[2] + '</span></span></button>'; }).join('') + '</div>';
       if (d.repeat === 'weekly' || d.repeat === 'biweekly' || d.repeat === 'monthly') inner += dayPicker(d) + '<button class="btn gold" data-act="add-repeat-next">NEXT</button>';
       inner += skip;
     } else {
       inner += summaryHTML(pid, s);
     }
-    return sheetWrap(pid, inner, s.fresh, 'Add quest');
+    return sheetWrap(pid, inner, s.fresh, 'Add task');
   }
   function dayPicker(d) {
     if (d.repeat === 'monthly') return '<div class="stepper"><button data-act="add-monthday" data-d="-1" aria-label="Earlier day">−</button><span>On day <b>' + d.monthDay + '</b> of each month</span><button data-act="add-monthday" data-d="1" aria-label="Later day">+</button></div>';
@@ -1354,8 +1901,8 @@ export function startGame(SYNCAPI) {
     var d = s.draft, o = other(pid), hasP = hasPartner(pid);
     function seg(act, key, items, cur) { return '<div class="seg">' + items.map(function (it) { return '<button class="' + (cur === it[0] ? 'on' : '') + '" data-act="' + act + '" data-' + key + '="' + it[0] + '"' + (it[2] ? ' disabled' : '') + '>' + it[1] + '</button>'; }).join('') + '</div>'; }
     var xp = SIZES[d.size].xp;
-    var h = '<h3>' + (s.editId ? 'Edit quest' : 'Ready to add?') + '</h3>' +
-      '<div class="sum-block"><label class="lbl" for="' + pid + '-sum-title">Quest</label><input class="field" id="' + pid + '-sum-title" data-bind="draft.title" data-rerender="1" maxlength="60" value="' + esc(d.title) + '"></div>' +
+    var h = '<h3>' + (s.editId ? 'Edit task' : 'Ready to add?') + '</h3>' +
+      '<div class="sum-block"><label class="lbl" for="' + pid + '-sum-title">Task</label><input class="field" id="' + pid + '-sum-title" data-bind="draft.title" data-rerender="1" maxlength="60" value="' + esc(d.title) + '"></div>' +
       '<div class="sum-block"><span class="lbl">How bad is it?</span>' + seg('sum-size', 'n', SIZE_KEYS.map(function (n) { return [n, SIZES[n].label + ' (' + SIZES[n].xp + ' XP)']; }), d.size) + '</div>' +
       '<div class="sum-block"><span class="lbl">Who</span>' + seg('sum-who', 'w', [['me', 'Me'], ['partner', hasP ? esc(nameOf(o)) : 'Partner', !hasP], ['any', 'Anyone']], d.who) + '</div>';
     if (d.who !== 'any') h += '<div class="sum-block"><span class="lbl">Grace period · how long only ' + (d.who === 'me' ? 'you' : esc(nameOf(o))) + ' can do it before it can be stolen</span>' + seg('sum-grace', 'g', GRACE, d.grace) + '</div>';
@@ -1365,7 +1912,7 @@ export function startGame(SYNCAPI) {
     var ok = !!d.title.trim();
     if (s.editId) h += '<button class="btn gold" data-act="add-save"' + (ok ? '' : ' disabled') + '>SAVE</button>';
     else {
-      h += '<button class="btn gold" data-act="add-save"' + (ok ? '' : ' disabled') + '>ADD QUEST</button>';
+      h += '<button class="btn gold" data-act="add-save"' + (ok ? '' : ' disabled') + '>ADD TASK</button>';
       if (d.who !== 'partner') h += '<button class="btn ghost" data-act="add-already"' + (ok && !isPaused() ? '' : ' disabled') + '>I already did it · +' + xp + '</button>';
     }
     return h;
@@ -1373,9 +1920,9 @@ export function startGame(SYNCAPI) {
 
   function rewardSheet(pid, s) {
     var o = other(pid), hasP = hasPartner(pid), c = s.comp;
-    var kicker = s.gift ? 'GIFT UNLOCKED!' : s.levelUp ? 'LEVEL UP!' : s.challengeWon ? 'CHALLENGE WON!' : s.challengeCollect ? 'BONUS COLLECTED' : s.tookLead ? 'YOU TAKE THE LEAD' : s.stolen ? 'QUEST STOLEN!' : s.badges.length ? 'NEW BADGE' : 'QUEST COMPLETE';
-    var pool = s.gift ? 'gift' : s.challengeWon ? 'chwin' : s.challengeCollect ? 'chcollect' : s.tookLead ? 'lead' : s.stolen ? 'steal' : s.levelUp ? 'level' : 'big';
-    var html = '<div class="reward-head"><span class="reward-kicker">' + kicker + '</span><span style="font-size:var(--fs-md);color:var(--soft)">' + esc(c.title) + '</span><span class="reward-xp' + (s.fresh ? ' pop' : '') + '"><span data-count="' + c.xp + '">' + (s.fresh ? 0 : c.xp) + '</span> <small>XP</small></span></div>' +
+    var kicker = c.help ? 'YOU HELPED ' + esc(nameOf(c.help.owner)).toUpperCase() : s.gift ? 'GIFT UNLOCKED!' : s.levelUp ? 'LEVEL UP!' : s.challengeWon ? 'CHALLENGE WON!' : s.challengeCollect ? 'BONUS COLLECTED' : s.tookLead ? 'YOU TAKE THE LEAD' : s.stolen ? 'TASK STOLEN!' : 'TASK COMPLETE';
+    var pool = c.help ? 'helpdone' : s.gift ? 'gift' : s.challengeWon ? 'chwin' : s.challengeCollect ? 'chcollect' : s.tookLead ? 'lead' : s.stolen ? 'steal' : s.levelUp ? 'level' : 'big';
+    var html = '<div class="reward-head"><span class="reward-kicker">' + kicker + '</span><span style="font-size:var(--fs-md);color:var(--soft)">' + esc(c.title) + '</span>' + (c.help ? '<span class="reward-xp bst' + (s.fresh ? ' pop' : '') + '">+<span data-count="' + c.help.banked + '">' + (s.fresh ? 0 : c.help.banked) + '</span> <small>BOOST</small></span><span class="muted" style="text-align:center">No XP now. Saved for when you fall behind.</span></div>' : '<span class="reward-xp' + (s.fresh ? ' pop' : '') + '"><span data-count="' + c.xp + '">' + (s.fresh ? 0 : c.xp) + '</span> <small>XP</small></span></div>') +
       '<div class="bd">' + c.breakdown.map(function (b) { return '<span>' + esc(b) + '</span>'; }).join('') + '</div>';
     if (s.gift) html += '<div class="gift' + (s.fresh ? ' pop' : '') + '">' + IC.gift + '<span class="disp">CONGRATS!</span><small>You earned ' + esc(nameOf(s.gift.from)) + "'s special reward</small><span class=\"gift-text\">\u201C" + esc(s.gift.text) + '\u201D</span><small>' + esc(nameOf(s.gift.from)) + ' has been told to pay up. You\'ll find it under Score.</small></div>';
     if (hasP) {
@@ -1387,8 +1934,8 @@ export function startGame(SYNCAPI) {
     }
     if (s.levelUp) html += '<div class="strip"><span class="lvlbox">' + s.levelUp + '</span><span class="tx"><b>LEVEL UP</b><span>You are now a ' + levelTitle(s.levelUp) + '.</span></span></div>';
     if (s.challengeWon || s.challengeCollect) html += '<div class="strip"><span class="lvlbox" style="font-size:var(--fs-body);width:auto;padding:0 8px">VS</span><span class="tx"><b>' + (s.challengeWon ? 'CHALLENGE WON' : 'BONUS COLLECTED') + '</b><span>' + (s.challengeWon ? 'You beat ' + esc(nameOf(o)) + "'s challenge." : esc(nameOf(o)) + ' missed the deadline. The bonus is yours.') + '</span></span></div>';
-    if (s.stolen) html += '<div class="strip"><span class="avatar sm them" aria-hidden="true">' + esc(initial(o)) + '</span><span class="tx"><b>QUEST STOLEN</b><span>Taken from ' + esc(nameOf(o)) + "'s list. Full points.</span></span></div>";
-    s.badges.forEach(function (id) { var b = badgeDef(id); html += '<div class="strip badge-new">' + IC.hex(b.rare ? '#FF7A59' : '#FFC93C', '<path d="M11 16l3.5 3.5L21 12" fill="none" stroke="#241E4E" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"></path>') + '<span class="tx"><b>' + (b.rare ? 'RARE BADGE' : 'NEW BADGE') + '</b><span>' + esc(b.name) + ': ' + esc(b.desc) + '</span></span></div>'; });
+    if (s.stolen) html += '<div class="strip"><span class="avatar sm them" aria-hidden="true">' + esc(initial(o)) + '</span><span class="tx"><b>TASK STOLEN</b><span>Taken from ' + esc(nameOf(o)) + "'s list. Full points.</span></span></div>";
+    [].forEach(function (id) { var b = badgeDef(id); html += '<div class="strip badge-new">' + IC.hex(b.rare ? '#FF7A59' : '#FFC93C', '<path d="M11 16l3.5 3.5L21 12" fill="none" stroke="#241E4E" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"></path>') + '<span class="tx"><b>' + (b.rare ? 'RARE BADGE' : 'NEW BADGE') + '</b><span>' + esc(b.name) + ': ' + esc(b.desc) + '</span></span></div>'; });
     if (hasP) html += '<span style="font-weight:500">' + (s.tookLead || s.stolen ? 'Taunt ' : 'Tell ') + esc(nameOf(o)) + '?</span>' + composerHTML(pid, 'sheet', pool, 'send');
     html += '<div class="btn-row"><button class="btn plain" data-act="reward-undo" style="flex:none">Undo</button><button class="btn gold" data-act="close-sheet">CONTINUE</button></div>';
     return sheetWrap(pid, html, s.fresh, 'Reward');
@@ -1405,7 +1952,7 @@ export function startGame(SYNCAPI) {
 
   function upcomingSheet(pid, s) {
     var ups = S.tasks.filter(isUpcoming).sort(function (a, b) { return a.dueAt - b.dueAt; });
-    var inner = '<div class="sheet-top"><span class="ttl">COMING UP</span><button class="iconbtn" data-act="close-sheet" aria-label="Close">' + IC.close + '</button></div><p class="muted" style="margin:0">Recurring quests show up in the list on their day.</p>';
+    var inner = '<div class="sheet-top"><span class="ttl">COMING UP</span><button class="iconbtn" data-act="close-sheet" aria-label="Close">' + IC.close + '</button></div><p class="muted" style="margin:0">Recurring tasks show up in the list on their day.</p>';
     ups.forEach(function (t) {
       var forTxt = t.assignee === 'any' ? 'Anyone' : t.assignee === pid ? 'You' : esc(nameOf(t.assignee));
       inner += '<button class="done-row" style="border:0;text-align:left" data-act="open-task" data-id="' + t.id + '"><span class="t"><span style="text-decoration:none">' + esc(t.title) + '</span><span>' + fmtDate(t.dueAt) + ' · ' + forTxt + ' · ' + repLabel(t.repeat) + '</span></span><span class="xp">+' + SIZES[t.size].xp + '</span></button>';
@@ -1425,7 +1972,7 @@ export function startGame(SYNCAPI) {
       var on = !s.excluded[c.id];
       inner += '<label class="done-row" style="cursor:pointer"><input type="checkbox" data-act="showoff-toggle" data-id="' + c.id + '"' + (on ? ' checked' : '') + ' style="width:20px;height:20px;accent-color:#FFC93C"><span class="t"><span style="text-decoration:none">' + esc(c.title) + '</span><span>' + fmtDate(c.at) + ' ' + fmtTime(c.at) + '</span></span><span class="xp">+' + c.xp + '</span></label>';
     });
-    inner += '<span class="xp-preview">' + picked.length + (picked.length === 1 ? ' quest' : ' quests') + ' · <b>' + total + ' XP</b></span><span class="lbl">Note to ' + esc(nameOf(o)) + ' (optional)</span>' + composerHTML(pid, 'sheet', 'showoff', 'select') +
+    inner += '<span class="xp-preview">' + picked.length + (picked.length === 1 ? ' task' : ' tasks') + ' · <b>' + total + ' XP</b></span><span class="lbl">Note to ' + esc(nameOf(o)) + ' (optional)</span>' + composerHTML(pid, 'sheet', 'showoff', 'select') +
       '<button class="btn gold" data-act="showoff-send"' + (picked.length && hasPartner(pid) ? '' : ' disabled') + '>SEND TO ' + esc(nameOf(o)).toUpperCase() + '</button>';
     return sheetWrap(pid, inner, s.fresh, 'Show off');
   }
@@ -1435,7 +1982,7 @@ export function startGame(SYNCAPI) {
     var html = '<div class="toast' + (t.fresh ? ' enter' : '') + '" role="status">';
     if (t.kind === 'info') return html + '<div class="toast-row"><span class="toast-txt">' + esc(t.text) + '</span></div></div>';
     var xp = t.items.reduce(function (n, c) { return n + c.xp; }, 0);
-    var txt = t.items.length === 1 ? esc(t.items[0].title) + ' · <b>+' + xp + ' XP</b>' : t.items.length + ' quests · <b>+' + xp + ' XP</b>';
+    var txt = t.items.length === 1 ? esc(t.items[0].title) + ' · <b>+' + xp + ' XP</b>' : t.items.length + ' tasks · <b>+' + xp + ' XP</b>';
     var extra = t.items.length === 1 && t.items[0].breakdown.length > 1 ? '<small>' + t.items[0].breakdown.slice(1).map(esc).join(' · ') + '</small>' : '';
     html += '<div class="toast-row"><span class="toast-txt">' + txt + extra + '</span>' + (hasPartner(pid) ? '<button class="tbtn" data-act="toast-note">Add note</button>' : '') + '<button class="tbtn" data-act="toast-undo">Undo</button></div>';
     if (t.c && t.noteOpen) html += composerHTML(pid, 'toast', 'small', 'send');
@@ -1469,7 +2016,7 @@ export function startGame(SYNCAPI) {
       var picks = LIBRARY.slice(0, 8), n = Object.keys(ob.starter).filter(function (k) { return ob.starter[k]; }).length;
       x += '<h2>Pick a few to start</h2><p>Tap the chores your household has. You can change everything later.</p><div class="starter">' +
         picks.map(function (l) { var on = !!ob.starter[l.title]; return '<button class="' + (on ? 'on' : '') + '" aria-pressed="' + on + '" data-act="ob-starter" data-title="' + esc(l.title) + '">' + esc(l.title) + '<small>' + SIZES[l.size].label + ' · ' + SIZES[l.size].xp + ' XP' + (l.rep !== 'none' ? ' · ' + { daily: 'daily', alternate: 'every other day', weekly: 'weekly', biweekly: 'every 2 weeks', monthly: 'monthly' }[l.rep] : '') + '</small></button>'; }).join('') +
-        '</div><div class="grow"></div><button class="btn gold" data-act="ob-starter-add"' + (n ? '' : ' disabled') + '>ADD ' + n + (n === 1 ? ' QUEST' : ' QUESTS') + '</button><button class="textlink" data-act="ob-starter-skip">Skip</button>';
+        '</div><div class="grow"></div><button class="btn gold" data-act="ob-starter-add"' + (n ? '' : ' disabled') + '>ADD ' + n + (n === 1 ? ' TASK' : ' TASKS') + '</button><button class="textlink" data-act="ob-starter-skip">Skip</button>';
     }
     return x + '</div>';
   }
@@ -1583,8 +2130,12 @@ export function startGame(SYNCAPI) {
     var main;
     if (ui.settings) main = settingsHTML(pid);
     else main = bannerHTML(pid) + installBannerHTML() + (ui.tab === 'tasks' ? tasksHTML(pid) : ui.tab === 'score' ? scoreHTML(pid) : activityHTML(pid)) + navHTML(pid);
-    var fab = ui.tab === 'tasks' && !ui.settings && !paused ? '<button class="fab" data-act="add-open" aria-label="Add quest">' + IC.plus + '</button>' : '';
-    return '<div class="app' + (paused ? ' is-paused' : '') + '">' + (SYNC.status === 'offline' ? '<div class="netbar" role="status">Offline. Your changes will sync when you\'re back online.</div>' : '') + main + fab + (ui.settings ? '' : toastHTML(pid)) + sheetHTML(pid) + dogPickerHTML(pid) + '</div>';
+    var fab = ui.tab === 'tasks' && !ui.settings && !paused ? '<button class="fab" data-act="add-open" aria-label="Add task">' + IC.plus + '</button>' : '';
+    maybeOpenSummary(pid);
+    maybeAskNudges(pid);
+    underdogNotice(pid);
+    maybeOpenChest(pid);
+    return '<div class="app' + (paused ? ' is-paused' : '') + '">' + (SYNC.status === 'offline' ? '<div class="netbar" role="status">Offline. Your changes will sync when you\'re back online.</div>' : '') + main + fab + (ui.settings ? '' : toastHTML(pid)) + sheetHTML(pid) + dogPickerHTML(pid) + chestHTML(pid) + udModalHTML(pid) + weekSumHTML(pid) + notifHTML(pid) + '</div>';
   }
 
   var phoneEl = {}, reduceMotion = false;
@@ -1645,10 +2196,10 @@ export function startGame(SYNCAPI) {
     if (lv) bars.push([lv, lv.style.width]);
     bars.forEach(function (b) { b[0].style.transition = 'none'; b[0].style.width = '0%'; });
     void hdr.offsetWidth;
-    bars.forEach(function (b) { b[0].style.transition = 'width 0.9s cubic-bezier(.2,.8,.2,1)'; b[0].style.width = b[1]; });
+    bars.forEach(function (b) { b[0].style.transition = 'width 1s cubic-bezier(.65,0,.3,1.25)'; b[0].style.width = b[1]; });
     var tug = hdr.querySelector('.tug');
-    setTimeout(function () { if (tug) { tug.classList.remove('fx-bulge'); void tug.offsetWidth; tug.classList.add('fx-bulge'); } }, 780);
-    setTimeout(function () { bars.forEach(function (b) { b[0].style.transition = ''; }); if (r) { r.style.flex = ''; r.style.width = ''; } if (tug) tug.classList.remove('fx-bulge'); }, 1150);
+    setTimeout(function () { if (tug) { tug.classList.remove('fx-bulge'); void tug.offsetWidth; tug.classList.add('fx-bulge'); } }, 860);
+    setTimeout(function () { bars.forEach(function (b) { b[0].style.transition = ''; }); if (r) { r.style.flex = ''; r.style.width = ''; } if (tug) tug.classList.remove('fx-bulge'); }, 1250);
   }
   function applyFx(pid, root) {
     Array.prototype.forEach.call(root.querySelectorAll('.vs .score-num'), function (el) { el.classList.toggle('long', el.textContent.trim().length >= 3); });
@@ -1736,6 +2287,9 @@ export function startGame(SYNCAPI) {
     Array.prototype.forEach.call(root.querySelectorAll('[data-scroll]'), function (el) { var k = el.getAttribute('data-scroll'); if (scrolls[k] != null) { el.scrollTop = scrolls[k][0]; el.scrollLeft = scrolls[k][1]; } });
     var ch = root.querySelector('.chips'); if (ch) wireChips(ch);
     wireSheets(root, pid);
+    wireChest(root, pid);
+    wireSummary(root, pid);
+    wireNotif(root, pid);
     if (ui.sheet && ui.sheet.kind === 'levels' && !ui.sheet.scrolled) { ui.sheet.scrolled = true; var here = root.querySelector('.lp-node.here'), shl = root.querySelector('.sheet'); if (here && shl) shl.scrollTop = Math.max(0, here.offsetTop - shl.clientHeight / 2 + 120); }
     if (ui.intro) { ui.intro = false; ui.introAt = Date.now(); introBars(root); }
     applyFx(pid, root);
@@ -1810,13 +2364,13 @@ export function startGame(SYNCAPI) {
           if (S.household) { ui.ob.error = 'You already have a household.'; break; }
           var code = ''; var chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; for (var i = 0; i < 6; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
           S.household = { code: code, createdBy: pid, createdAt: T, paused: false, pausedAt: null, request: null, declined: null };
-          S.members[pid] = { id: pid, name: nm, joinedAt: T, dogStyle: ui.ob.style || freeStyle(pid) };
+          S.members[pid] = { id: pid, name: nm, joinedAt: T, sumSeen: weekStart(T), dogStyle: ui.ob.style || freeStyle(pid) };
           ui.ob.step = 'invite'; ui.ob.error = '';
           log('<b>' + esc(nm) + '</b> created the household. Invite code ' + code);
           APP.afterCreate = true;
         } else {
           if (!S.household || S.members[pid]) { ui.ob.error = 'Something changed. Go back and enter the code again.'; break; }
-          S.members[pid] = { id: pid, name: nm, joinedAt: T, dogStyle: (ui.ob.style && !(styleTakenBy(pid, ui.ob.style) && !allTaken(pid))) ? ui.ob.style : freeStyle(pid) };
+          S.members[pid] = { id: pid, name: nm, joinedAt: T, sumSeen: weekStart(T), dogStyle: (ui.ob.style && !(styleTakenBy(pid, ui.ob.style) && !allTaken(pid))) ? ui.ob.style : freeStyle(pid) };
           APP.joinAct = addAct({ kind: 'join', actor: pid });
           ui.ob.step = 'done'; ui.tab = 'tasks'; ui.filter = 'mine';
           log('<b>' + esc(nm) + '</b> joined the household');
@@ -1829,7 +2383,7 @@ export function startGame(SYNCAPI) {
         var cdEl = document.getElementById(pid + '-code');
         copyText(h.code, function (ok) { if (ok) { ui.ob.copied = true; renderPhone(pid); setTimeout(function () { ui.ob.copied = false; renderPhone(pid); }, 1900); } else selectText(cdEl); });
         return;
-      case 'ob-invite-continue': ui.ob.step = 'starter'; break;
+      case 'ob-invite-continue': ui.ob.step = 'done'; ui.tab = 'tasks'; ui.filter = 'mine'; break;
       case 'ob-starter': ui.ob.starter[ds.title] = !ui.ob.starter[ds.title]; break;
       case 'ob-starter-add':
         LIBRARY.slice(0, 8).forEach(function (l) {
@@ -1931,6 +2485,48 @@ export function startGame(SYNCAPI) {
         w.delivered = true;
         addAct({ kind: 'reward_delivered', actor: pid, text: w.text });
         log('<b>' + esc(nameOf(pid)) + '</b> delivered "' + esc(w.text) + '"'); break;
+      case 'ns-when': s.d.when = ds.v; break;
+      case 'ns-level': s.d.level = ds.v; break;
+      case 'ns-quiet': s.d.quiet = ds.v.split('-').map(Number); break;
+      case 'ns-next': s.step++; break;
+      case 'ns-prev': s.step = Math.max(0, s.step - 1); break;
+      case 'ns-perm': if (!REPLAYING) requestPush(); break;
+      case 'ns-sys': s.sys = false; s.d.perm = ds.v; buzz('light'); break;
+      case 'ns-skip': S.members[pid].nudge = nudgeDefaults(); S.members[pid].nudge.skipped = true; ui.sheet = null; infoToast(pid, 'Change nudges anytime in Settings.'); break;
+      case 'ns-save': if (!S.members[pid]) break; if (!REPLAYING && s.d.perm === 'granted') setTimeout(refreshPush, 0); S.members[pid].nudge = { when: s.d.when, level: s.d.level, quiet: s.d.quiet.slice(), perm: s.d.perm };
+        ui.sheet = null; infoToast(pid, s.d.level === 'off' ? 'No nudges. Peace and quiet.' : s.d.perm === 'granted' ? 'Nudges on.' : 'Saved. Allow notifications to get nudges.'); break;
+      case 'ns-edit': openSheet(pid, { kind: 'nudge', step: 0, d: JSON.parse(JSON.stringify(nudgePrefs(pid) || nudgeDefaults())), first: false }); break;
+      case 'nudge-x': ui.notifDone = ds.id; break;
+      case 'nudge-open':
+        var nr = (S.nudges || []).filter(function (r) { return r.id === ds.id; })[0]; ui.notifDone = ds.id; if (!nr) break;
+        ui.closed = false; ui.sheet = null;
+        if (nr.go.settings) { ui.settings = true; break; }
+        ui.settings = false; ui.tab = 'tasks'; ui.filter = nr.go.filter || 'mine';
+        if (nr.go.taskId && getTask(nr.go.taskId)) openSheet(pid, { kind: 'detail', id: nr.go.taskId });
+        break;
+      case 'help-open': t = getTask(s.id); if (t && canHelp(t, pid)) ui.sheet = { kind: 'help', id: s.id, c: newComposer(), fresh: false }; break;
+      case 'help-send':
+        t = getTask(s.id); if (!t || !canHelp(t, pid)) break;
+        var hk = t.assignee === pid ? 'ask' : 'offer', hn = noteValue(s.c);
+        t.help = { id: uid(), kind: hk, from: pid, to: o, helper: hk === 'ask' ? o : pid, status: 'pending', note: hn || null, gif: s.c.gif || null, at: T };
+        addAct({ kind: 'help_req', actor: pid, target: o, ask: hk === 'ask', taskId: t.id, title: t.title, banked: helpBank(t), note: hn || null });
+        log('<b>' + esc(nameOf(pid)) + '</b> ' + (hk === 'ask' ? 'asked ' + esc(nameOf(o)) + ' for help with' : 'offered to help ' + esc(nameOf(o)) + ' with') + ' "' + esc(t.title) + '"');
+        ui.sheet = null; infoToast(pid, hk === 'ask' ? 'Asked ' + nameOf(o) + ' for help.' : 'Offer sent to ' + nameOf(o) + '.'); break;
+      case 'help-accept':
+        t = getTask(ds.id); var hA = t && helpOn(t); if (!hA || hA.status !== 'pending' || hA.to !== pid || isPaused()) break;
+        hA.status = 'accepted'; hA.okAt = T;
+        addAct({ kind: 'help_ok', actor: pid, ask: hA.kind === 'ask', taskId: t.id, title: t.title, helper: hA.helper });
+        log('<b>' + esc(nameOf(pid)) + '</b> accepted: ' + esc(nameOf(hA.helper)) + ' helps with "' + esc(t.title) + '"');
+        if (s && s.kind === 'detail') s.fresh = false;
+        infoToast(pid, hA.helper === pid ? "It's on your list. Finish it to bank the boost." : nameOf(o) + ' is on it.'); break;
+      case 'help-decline':
+        t = getTask(ds.id); var hD = t && helpOn(t); if (!hD || hD.status !== 'pending' || hD.to !== pid) break;
+        addAct({ kind: 'help_no', actor: pid, ask: hD.kind === 'ask', taskId: t.id, title: t.title });
+        t.help = null; infoToast(pid, 'Said no.'); break;
+      case 'help-cancel':
+        t = getTask(ds.id); var hC = t && helpOn(t); if (!hC || !(hC.status === 'pending' && hC.from === pid || hC.status === 'accepted')) break;
+        if (hC.status === 'accepted') addAct({ kind: 'help_stop', actor: pid, taskId: t.id, title: t.title, helper: hC.helper });
+        t.help = null; break;
       case 'ch-open': ui.sheet = { kind: 'challenge', id: s.id, bonus: 10, day: 0, c: newComposer(), fresh: false }; break;
       case 'ch-back': ui.sheet = { kind: 'detail', id: s.id, fresh: false }; break;
       case 'ch-bonus': s.bonus = parseInt(ds.b, 10); break;
@@ -2026,13 +2622,14 @@ export function startGame(SYNCAPI) {
         if (!items.length) break;
         var total = items.reduce(function (n, x) { return n + x.xp; }, 0);
         addAct({ kind: 'showoff', actor: pid, items: items.map(function (x) { return { title: x.title, xp: x.xp }; }), total: total, note: noteValue(s.c) || null, gif: s.c.gif || null });
-        log('<b>' + esc(nameOf(pid)) + '</b> showed off ' + items.length + ' quests (' + total + ' XP) to ' + esc(nameOf(o)));
+        log('<b>' + esc(nameOf(pid)) + '</b> showed off ' + items.length + ' tasks (' + total + ' XP) to ' + esc(nameOf(o)));
         ui.sheet = null; infoToast(pid, 'Sent to ' + nameOf(o) + '.'); break;
 
       /* score */
       case 'score-period': ui.scorePeriod = ds.p; break;
       case 'badge-owner': ui.badgeOwner = ui.badgeOwner === 'me' ? 'partner' : 'me'; ui.badgeOpen = null; break;
-      case 'badge-open': ui.badgeOpen = ui.badgeOpen === ds.id ? null : ds.id; break;
+      case 'badge-open': ui.badgeOpen = ds.id; break;
+      case 'badge-close': ui.badgeOpen = null; break;
 
       /* settings + pause */
       case 'copy-code':
@@ -2045,19 +2642,46 @@ export function startGame(SYNCAPI) {
         if (S.members[pid]) { S.members[pid].dogStyle = ds.id; log('<b>' + esc(nameOf(pid)) + '</b> picked the ' + esc(styleById(ds.id).name) + ' dog style'); infoToast(pid, 'Dog style saved.'); }
         break;
       case 'add-keep': if (s) s.confirmClose = false; break;
-      case 'add-discard': ui.sheet = null; ui.dogPicker = null; infoToast(pid, s && s.editId ? 'Changes discarded.' : 'Quest discarded.'); break;
+      case 'add-discard': ui.sheet = null; ui.dogPicker = null; infoToast(pid, s && s.editId ? 'Changes discarded.' : 'Task discarded.'); break;
       case 'tip-close': var tst = tipState(pid); tst.hidden = sod(now()); saveTipState(pid, tst); break;
       case 'tip-next': nextTip(pid); break;
+      case 'ud-close': ui.udModal = false; break;
+      case 'sum-next': if (ui.summary) ui.summary.step++; break;
+      case 'sum-prev': if (ui.summary) ui.summary.step = Math.max(0, ui.summary.step - 1); break;
+      case 'sum-close':
+        if (!ui.summary) break;
+        if (!ui.summary.debug && S.members[pid]) S.members[pid].sumSeen = addDays(ui.summary.ws, 7);
+        ui.summary = null; break;
+      case 'sum-taunt':
+        if (!ui.summary || !hasPartner(pid)) break;
+        addAct({ kind: 'taunt', actor: pid, week: isoWeek(ui.summary.ws), note: ds.text, gif: NOTE_MEDIA[ds.text] ? { sticker: NOTE_MEDIA[ds.text].sticker, style: styleOf(pid) } : null });
+        infoToast(pid, 'Sent to ' + nameOf(other(pid)) + '.');
+        if (!ui.summary.debug && S.members[pid]) S.members[pid].sumSeen = addDays(ui.summary.ws, 7);
+        ui.summary = null; break;
+      case 'boost-open': if (boostsAvail(pid).length) openSheet(pid, { kind: 'boost' }); break;
+      case 'boost-use':
+        var bU = boostsAvail(pid).filter(function (b) { return b.id === ds.id; })[0];
+        if (!bU || isPaused() || !isBehind(pid, T)) break;
+        var bxU = bU.xp, o2 = other(pid), myB2 = weekXP(pid, T), pB2 = weekXP(o2, T);
+        bU.used = true; bU.usedAt = T;
+        S.adjust = S.adjust || []; S.adjust.push({ id: uid(), pid: pid, by: 'boost', delta: bxU, at: T });
+        addAct({ kind: 'boost_used', actor: pid, xp: bxU, lead: myB2 + bxU > pB2 });
+        log('<b>' + esc(nameOf(pid)) + '</b> played a +' + bxU + ' XP boost');
+        ui.sheet = null; ui.fx = { me: 'level', them: myB2 + bxU > pB2 ? 'flinch' : null }; buzz('big');
+        infoToast(pid, 'Boost used: +' + bxU + ' XP.'); break;
+      case 'ud-info': ui.udModal = true; break;
+      case 'chest-collect':
+        if (!ui.chest) break;
+        var gotXp = collectBadge(pid, ui.chest.key); ui.chest = null;
+        if (gotXp) infoToast(pid, '+' + gotXp + ' XP from the badge.');
+        break;
       case 'sugg-more': ui.suggOff = (ui.suggOff || 0) + 3; break;
       case 'sugg-hide': ui.suggHidden = true; infoToast(pid, 'Suggestions hidden until you open the app again.'); break;
       case 'sugg-add':
-        var sga = suggFind(pid, ds.k); if (!sga || isPaused()) break;
-        var dsa = newDraft(); dsa.title = sga.title; dsa.size = sga.size; dsa.who = 'any'; dsa.repeat = 'none';
-        createTask(pid, dsa); infoToast(pid, 'Added "' + sga.title + '" for anyone.'); break;
       case 'sugg-edit':
         var sge = suggFind(pid, ds.k); if (!sge || isPaused()) break;
-        var dse = newDraft(), base = JSON.stringify(dse); dse.title = sge.title; dse.size = sge.size; dse.who = 'any'; dse.repeat = 'none';
-        openSheet(pid, { kind: 'add', step: 'summary', draft: dse, orig: base, more: false, editId: null, from: null, c: newComposer(), exSeed: 0 }); break;
+        var dse = newDraft(); dse.title = sge.title; dse.size = sge.size; draftDefaults(dse);
+        openSheet(pid, { kind: 'add', step: 'summary', draft: dse, orig: JSON.stringify(dse), more: false, editId: null, from: null, c: newComposer(), exSeed: 0, fromSugg: sge.key }); break;
       case 'sugg-snooze': S.sugg = S.sugg || {}; S.sugg.snooze = S.sugg.snooze || {}; S.sugg.snooze[ds.k] = now() + 7 * DAY; infoToast(pid, 'OK. Not for a week.'); break;
       case 'sugg-never': S.sugg = S.sugg || {}; S.sugg.never = S.sugg.never || {}; S.sugg.never[ds.k] = 1; infoToast(pid, "Got it. Won't suggest that again."); break;
       case 'score-edit': ui.scoreEdit = {}; ui.scoreEdit[pid] = weekXP(pid, now()); if (hasPartner(pid)) ui.scoreEdit[o] = weekXP(o, now()); break;
@@ -2186,10 +2810,10 @@ export function startGame(SYNCAPI) {
     }
     var na = assigneeFromWho(pid, d.who);
     if (na !== t.assignee) {
-      t.assignee = na; t.assignedBy = na === o ? pid : null;
+      t.assignee = na; t.assignedBy = na === o ? pid : null; t.assignedAt = na === o ? T : null;
       if (na === o) {
         if (d.note || d.gif) t.thread.push({ from: pid, text: d.note || '', gif: d.gif || null, at: T, kind: 'assign' });
-        addAct({ kind: 'assign', actor: pid, target: o, taskId: t.id, title: t.title, size: t.size, note: d.note || null, gif: d.gif || null });
+        addAct({ kind: 'assign', actor: pid, target: o, taskId: t.id, title: t.title, size: t.size, note: d.note || null, gif: d.gif || null, reassign: true }); awardBadges(pid, null, T);
       } else changes.push('now for ' + (na === 'any' ? 'anyone' : nameOf(na)));
     }
     if (changes.length) addAct({ kind: 'edit', actor: pid, taskId: t.id, title: t.title, changes: changes.join(', ') });
@@ -2287,6 +2911,7 @@ export function startGame(SYNCAPI) {
     if (a === 'retry-boot') { APP.error = ''; boot(APP.user); return; }
     if (a === 'sign-in') { signIn(); return; }
     if (a === 'install-app') { installApp(); return; }
+    if (a === 'sugg-more') setTimeout(function () { maybeFetchAi(true); }, 0);
     if (a === 'install-dismiss') { try { localStorage.setItem('hb-install-dismissed', String(Date.now())); } catch (e) { } renderPhone(ME); return; }
     if (!SYNC.code) {
       if (a === 'ob-create' && S && !S.members[ME]) { S = emptyState(); ME = 'A'; }
@@ -2309,7 +2934,8 @@ export function startGame(SYNCAPI) {
     try {
       S = JSON.parse(json);
       recs.forEach(function (r) {
-        if (r.a !== '__sweep') {
+        if (r.a === '__ai') { S.aiIdeas = r.data; }
+        else if (r.a !== '__sweep') {
           UI[ME] = r.ui ? JSON.parse(JSON.stringify(r.ui)) : freshUI();
           NOW_OVERRIDE = r.t; REPLAY_IDS = r.ids.slice();
           try { act(ME, r.a, r.ds, r.el); } catch (e) { console.warn('replay failed for', r.a, e); }
@@ -2406,6 +3032,7 @@ export function startGame(SYNCAPI) {
     SYNC.api.createHousehold(code, ME, JSON.stringify(S)).then(function () {
       SYNC.code = code; SYNC.rev = 1; subscribe(); saveCache();
       flush();
+      setTimeout(maybeFetchAi, 3000);
     }, function (e) {
       if (e && e.message === 'exists' && attempt < 3) { S.household.code = newCode(); renderPhone(ME); createRemote(attempt + 1); return; }
       console.warn('create failed', e);
@@ -2449,6 +3076,7 @@ export function startGame(SYNCAPI) {
     }).then(function (res) {
       S = JSON.parse(res.state); SYNC.code = code; SYNC.rev = res.rev;
       subscribe(); sweep(); renderAll(); saveCache();
+      setTimeout(maybeFetchAi, 3000);
     }, function (e) {
       console.warn('join failed', e);
       S.members[ME] = null; ui.ob.step = 'join-code';
@@ -2464,6 +3092,8 @@ export function startGame(SYNCAPI) {
     UI[ME].ob.step = st.members[ME] ? 'done' : 'welcome';
     APP.screen = null; nextTip(ME); UI[ME].intro = true;
     subscribe(); sweep(); renderAll(); saveCache();
+    setTimeout(maybeFetchAi, 3000);
+    setTimeout(afterReady, 600);
   }
 
   /* ---------- Android back button ---------- */
@@ -2481,6 +3111,55 @@ export function startGame(SYNCAPI) {
     else if (ui.tab !== 'tasks') doAct(ME, 'tab', { tab: 'tasks' }, null);
     syncBack();
   });
+
+  /* ---------- Gemini suggestions ---------- */
+  // Once a week (or when you ask for new ideas and the old ones are used up) one phone asks Gemini for ideas.
+  // Only task titles, sizes and dates are sent: no names, no messages.
+  var AI = { busy: false };
+  function aiPrompt() {
+    var T = now(), d = new Date(T), hist = {};
+    S.completions.forEach(function (c) { var k = normT(c.title); var h = hist[k] = hist[k] || { title: c.title, size: c.size, n: 0, last: 0 }; h.n++; if (c.at > h.last) h.last = c.at; });
+    var rows = Object.keys(hist).map(function (k) { return hist[k]; }).sort(function (a, b) { return b.last - a.last; }).slice(0, 40)
+      .map(function (h) { return h.title + ' | ' + SIZES[h.size].label + ' | done ' + h.n + 'x | ' + Math.floor((T - h.last) / DAY) + ' days ago'; });
+    var open = S.tasks.filter(function (t) { return t.status === 'open'; }).map(function (t) { return t.title; }).slice(0, 60);
+    var never = Object.keys((S.sugg && S.sugg.never) || {}).slice(0, 60);
+    return 'You suggest household chores for a two-person household in Sweden that plays a friendly chore competition app.\n' +
+      'Today is ' + WD_LONG[wdIdx(T)] + ' ' + d.getDate() + ' ' + MON_LONG[d.getMonth()] + ' ' + d.getFullYear() + '.\n' +
+      'Return ONLY a JSON array of 8 objects: {"title": short imperative chore name (max 40 characters), "size": 1-5, "reason": one short cheeky sentence (max 90 characters) saying why now}.\n' +
+      'Sizes: 1 Trivial (2 min), 2 Easy (15 min), 3 Annoying (45 min), 4 Hard (2 hours), 5 Epic (half a day or more).\n' +
+      'Mix: things that fit this time of year or the calendar in Sweden, upkeep that looks overdue from the history, and easy-to-forget household maintenance they have never logged.\n' +
+      'Never suggest anything already OPEN or in NEVER, and no duplicates. Plain English, no emojis.\n\n' +
+      'HISTORY (title | size | times done | last done):\n' + (rows.join('\n') || '(nothing yet)') + '\n\nOPEN:\n' + (open.join('\n') || '(none)') + '\n\nNEVER:\n' + (never.join('\n') || '(none)');
+  }
+  function parseIdeas(text) {
+    var j = JSON.parse(String(text).replace(/^```(json)?|```$/g, '').trim());
+    if (!Array.isArray(j)) j = j.suggestions || j.ideas || j.items || [];
+    return j.map(function (x) { return { title: String(x.title || '').trim().slice(0, 60), size: Math.max(1, Math.min(5, Math.round(+x.size || 2))), reason: String(x.reason || '').trim().slice(0, 140) }; })
+      .filter(function (x) { return x.title; }).slice(0, 10);
+  }
+  function aiStale(force) {
+    var a = S.aiIdeas, T = now();
+    if (!a || !a.at) return true;
+    if (a.at < weekStart(T)) return true;
+    if (force && T - a.at > HOUR) {
+      var left = suggestions(ME).filter(function (g) { return g.tag === 'Idea'; }).length;
+      return left < 2;
+    }
+    return false;
+  }
+  function maybeFetchAi(force) {
+    if (AI.busy || !SYNC.api.ai || !SYNC.code || !S || !S.members[ME] || APP.screen || isPaused()) return;
+    if (!aiStale(force)) return;
+    AI.busy = true;
+    SYNC.api.ai(aiPrompt()).then(function (text) {
+      AI.busy = false;
+      var items = parseIdeas(text); if (!items.length) return;
+      var data = { at: now(), items: items };
+      S.aiIdeas = data;
+      SYNC.pending.push({ a: '__ai', data: data, ds: {}, ui: null, t: Date.now(), ids: [] });
+      saveCache(); flush(); renderPhone(ME);
+    }, function (e) { AI.busy = false; console.warn('AI suggestions unavailable', e); });
+  }
 
   /* ---------- install the web app ---------- */
   var INSTALL = { evt: null };
@@ -2540,6 +3219,8 @@ export function startGame(SYNCAPI) {
       UI[ME].ob.step = 'done'; APP.screen = null; APP.catchupPending = true; nextTip(ME); UI[ME].intro = true;
       sweep(); renderAll(); subscribe(); flush();
       setTimeout(function () { if (APP.catchupPending) { APP.catchupPending = false; checkCatchup(); } }, 1500);
+      setTimeout(maybeFetchAi, 4000);
+      setTimeout(afterReady, 600);
       return;
     }
     APP.screen = 'loading'; renderPhone(ME);
@@ -2582,9 +3263,52 @@ export function startGame(SYNCAPI) {
   renderPhone(ME);
   document.addEventListener('visibilitychange', function () {
     if (document.visibilityState === 'hidden') { noteAway(); saveCache(); }
-    else { flush(); setTimeout(checkCatchup, 1200); }
+    else { flush(); setTimeout(checkCatchup, 1200); setTimeout(maybeFetchAi, 4000); }
   });
   SYNC.api.onAuth(boot);
   window.__hb = { get S() { return S; }, UI: UI, SYNC: SYNC, get ME() { return ME; } };
+
+  /* ================= 0.7.0: push notifications for nudges ================= */
+  // The nudge job (GitHub Actions, hourly) decides when to nudge and sends it through Firebase Cloud Messaging.
+  // This phone asks Android for permission and hands its push token to Firebase.
+  function pushSupported() { return 'Notification' in window && 'serviceWorker' in navigator && 'PushManager' in window; }
+  function nudgeSheetOpen() { var s = UI[ME].sheet; return s && s.kind === 'nudge' ? s : null; }
+  function requestPush() {
+    var s = nudgeSheetOpen();
+    if (!pushSupported()) { if (s) { s.pushErr = 'This browser can’t show notifications. Install the app to your home screen first.'; doAct(ME, 'ns-sys', { v: 'denied' }); } return; }
+    Notification.requestPermission().then(function (res) {
+      if (res !== 'granted') { if (nudgeSheetOpen()) doAct(ME, 'ns-sys', { v: 'denied' }); return; }
+      return registerPushToken().then(function () { if (nudgeSheetOpen()) doAct(ME, 'ns-sys', { v: 'granted' }); }, function (e) {
+        console.warn('push token failed', e);
+        var s2 = nudgeSheetOpen(); if (s2) { s2.pushErr = 'Allowed, but we couldn’t connect to the notification service. Try again later.'; renderPhone(ME); }
+      });
+    });
+  }
+  function registerPushToken() {
+    if (!SYNC.api.registerPush || !SYNC.code) return Promise.resolve();
+    var ready = SYNC.api.kind === 'mock' ? Promise.resolve(null) : navigator.serviceWorker.ready; // the mock backend runs without a service worker
+    return ready.then(function (reg) { return SYNC.api.registerPush(reg, { code: SYNC.code, pid: ME }); });
+  }
+  // Tokens change now and then. Refresh quietly whenever the app starts with permission already given.
+  function refreshPush() {
+    try {
+      var n = S && S.members[ME] && S.members[ME].nudge;
+      if (!n || n.level === 'off' || n.perm !== 'granted' || !pushSupported() || Notification.permission !== 'granted') return;
+      registerPushToken().catch(function (e) { console.warn('push refresh failed', e); });
+    } catch (e) { }
+  }
+  // Tapping a nudge notification opens the app on the right task.
+  function openNudge(id) {
+    if (!id || !S || APP.screen) return false;
+    doAct(ME, 'nudge-open', { id: id });
+    return true;
+  }
+  var pendingNudge = new URLSearchParams(location.search).get('nudge');
+  if (pendingNudge) { try { history.replaceState(null, '', location.pathname + location.search.replace(/[?&]nudge=[^&]*/, '').replace(/^&/, '?')); } catch (e) { } }
+  function afterReady() {
+    if (pendingNudge && openNudge(pendingNudge)) pendingNudge = null;
+    refreshPush();
+  }
+  if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', function (e) { if (e.data && e.data.nudge) openNudge(e.data.nudge); });
 
 }

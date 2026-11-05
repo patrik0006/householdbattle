@@ -6,9 +6,9 @@
 //
 // Add ?mock=<name> to the URL to run against a fake in-browser backend (used for local testing).
 
-import { firebaseConfig } from './firebase-config.js';
+import { firebaseConfig, vapidKey } from './firebase-config.js';
 
-const FB_VERSION = '10.12.2';
+const FB_VERSION = '12.11.0';
 const FB = 'https://www.gstatic.com/firebasejs/' + FB_VERSION + '/';
 
 export async function createSync() {
@@ -72,7 +72,7 @@ async function firebaseSync() {
         if (s.exists()) throw new Error('exists');
         tx.set(hhRef(code), { memberUids: [uid], pids: { [uid]: pid }, state: stateJSON, rev: 1, updatedAt: F.serverTimestamp(), updatedBy: uid });
       });
-      await F.setDoc(userRef(uid), { householdId: code });
+      await F.setDoc(userRef(uid), { householdId: code }, { merge: true });
       return { rev: 1 };
     },
     // Adds the signed-in person to the household. build(remoteStateJSON) returns the new state JSON.
@@ -88,7 +88,7 @@ async function firebaseSync() {
         tx.update(hhRef(code), { memberUids: d.memberUids.concat([uid]), ['pids.' + uid]: pid, state: json, rev: d.rev + 1, updatedAt: F.serverTimestamp(), updatedBy: uid });
         return { rev: d.rev + 1, state: json };
       });
-      await F.setDoc(userRef(uid), { householdId: code });
+      await F.setDoc(userRef(uid), { householdId: code }, { merge: true });
       return res;
     },
     subscribe(code, cb, onError) {
@@ -107,7 +107,40 @@ async function firebaseSync() {
       });
     },
     async leaveHousehold() {
-      await F.setDoc(userRef(me().uid), { householdId: null });
+      await F.setDoc(userRef(me().uid), { householdId: null, push: null }, { merge: true });
+    },
+    // Push: get this phone's FCM token (using our own service worker) and store it on users/{uid}.
+    async registerPush(swReg, info) {
+      const M = await import(FB + 'firebase-messaging.js');
+      if (!(await M.isSupported())) throw new Error('messaging-unsupported');
+      const messaging = M.getMessaging(app);
+      const opts = { serviceWorkerRegistration: swReg };
+      if (vapidKey) opts.vapidKey = vapidKey;
+      const token = await M.getToken(messaging, opts);
+      if (!token) throw new Error('no-token');
+      await F.setDoc(userRef(me().uid), { push: { token, code: info.code, pid: info.pid, at: Date.now(), ua: navigator.userAgent.slice(0, 120) } }, { merge: true });
+      return token;
+    },
+    // Gemini through Firebase AI Logic (free Gemini Developer API tier). Returns the model's text.
+    async ai(prompt) {
+      const AI = await import(FB + 'firebase-ai.js');
+      const ai = AI.getAI(app, { backend: new AI.GoogleAIBackend() });
+      const models = ['gemini-3.5-flash', 'gemini-3-flash', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'];
+      const start = Math.max(0, models.indexOf(localStorage.getItem('hb-ai-model') || ''));
+      let lastErr = null;
+      for (let i = start; i < models.length; i++) {
+        try {
+          const model = AI.getGenerativeModel(ai, { model: models[i], generationConfig: { responseMimeType: 'application/json', temperature: 0.9 } });
+          const res = await model.generateContent(prompt);
+          localStorage.setItem('hb-ai-model', models[i]);
+          return res.response.text();
+        } catch (e) {
+          lastErr = e;
+          const msg = String((e && e.message) || e);
+          if (!/not found|404|unsupported|not supported|does not exist|permission|403/i.test(msg)) break; // only try the next model when this one isn't available
+        }
+      }
+      throw lastErr;
     }
   };
 }
@@ -164,6 +197,18 @@ function mockSync(name) {
       d.state = out.json; d.rev += 1; d.updatedBy = uid; write(db);
       return { rev: d.rev, json: out.json, replayed: out.replayed };
     },
-    async leaveHousehold() { const db = read(); db.users[uid] = { householdId: null }; write(db); }
+    async leaveHousehold() { const db = read(); db.users[uid] = { householdId: null }; write(db); },
+    async registerPush(swReg, info) { await delay(); const db = read(); db.users[uid] = Object.assign({}, db.users[uid], { push: { token: 'mock-token-' + name, code: info.code, pid: info.pid, at: Date.now() } }); write(db); return 'mock-token-' + name; },
+    async ai(prompt) {
+      await delay(); if (offline() || window.__hbAiFail) throw new Error('unavailable');
+      window.__hbAiPrompt = prompt;
+      return JSON.stringify([
+        { title: 'Swap to winter tyres', size: 5, reason: 'It is November in Sweden. The first frost will not wait.' },
+        { title: 'Descale the coffee machine', size: 2, reason: 'Never done here, and your coffee knows it.' },
+        { title: 'Clean the oven', size: 4, reason: 'Last done 7 months ago. Brave soul wanted.' },
+        { title: 'Pay the bills', size: 2, reason: 'End of the month is coming.' },
+        { title: 'Test the smoke alarms', size: 1, reason: 'Two minutes. Possibly life-saving.' }
+      ]);
+    }
   };
 }

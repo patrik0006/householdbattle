@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.7.0 · 5 Nov 2026 · commit __COMMIT__
+- Smart suggestions from Gemini (free tier): seasonal and Sweden-aware ideas, shared by both phones, refreshed weekly.
+- Badges: 20 badges in bronze, silver and gold, revealed in a chest you hold to open after a task is confirmed. XP is paid when you collect. Chore Dodger for empty weeks. Badges without finished art share one placeholder.
+- Week summary on the first open of a new week: the winner, head-to-head stats, all-time weeks won, and a taunt to send.
+- Boosts: win the week to bank a +10 XP comeback card, kept for 4 weeks, playable only when you're behind. Boost XP is blue in the score bar.
+- Help: ask for help with your task, or offer help with your partner's. The helper gets no XP now but banks 1.5× the task as a boost.
+- Nudges: a short setup (when you do chores, how pushy, quiet hours, notifications), editable in Settings. At most one a day, around the hour you actually finish tasks.
+- Push notifications: an hourly job (GitHub Actions) runs the nudge rules and sends them through Firebase Cloud Messaging. Tapping one opens the right task.
+- Behind-lines get blunter the further behind you are. Header chips for underdog removed (replaced by boosts).
+
 ## v0.4.0 · 4 Nov 2026 · commit 5afb375
 - New header: big dogs at the edges behind the score bar, scores beside them, names under the bar. Bar has a dark rim and shadow so it stands out from the dogs.
 - "Suggested for you" on Mine: your rhythm (overdue compared to how often you usually do it), jobs not done in 6+ months, end-of-month bills, seasonal ideas for Sweden and easy-to-forget classics. Add, Not now (a week), Never.
