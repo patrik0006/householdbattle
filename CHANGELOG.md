@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.7.0 · 5 Nov 2026 · commit __COMMIT__
+## v0.7.0 · 5 Nov 2026 · commit 4c0c700
 - Smart suggestions from Gemini (free tier): seasonal and Sweden-aware ideas, shared by both phones, refreshed weekly.
 - Badges: 20 badges in bronze, silver and gold, revealed in a chest you hold to open after a task is confirmed. XP is paid when you collect. Chore Dodger for empty weeks. Badges without finished art share one placeholder.
 - Week summary on the first open of a new week: the winner, head-to-head stats, all-time weeks won, and a taunt to send.
