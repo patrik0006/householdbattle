@@ -7,3 +7,6 @@ export const firebaseConfig = {
   messagingSenderId: "615984624210",
   appId: "1:615984624210:web:2e00b9e86e1a8568e3e58b"
 };
+
+// Web push key (Firebase > Project settings > Cloud Messaging > Web Push certificates). Empty = Firebase's default key.
+export const vapidKey = '';

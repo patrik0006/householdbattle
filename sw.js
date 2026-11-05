@@ -1,5 +1,5 @@
 // HouseholdBattle service worker: the app opens offline and updates itself in the background.
-const VERSION = '0.4.0';
+const VERSION = '0.7.0';
 const CACHE = 'hb-' + VERSION;
 const SHELL = ['./', 'index.html', 'app.js?v=' + VERSION, 'sync.js?v=' + VERSION, 'sync.js', 'version.js', 'firebase-config.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png'];
 
@@ -25,5 +25,29 @@ self.addEventListener('fetch', (e) => {
   e.respondWith(caches.match(req).then((hit) => {
     const net = fetch(req).then((res) => { if (res && (res.ok || res.type === 'opaque')) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(req, copy)); } return res; }).catch(() => hit);
     return hit || net;
+  }));
+});
+
+// ---------- 0.7.0: nudges arrive as push messages from the nudge job (via Firebase Cloud Messaging) ----------
+self.addEventListener('push', (e) => {
+  let p = {};
+  try { p = e.data ? e.data.json() : {}; } catch (err) { p = { data: { title: 'HouseholdBattle', body: e.data ? e.data.text() : '' } }; }
+  const d = p.data || p.notification || p;
+  const title = d.title || 'HouseholdBattle';
+  e.waitUntil(self.registration.showNotification(title, {
+    body: d.body || '',
+    icon: 'icons/icon-192.png',
+    badge: 'icons/icon-192.png',
+    tag: d.tag || 'nudge',
+    data: { nudge: d.nudge || '' }
+  }));
+});
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const id = (e.notification.data && e.notification.data.nudge) || '';
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+    const open = list.find((c) => c.url.indexOf(self.registration.scope) === 0);
+    if (open) { open.postMessage({ nudge: id }); return open.focus(); }
+    return self.clients.openWindow('./' + (id ? '?nudge=' + encodeURIComponent(id) : ''));
   }));
 });

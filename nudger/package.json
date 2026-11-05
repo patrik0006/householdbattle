@@ -1,0 +1,7 @@
+{
+  "name": "householdbattle-nudger",
+  "private": true,
+  "type": "module",
+  "description": "Hourly job: decides who gets a nudge and sends it as a push notification.",
+  "dependencies": { "firebase-admin": "^13.0.0" }
+}
