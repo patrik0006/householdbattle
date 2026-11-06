@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.7.1 · 6 Nov 2026 · commit __COMMIT__
+## v0.7.1 · 6 Nov 2026 · commit 9e55a43
 - Level path runs top to bottom (level 1 first) and opens at the top, so closing it is easy.
 - Removed the flag and "…and beyond" from the end of the path.
 
