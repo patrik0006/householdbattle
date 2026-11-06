@@ -1385,7 +1385,7 @@ export function startEngine() {
     var mine = who === pid, nm = mine ? 'Your' : esc(nameOf(who)) + "'s";
     var pts = [], nodes = '';
     for (var l = 1; l <= top; l++) {
-      var i = l - 1, x = 50 + Math.sin(i * 1.15) * 28, y = (top - l) * rowH + rowH / 2;
+      var i = l - 1, x = 50 + Math.sin(i * 1.15) * 28, y = (l - 1) * rowH + rowH / 2; // level 1 at the top
       pts.push([x, y]);
       var st = l < li.lvl ? 'done' : l === li.lvl ? 'here' : 'locked', need = levelStartXP(l);
       var sub = st === 'done' ? 'Reached' : st === 'here' ? (mine ? 'You are here' : esc(nameOf(who)) + ' is here') : (l === li.lvl + 1 ? li.toNext + ' XP to go' : need + ' XP');
@@ -1407,7 +1407,7 @@ export function startEngine() {
       (walked.length > 1 ? '<path d="' + curve(walked) + '" fill="none" stroke="#FFC93C" stroke-width="5" stroke-linecap="round" vector-effect="non-scaling-stroke"></path>' : '') + '</svg>';
     var inner = '<div class="sheet-top"><span class="ttl">' + nm.toUpperCase() + ' PATH</span><button class="iconbtn" data-act="close-sheet" aria-label="Close">' + IC.close + '</button></div>' +
       '<p class="muted" style="margin:0">' + xp + ' XP in total. Every task moves ' + (mine ? 'you' : esc(nameOf(who))) + ' along the trail.</p>' +
-      '<div class="lp-map" style="height:' + H + 'px"><div class="lp-flag">' + IC.flag + '<span>…and beyond</span></div>' + svg + nodes + '</div>';
+      '<div class="lp-map" style="height:' + H + 'px">' + svg + nodes + '</div>';
     return sheetWrap(pid, inner, s.fresh, 'Level path');
   }
   function personHTML(pid) {
@@ -2291,7 +2291,7 @@ export function startEngine() {
     wireChest(root, pid);
     wireSummary(root, pid);
     wireNotif(root, pid);
-    if (ui.sheet && ui.sheet.kind === 'levels' && !ui.sheet.scrolled) { ui.sheet.scrolled = true; var here = root.querySelector('.lp-node.here'), shl = root.querySelector('.sheet'); if (here && shl) shl.scrollTop = Math.max(0, here.offsetTop - shl.clientHeight / 2 + 120); }
+    if (false && ui.sheet && ui.sheet.kind === 'levels' && !ui.sheet.scrolled) { /* level path opens at the top now */ ui.sheet.scrolled = true; var here = root.querySelector('.lp-node.here'), shl = root.querySelector('.sheet'); if (here && shl) shl.scrollTop = Math.max(0, here.offsetTop - shl.clientHeight / 2 + 120); }
     if (ui.intro) { ui.intro = false; ui.introAt = Date.now(); introBars(root); }
     applyFx(pid, root);
     if (typeof syncBack === 'function') syncBack();
