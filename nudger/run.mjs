@@ -30,6 +30,7 @@ for (const home of homes.docs) {
       tx.update(home.ref, { state: eng.json(), rev: d.rev + 1, updatedAt: FieldValue.serverTimestamp(), updatedBy: 'nudger' });
     });
   } catch (e) { console.error(home.id, 'failed:', e.message); continue; }
+  if (!sent.length) console.log(home.id, ': nobody to nudge right now');
   for (const n of sent) {
     const uid = Object.keys(pids).find((u) => pids[u] === n.pid);
     console.log(home.id, n.pid, n.kind, '-', n.title, '|', n.body, DRY ? '(dry run)' : '');
@@ -46,4 +47,4 @@ for (const home of homes.docs) {
     }
   }
 }
-console.log('done,', total, 'push(es) sent');
+console.log('checked', homes.size, 'household(s);', total, 'push(es) sent');
