@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.8.0 · 8 Nov 2026 · commit __COMMIT__
+## v0.8.0 · 8 Nov 2026 · commit 43b536c
 - Both: tasks for both of you, with their own tab. Either of you does it, you both get the base XP.
 - Can't be stolen: new grace option Never.
 - Mark done for your partner, behind the ⋯ in the task sheet. They get the XP.
