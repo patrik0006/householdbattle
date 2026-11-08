@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.8.0 · 8 Nov 2026 · commit __COMMIT__
+- Both: tasks for both of you, with their own tab. Either of you does it, you both get the base XP.
+- Can't be stolen: new grace option Never.
+- Mark done for your partner, behind the ⋯ in the task sheet. They get the XP.
+- Sorting: tap the active filter to cycle Newest first, Easiest first, A to Z.
+- Missed challenges: the challenger has as many days as the challenge ran to collect the bonus, then it lapses.
+- Push notifications for challenges, rewards and help requests. The job now runs every 5 minutes.
+- Up for grabs tasks no longer get a yellow border.
+- Removed the Busy Body badge (v0.7.2 in the prototype).
+
 ## v0.7.1 · 6 Nov 2026 · commit 9e55a43
 - Level path runs top to bottom (level 1 first) and opens at the top, so closing it is easy.
 - Removed the flag and "…and beyond" from the end of the path.

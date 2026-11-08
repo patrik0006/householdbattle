@@ -812,6 +812,16 @@ button.pcard { width: 100%; border: 0; color: inherit; text-align: left; cursor:
 .n-x { background: none; border: none; color: #CAC4D0; padding: 12px; align-self: flex-start; }
 @media (prefers-reduced-motion: reduce) { .notif { animation: none; } }
 
+/* ---------- 0.8.0 ---------- */
+.sortrow { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; background: none; border: none; color: var(--muted); font: inherit; font-size: var(--fs-xs); padding: 2px 4px 0; letter-spacing: 0.3px; }
+.sortrow svg { width: 14px; height: 14px; }
+.sheet-top .iconbtn + .iconbtn { margin-left: 0; }
+.more-menu { display: flex; flex-direction: column; background: var(--bg); border-radius: 14px; overflow: hidden; }
+.more-menu button { display: flex; gap: 10px; align-items: flex-start; text-align: left; background: none; border: none; color: var(--ink); padding: 12px 14px; font: inherit; }
+.more-menu button svg { color: var(--gold); flex: none; margin-top: 2px; }
+.more-menu span { display: flex; flex-direction: column; gap: 2px; }
+.more-menu small { color: var(--muted); font-size: var(--fs-xs); }
+
 /* ---------- Real app: one full-screen phone instead of the test bench ---------- */
 html, body { height: 100%; }
 body { background: var(--bg); overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
@@ -834,8 +844,8 @@ body { background: var(--bg); overscroll-behavior: none; -webkit-tap-highlight-c
 <div id="phone" class="phone" role="application" aria-label="HouseholdBattle"></div>
 <noscript>HouseholdBattle needs JavaScript.</noscript>
 <script type="module">
-import { createSync } from './sync.js?v=0.7.1';
-import { startGame } from './app.js?v=0.7.1';
+import { createSync } from './sync.js?v=0.8.0';
+import { startGame } from './app.js?v=0.8.0';
 createSync().then(startGame).catch(function (e) {
   document.getElementById('phone').innerHTML = '<div class="app"><div class="ob"><div class="logo">HOUSEHOLD<br>BATTLE</div><p>Couldn\'t start. Check your connection and try again.</p><button class="btn gold" onclick="location.reload()">TRY AGAIN</button></div></div>';
   console.error(e);

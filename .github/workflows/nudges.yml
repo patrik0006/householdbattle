@@ -1,8 +1,8 @@
 name: Nudges
-# Every hour: decide who gets a nudge and send it as a push notification.
+# Every 5 minutes: send pushes for challenges, rewards and help requests, plus the daily nudge when it's due.
 on:
   schedule:
-    - cron: '17 * * * *'
+    - cron: '*/5 * * * *'
   workflow_dispatch:
 permissions:
   contents: read
