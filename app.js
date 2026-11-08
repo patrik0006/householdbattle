@@ -13,7 +13,7 @@ export function startGame(SYNCAPI) {
     5: { label: 'Epic', xp: 20, combo: 10, ex: ['Take down the hammock', 'Put up pictures on the wall', 'Book a flight'] }
   };
   var SIZE_KEYS = [1, 2, 3, 4, 5];
-  var GRACE = [[0, 'None'], [1, 'Today'], [3, '3 days'], [7, '1 week']];
+  var GRACE = [[0, 'None'], [1, 'Today'], [3, '3 days'], [7, '1 week'], [-1, 'Never']]; // -1 = can't be stolen
   function graceLabel(g) { for (var i = 0; i < GRACE.length; i++) if (GRACE[i][0] === g) return GRACE[i][1]; return g + ' days'; }
   var WD = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   var WD_LONG = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -75,7 +75,6 @@ export function startGame(SYNCAPI) {
     { id: 'begins', name: 'Now it begins', icon: 'flag', metal: 1, need: 1, desc: 'Create your first task.', value: function (cs, pid) { return actsBy(pid, ['add', 'assign']).length; } },
     { id: 'first', name: 'First Blood', icon: 'drop', metal: 1, need: 1, desc: 'Complete your first task.', value: function (cs) { return cs.length; } },
     { id: 'roll', name: 'On a Roll', icon: 'flame', metal: 1, need: 5, desc: '5 tasks in one day.', value: function (cs) { return maxPerDay(cs); } },
-    { id: 'tenacious', name: 'Busy Body', icon: 'check', metal: 2, need: 10, desc: '10 or more tasks in two days.', value: function (cs) { return twoDayMax(cs); } },
     { id: 'hardlab', name: 'Beast of Burden', icon: 'weight', metal: 2, need: 5, desc: '5 Hard or Epic tasks in one week.', value: function (cs) { return weekly(cs.filter(isHate).map(function (c) { return c.at; })); } },
     { id: 'slaver', name: "Slaver's Dog", icon: 'chain', metal: 2, need: 11, noXp: true, desc: 'Assign more than 10 tasks to your partner in one week.', value: function (cs, pid) { return weekly(actsBy(pid, ['assign']).map(function (a) { return a.at; })); } },
     { id: 'bloodhound', name: 'Blood Hound', icon: 'paw', metal: 1, need: 11, noXp: true, desc: 'Create more than 10 tasks in one week.', value: function (cs, pid) { return weekly(actsBy(pid, ['add', 'assign']).filter(function (a) { return !a.reassign; }).map(function (a) { return a.at; })); } },
@@ -111,6 +110,8 @@ export function startGame(SYNCAPI) {
     back: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg>',
     close: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>',
     check: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+    dots: '<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>',
+    sort: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4v16M3 16l4 4 4-4M17 20V4M13 8l4-4 4 4"/></svg>',
     boltSm: '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"/></svg>',
     boltBig: '<svg width="56" height="56" viewBox="0 0 24 24" aria-hidden="true"><path fill="#4FB4FF" d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"/></svg>',
     crown: '<svg width="38" height="30" viewBox="0 0 38 30" aria-hidden="true"><path d="M3 26 L1 6 L11 14 L19 2 L27 14 L37 6 L35 26 Z" fill="#FFC93C" stroke="#7A4A08" stroke-width="2" stroke-linejoin="round"/><circle cx="19" cy="18" r="3" fill="#FF7A59"/></svg>',
@@ -223,22 +224,26 @@ export function startGame(SYNCAPI) {
   function initial(pid) { return (nameOf(pid) || '?').charAt(0).toUpperCase(); }
   function ageDays(t) { return Math.max(0, Math.floor((effNow() - t.ageStart) / DAY)); }
   // Grace ends at midnight: 'Today' = end of the day the task was assigned, 3 days = end of the third day, etc.
-  function graceEnd(t) { return t.grace ? addDays(sod(t.ageStart), t.grace) : t.ageStart; }
+  function noSteal(t) { return t.grace === -1; }
+  function graceEnd(t) { return noSteal(t) ? Infinity : t.grace ? addDays(sod(t.ageStart), t.grace) : t.ageStart; }
   function fmtGrace(t) { return fmtDeadline(graceEnd(t)); }
   function inGrace(t) { return effNow() < graceEnd(t); }
   // Bounty: grows 10% of base per day for whoever can take the task (Anyone tasks from day 1, others' tasks after grace). Max = base.
   function bountyDays(t, pid) {
     var T = effNow();
     if (t.assignee === 'any') return Math.floor((T - t.ageStart) / DAY);
-    if (t.assignee === pid) return 0;
+    if (t.assignee === pid || t.assignee === 'both') return 0;
     var ge = graceEnd(t); if (T < ge) return 0;
     return Math.floor((T - ge) / DAY) + 1;
   }
   function bountyFor(t, pid) { var b = SIZES[t.size].xp, d = bountyDays(t, pid); return d <= 0 ? 0 : Math.min(b, Math.ceil(b * 0.1 * d)); }
+  // After a missed challenge, the challenger has as long as the challenge lasted to collect the bonus.
+  function collectEnd(c) { var days = Math.max(1, Math.round((c.deadline - sod(c.at || c.deadline - DAY)) / DAY)); return addDays(c.deadline, days); } // same number of days, ending at midnight
   function chState(t) {
     var c = t.challenge; if (!c) return null;
     var T = effNow();
     if (c.status === 'pending' && T >= c.deadline) return 'expired';
+    if ((c.status === 'accepted' || c.status === 'failed') && T >= collectEnd(c)) return 'lapsed';
     if (c.status === 'accepted' && T >= c.deadline) return 'failed';
     return c.status;
   }
@@ -249,10 +254,10 @@ export function startGame(SYNCAPI) {
     if (st === 'accepted') return pid === c.to;
     if (helpingMe(t, pid)) return true;
     if (st === 'failed' && pid === c.from) return true;
-    if (t.assignee === 'any' || t.assignee === pid) return true;
+    if (t.assignee === 'any' || t.assignee === 'both' || t.assignee === pid) return true;
     return hasPartner(pid) && !inGrace(t);
   }
-  function canChallenge(t, pid) { return hasPartner(pid) && !isPaused() && isActive(t) && (t.assignee === 'any' || t.assignee === other(pid)) && (!t.challenge || chState(t) === 'expired'); }
+  function canChallenge(t, pid) { return hasPartner(pid) && !isPaused() && isActive(t) && (t.assignee === 'any' || t.assignee === other(pid)) && (!t.challenge || chState(t) === 'expired' || chState(t) === 'lapsed'); }
   /* ---------- 0.6.2: help ---------- */
   // Ask your partner to help with one of your tasks, or offer to help with one of theirs.
   // Once accepted, the helper can finish it. They get no XP now, but bank 1.5x the task's base XP as a comeback boost.
@@ -272,7 +277,15 @@ export function startGame(SYNCAPI) {
   function xpFor(t, pid) { var x = SIZES[t.size].xp + bountyFor(t, pid) + challengeBonusFor(t, pid); return isUnderdog(pid) ? x + underdogExtra(x) : x; }
   function isActive(t) { return t.status === 'open' && (!t.repeat || t.dueAt <= effNow()); }
   function isUpcoming(t) { return t.status === 'open' && t.repeat && t.dueAt > effNow(); }
-  function sortTasks(list, pid) { return list.sort(function (a, b) { return (xpFor(b, pid) - xpFor(a, pid)) || (a.ageStart - b.ageStart); }); }
+  // Sorting: tap the active filter again to cycle. Newest first (default) -> easiest first -> A to Z.
+  var SORTS = [['new', 'Newest first'], ['easy', 'Easiest first'], ['az', 'A to Z']];
+  function sortLabel(k) { for (var i = 0; i < SORTS.length; i++) if (SORTS[i][0] === k) return SORTS[i][1]; return SORTS[0][1]; }
+  function sortTasks(list, pid) {
+    var k = (UI[pid] && UI[pid].sort) || 'new';
+    var byNew = function (a, b) { return (b.ageStart - a.ageStart) || (b.createdAt - a.createdAt); };
+    return list.sort(k === 'easy' ? function (a, b) { return (a.size - b.size) || byNew(a, b); }
+      : k === 'az' ? function (a, b) { return a.title.localeCompare(b.title, 'sv', { sensitivity: 'base' }) || byNew(a, b); } : byNew);
+  }
   function fmtDeadline(t) { var d = sod(t - 1); return (d === sod(effNow()) ? 'today' : d === addDays(sod(effNow()), 1) ? 'tomorrow' : fmtDate(d)) + ' 23:59'; }
   function getTask(id) { for (var i = 0; i < S.tasks.length; i++) if (S.tasks[i].id === id) return S.tasks[i]; return null; }
   function badgeDef(id) { for (var i = 0; i < BADGES.length; i++) if (BADGES[i].id === id) return BADGES[i]; return null; }
@@ -377,6 +390,12 @@ export function startGame(SYNCAPI) {
     var tookLead = hasP && myB <= pB && myB + xp > pB;
     var comp = { id: uid(), taskId: t.id, title: t.title, size: t.size, by: pid, at: T, xp: xp, breakdown: breakdown, stolen: stolen, waitedDays: waited, alreadyDone: !!opts.alreadyDone, boomerang: boomerang, hour: new Date(T).getHours(), comeback: tookLead && wdIdx(T) === 6 && myB < pB, bounty: bounty, combo: combo, comboN: todayCount + 1, challengeWon: challengeWon, challengeCollect: challengeCollect };
     comp.underdog = udXp;
+    if (t.assignee === 'both' && hasP && !helping) {
+      comp.shared = { pid: o, xp: base };
+      breakdown.push(nameOf(o) + ' also gets +' + base);
+      S.adjust = S.adjust || []; S.adjust.push({ id: uid(), pid: o, by: 'shared', delta: base, at: T, compId: comp.id });
+    }
+    if (opts.markedBy) { comp.markedBy = opts.markedBy; breakdown.push('Marked done by ' + nameOf(opts.markedBy)); }
     if (helping) {
       comp.help = { owner: helpOwner, banked: banked };
       var wsN = addDays(weekStart(T), 7);
@@ -394,7 +413,7 @@ export function startGame(SYNCAPI) {
       t.dueAt = next; t.ageStart = next; t.thread = []; t.handedBackBy = null;
     } else { t.status = 'done'; t.doneAt = T; t.doneBy = pid; }
     var actIds = [];
-    var a = addAct({ kind: helping ? 'helped' : stolen ? 'steal' : 'complete', banked: banked, owner2: helpOwner, actor: pid, taskId: t.id, title: t.title, xp: xp, owner: stolen ? o : null, compId: comp.id, already: !!opts.alreadyDone, challenge: challengeWon ? 'won' : challengeCollect ? 'collect' : null, chFrom: ch ? ch.from : null });
+    var a = addAct({ markedBy: opts.markedBy || null, shared: comp.shared ? comp.shared.xp : 0, kind: helping ? 'helped' : stolen ? 'steal' : 'complete', banked: banked, owner2: helpOwner, actor: pid, taskId: t.id, title: t.title, xp: xp, owner: stolen ? o : null, compId: comp.id, already: !!opts.alreadyDone, challenge: challengeWon ? 'won' : challengeCollect ? 'collect' : null, chFrom: ch ? ch.from : null });
     actIds.push(a.id);
     if (rw && rw.to === pid) {
       S.owed.push({ id: uid(), compId: comp.id, from: rw.from, to: pid, text: rw.text, title: t.title, at: T, delivered: false });
@@ -462,17 +481,39 @@ export function startGame(SYNCAPI) {
     if (!today && open.length) return mk('idle', pickLine(['Zero tasks today. Bold strategy.', 'The chores miss you.', 'Nothing done yet today', 'Your couch called. It wants a break.'], T), 'One quick task grabs the +2 first-of-the-day bonus.');
     return null;
   }
-  function sendNudge(pid, nd, T, debug) {
+  function sendNudge(pid, nd, T, debug, isEvent) {
     S.nudges = S.nudges || [];
     var rec = { id: uid(), pid: pid, at: T, kind: nd.kind, title: nd.title, body: nd.body, go: nd.go, debug: !!debug };
     S.nudges.push(rec); if (S.nudges.length > 40) S.nudges = S.nudges.slice(-40);
-    if (!debug) S.members[pid].lastNudge = T;
+    if (!debug && !isEvent) S.members[pid].lastNudge = T;
     log('Nudge to <b>' + esc(nameOf(pid)) + '</b>: ' + esc(nd.title) + ' · ' + esc(nd.body) + (debug ? ' (debug)' : ''));
     return rec;
+  }
+  // Things your partner sends you get their own push, right away (outside quiet hours).
+  var EVENT_KINDS = { challenge_req: 1, reward_set: 1, help_req: 1 };
+  function eventPush(a, pid) {
+    var on = nameOf(a.actor), tl = '\u201C' + a.title + '\u201D';
+    if (a.kind === 'challenge_req') return { kind: 'challenge', title: on + ' challenged you', body: tl + ' for +' + a.bonus + ' XP. Accept or chicken out.', go: { taskId: a.taskId } };
+    if (a.kind === 'reward_set') return { kind: 'reward', title: on + ' put a reward on a task', body: tl + ': \u201C' + a.text + '\u201D if you do it in time.', go: { taskId: a.taskId } };
+    if (a.kind === 'help_req') return { kind: 'help', title: a.ask ? on + ' needs a hand' : on + ' wants to help', body: a.ask ? 'Help with ' + tl + ' and bank a +' + a.banked + ' XP boost.' : 'Let them take ' + tl + '?', go: { taskId: a.taskId } };
+    return null;
+  }
+  function checkEvents(T) {
+    ['A', 'B'].forEach(function (p) {
+      var m = S.members[p], n = nudgePrefs(p); if (!m || !n || n.level === 'off' || n.perm !== 'granted') return;
+      if (inQuiet(new Date(T).getHours(), n.quiet)) return; // they wait until quiet hours end
+      if (m.evAt == null) { m.evAt = T; return; } // start fresh: no backlog of old events
+      var since = Math.max(m.evAt, T - DAY);
+      S.activity.filter(function (a) { return EVENT_KINDS[a.kind] && a.target === p && a.at > since && a.at <= T; }).slice(-3).forEach(function (a) {
+        var nd = eventPush(a, p); if (nd) { var r = sendNudge(p, nd, T, false, true); r.event = a.kind; }
+      });
+      m.evAt = T;
+    });
   }
   function checkNudges() {
     var T = now();
     if (isPaused()) return;
+    checkEvents(T);
     ['A', 'B'].forEach(function (p) {
       var m = S.members[p], n = nudgePrefs(p); if (!m || !n || n.level === 'off' || n.perm !== 'granted') return;
       if (m.lastNudge && m.lastNudge >= sod(T)) return;
@@ -503,6 +544,11 @@ export function startGame(SYNCAPI) {
         addAct({ kind: 'challenge_expired', actor: c.to, from: c.from, taskId: t.id, title: t.title, at: c.deadline });
         log('Challenge on "' + esc(t.title) + '" expired: ' + esc(nameOf(c.to)) + ' never answered');
         t.challenge = null;
+      } else if (st === 'lapsed') {
+        if (c.status !== 'failed') addAct({ kind: 'challenge_failed', actor: c.to, from: c.from, taskId: t.id, title: t.title, bonus: c.bonus, at: c.deadline });
+        addAct({ kind: 'challenge_lapsed', actor: c.from, taskId: t.id, title: t.title, bonus: c.bonus, at: collectEnd(c) });
+        log('The +' + c.bonus + ' challenge bonus on "' + esc(t.title) + '" was never collected. It\'s a normal task again.');
+        t.challenge = null;
       } else if (st === 'failed' && c.status !== 'failed') {
         c.status = 'failed';
         addAct({ kind: 'challenge_failed', actor: c.to, from: c.from, taskId: t.id, title: t.title, bonus: c.bonus, at: c.deadline });
@@ -520,6 +566,7 @@ export function startGame(SYNCAPI) {
       else if (i >= 0) S.tasks[i] = u.taskBefore; else S.tasks.push(u.taskBefore);
       S.activity = S.activity.filter(function (a) { return u.actIds.indexOf(a.id) < 0; });
       S.owed = S.owed.filter(function (o) { return o.compId !== u.compId; });
+      S.adjust = (S.adjust || []).filter(function (a) { return !(a.compId === u.compId && a.by === 'shared'); });
       ['A', 'B'].forEach(function (p) { S.badges[p] = S.badges[p].filter(function (b) { return b.compId !== u.compId; }); if (S.boosts && S.boosts[p]) S.boosts[p] = S.boosts[p].filter(function (b) { return b.compId !== u.compId; }); });
       if (c) log('<b>' + esc(nameOf(c.by)) + '</b> undid "' + esc(c.title) + '" (−' + c.xp + ' XP)');
     });
@@ -534,8 +581,8 @@ export function startGame(SYNCAPI) {
     if (d.repeat === 'monthly') return { kind: 'monthly', day: d.monthDay };
     return null;
   }
-  function assigneeFromWho(pid, who) { return who === 'me' ? pid : who === 'partner' ? other(pid) : 'any'; }
-  function whoFromAssignee(pid, a) { return a === pid ? 'me' : a === 'any' ? 'any' : 'partner'; }
+  function assigneeFromWho(pid, who) { return who === 'me' ? pid : who === 'partner' ? other(pid) : who === 'both' ? 'both' : 'any'; }
+  function whoFromAssignee(pid, a) { return a === pid ? 'me' : a === 'any' ? 'any' : a === 'both' ? 'both' : 'partner'; }
 
   function createTask(pid, d, opts) {
     opts = opts || {}; draftDefaults(d);
@@ -551,7 +598,7 @@ export function startGame(SYNCAPI) {
     var act = opts.alreadyDone ? null : assignee === o
       ? addAct({ kind: 'assign', actor: pid, target: o, taskId: t.id, title: t.title, size: t.size, note: note || null, gif: d.gif || null })
       : addAct({ kind: 'add', actor: pid, taskId: t.id, title: t.title, size: t.size, assignee: assignee });
-    log('<b>' + esc(nameOf(pid)) + '</b> added "' + esc(t.title) + '" · ' + SIZES[t.size].label + ' ' + SIZES[t.size].xp + ' XP · for ' + (assignee === 'any' ? 'Anyone' : esc(nameOf(assignee))) + (rep ? ' · ' + repLabel(rep) + ', first due ' + fmtDate(t.dueAt) : '') + (assignee !== 'any' ? ' · grace ' + graceLabel(t.grace) : ''));
+    log('<b>' + esc(nameOf(pid)) + '</b> added "' + esc(t.title) + '" · ' + SIZES[t.size].label + ' ' + SIZES[t.size].xp + ' XP · for ' + (assignee === 'any' ? 'Anyone' : assignee === 'both' ? 'Both' : esc(nameOf(assignee))) + (rep ? ' · ' + repLabel(rep) + ', first due ' + fmtDate(t.dueAt) : '') + (assignee !== 'any' ? ' · grace ' + graceLabel(t.grace) : ''));
     awardBadges(pid, null, T);
     return { task: t, actId: act ? act.id : null };
   }
@@ -646,6 +693,7 @@ export function startGame(SYNCAPI) {
     addAct({ kind: 'assign', actor: 'A', target: 'B', taskId: kettle.id, title: kettle.title, size: 2, note: "You're welcome.", at: at(-3, 8) });
     task({ title: 'Sort the paperwork pile', size: 3, assignee: 'B', createdBy: 'B', createdAt: at(-2, 21), grace: 3 });
     // Coming up
+    task({ title: 'Book the car service', size: 2, assignee: 'both', createdBy: 'A', createdAt: at(-1, 18) });
     task({ title: 'Water the plants', size: 1, assignee: 'any', createdBy: 'B', createdAt: at(-30, 12), repeat: { kind: 'weekly', weekday: (twd + 2) % 7 } });
     task({ title: 'Take out the trash', size: 2, assignee: 'any', createdBy: 'A', createdAt: at(-30, 12), repeat: { kind: 'weekly', weekday: (twd + 1) % 7 } });
     task({ title: 'Clean the bathroom', size: 3, assignee: 'A', createdBy: 'A', createdAt: at(-30, 12), repeat: { kind: 'weekly', weekday: (twd + 3) % 7 } });
@@ -809,8 +857,8 @@ export function startGame(SYNCAPI) {
     if (c && st === 'pending' && c.from === pid) return { sub: 'You challenged ' + on + ' (+' + c.bonus + ') · waiting for an answer', cls: '' };
     if (c && st === 'accepted' && c.to === pid) return { sub: 'Challenge accepted · +' + c.bonus + ' if done by ' + fmtDeadline(c.deadline), cls: 'gold', hot: true };
     if (c && st === 'accepted' && c.from === pid) return { sub: on + ' accepted your challenge · locked until ' + fmtDeadline(c.deadline), cls: '' };
-    if (c && st === 'failed' && c.from === pid) return { sub: on + ' missed the challenge · +' + c.bonus + ' bonus is yours', cls: 'gold', hot: true };
-    if (c && st === 'failed' && c.to === pid) return { sub: 'Missed the challenge · the bonus went to ' + on, cls: 'coral' };
+    if (c && st === 'failed' && c.from === pid) return { sub: on + ' missed the challenge · do it by ' + fmtDeadline(collectEnd(c)) + ' for +' + c.bonus, cls: 'gold', hot: true };
+    if (c && st === 'failed' && c.to === pid) return { sub: 'Missed the challenge · ' + on + ' can collect +' + c.bonus + ' until ' + fmtDeadline(collectEnd(c)), cls: 'coral' };
     var hp = helpOn(t);
     if (hp && hp.status === 'pending' && hp.to === pid) return { sub: on + (hp.kind === 'ask' ? ' asks for your help · bank +' + helpBank(t) + ' boost' : ' offers to help with this'), cls: 'boost', hot: true };
     if (hp && hp.status === 'pending' && hp.from === pid) return { sub: (hp.kind === 'ask' ? 'You asked ' + on + ' for help' : 'You offered to help') + ' · waiting for an answer', cls: '' };
@@ -818,8 +866,10 @@ export function startGame(SYNCAPI) {
     if (hp && hp.status === 'accepted') return { sub: on + ' is helping you with this', cls: 'boost' };
     if (rwOpen(t) && t.reward.to === pid) return { sub: 'Special reward from ' + on + ': \u201C' + esc(t.reward.text) + '\u201D if done by ' + fmtDeadline(t.reward.deadline), cls: 'gold', hot: true };
     if (rwOpen(t) && t.reward.from === pid) return { sub: 'Your reward for ' + on + ': \u201C' + esc(t.reward.text) + '\u201D · until ' + fmtDeadline(t.reward.deadline), cls: '' };
+    if (t.assignee === o && hasPartner(pid) && noSteal(t)) return { sub: on + "'s · can't be stolen", cls: '' };
+    if (t.assignee === pid && hasPartner(pid) && noSteal(t) && !st) { var b0 = [SIZES[t.size].label, "can't be stolen"]; if (t.repeat) b0.splice(1, 0, repLabel(t.repeat)); return { sub: b0.join(' · '), cls: '' }; }
     if (t.assignee === o && hasPartner(pid) && inGrace(t)) return { sub: on + "'s until " + fmtGrace(t) + ' · then you can steal it', cls: '' };
-    if (bounty > 0) return { sub: (t.assignee === o ? 'Up for grabs · ' : '') + '+' + bounty + ' bounty · ' + (bounty >= SIZES[t.size].xp ? 'maxed out' : 'grows daily'), cls: 'gold', hot: true };
+    if (bounty > 0) return { sub: (t.assignee === o ? 'Up for grabs · ' : '') + '+' + bounty + ' bounty · ' + (bounty >= SIZES[t.size].xp ? 'maxed out' : 'grows daily'), cls: 'gold' };
     if (t.assignee === pid && hasPartner(pid) && !inGrace(t) && !st) return { sub: on + ' can steal this now · waiting ' + ageDays(t) + (ageDays(t) === 1 ? ' day' : ' days'), cls: 'coral' };
     if (last && t.assignee === pid && last.from === o) return { sub: 'From ' + on + ': "' + esc(last.text) + '"', cls: 'coral' };
     if (last && t.assignee === o && last.from === pid) return { sub: 'You: "' + esc(last.text) + '"', cls: '' };
@@ -969,12 +1019,13 @@ export function startGame(SYNCAPI) {
     var lists = {
       mine: sortTasks(active.filter(function (t) { return t.assignee === pid || helpingMe(t, pid); }), pid),
       any: sortTasks(active.filter(function (t) { return t.assignee === 'any'; }), pid),
+      both: sortTasks(active.filter(function (t) { return t.assignee === 'both'; }), pid),
       partner: sortTasks(active.filter(function (t) { return t.assignee === o && !helpingMe(t, pid); }), pid)
     };
     var doneToday = S.completions.filter(function (c) { return c.at >= sod(T) && c.at <= T; }).sort(function (a, b) { return b.at - a.at; });
     var upcoming = S.tasks.filter(isUpcoming).sort(function (a, b) { return a.dueAt - b.dueAt; });
     function chip(key, label, n) { return '<button class="fchip' + (ui.filter === key ? ' on' : '') + '" role="tab" aria-selected="' + (ui.filter === key) + '" data-act="filter" data-f="' + key + '">' + label + '<span class="cnt' + (n ? '' : ' zero') + '">' + n + '</span></button>'; }
-    var chips = '<div class="chips" role="tablist" data-scroll="chips">' + chip('mine', 'Mine', lists.mine.length) + chip('any', 'Anyone', lists.any.length) + chip('partner', (hasPartner(pid) ? esc(nameOf(o)) + "'s" : "Partner's"), lists.partner.length) + chip('done', 'Done', doneToday.length) + '</div>';
+    var chips = '<div class="chips" role="tablist" data-scroll="chips">' + chip('mine', 'Mine', lists.mine.length) + chip('any', 'Anyone', lists.any.length) + (hasPartner(pid) ? chip('both', 'Both', lists.both.length) : '') + chip('partner', (hasPartner(pid) ? esc(nameOf(o)) + "'s" : "Partner's"), lists.partner.length) + chip('done', 'Done', doneToday.length) + '</div>';
     var body = '';
     var claimed = S.completions.some(function (c) { return c.by === pid && c.at >= sod(T); });
     if (ui.filter === 'done') {
@@ -992,9 +1043,11 @@ export function startGame(SYNCAPI) {
       var comboToday = todayList.reduce(function (n, c) { return n + (c.combo || 0); }, 0);
       var sgBox = ui.filter === 'mine' && !isPaused() ? suggHTML(pid) : '';
       if (ui.filter === 'mine' && !isPaused()) body += tipHTML(pid) + sgBox;
+      if (list.length > 1) body += '<button class="sortrow" data-act="sort-cycle" aria-label="Sorted: ' + sortLabel(ui.sort) + '. Tap to change.">' + IC.sort + '<span>' + sortLabel(ui.sort) + '</span></button>';
       if (!list.length) {
         if (ui.filter === 'mine' && !sgBox) body += '<div class="empty"><span class="disp">NOTHING LEFT FOR YOU</span><span>Suspicious.</span></div>';
         else if (ui.filter === 'any') body += '<div class="empty"><span class="disp">NO OPEN TASKS</span><span>Add one with the + button.</span></div>';
+        else if (ui.filter === 'both') body += '<div class="empty"><span class="disp">NOTHING SHARED</span><span>Add a task for Both. Either of you does it, you both get the points.</span></div>';
         else body += '<div class="empty"><span class="disp">' + (hasPartner(pid) ? esc(nameOf(o)).toUpperCase() + ' IS ALL CLEAR' : 'NO PARTNER YET') + '</span><span>' + (hasPartner(pid) ? 'Nothing to steal. Annoying.' : 'Share your invite code from Settings.') + '</span></div>';
       }
       list.forEach(function (t) { body += taskRow(pid, t); });
@@ -1431,10 +1484,10 @@ export function startGame(SYNCAPI) {
     var t = '<b>' + esc(a.title || '') + '</b>';
     switch (a.kind) {
       case 'join': return who(a.actor) + ' joined the household';
-      case 'add': return who(a.actor) + ' added ' + t + ' · ' + SIZES[a.size].label + ' ' + SIZES[a.size].xp + ' XP' + (a.assignee === 'any' ? ' for anyone' : '');
+      case 'add': return who(a.actor) + ' added ' + t + ' · ' + SIZES[a.size].label + ' ' + SIZES[a.size].xp + ' XP' + (a.assignee === 'any' ? ' for anyone' : a.assignee === 'both' ? ' for both of you' : '');
       case 'assign': return who(a.actor) + ' assigned ' + (a.target === v ? 'you' : '<b>' + esc(nameOf(a.target)) + '</b>') + ' ' + t + ' · ' + SIZES[a.size].xp + ' XP';
       case 'handback': return who(a.actor) + ' handed back ' + t;
-      case 'complete': return who(a.actor) + ' completed ' + t + ' · +' + a.xp + (a.already ? ' (already done, just logged)' : '') + (a.challenge === 'won' ? ' · challenge won' : a.challenge === 'collect' ? ' · collected the challenge bonus' : '');
+      case 'complete': return (a.markedBy ? who(a.markedBy) + ' marked ' + t + ' done for ' + (a.actor === v ? 'you' : '<b>' + esc(nameOf(a.actor)) + '</b>') + ' · +' + a.xp : who(a.actor) + ' completed ' + t + ' · +' + a.xp) + (a.shared ? ' · ' + (a.actor === v ? esc(nameOf(other(v))) : 'you') + ' also got +' + a.shared : '') + (a.already ? ' (already done, just logged)' : '') + (a.challenge === 'won' ? ' · challenge won' : a.challenge === 'collect' ? ' · collected the challenge bonus' : '');
       case 'challenge_req': return who(a.actor) + ' challenged ' + (a.target === v ? 'you' : '<b>' + esc(nameOf(a.target)) + '</b>') + ': ' + t + ' · +' + a.bonus + ' by ' + fmtDate(a.deadline - 1);
       case 'reward_set': return who(a.actor) + ' set a special reward for ' + (a.target === v ? 'you' : '<b>' + esc(nameOf(a.target)) + '</b>') + ' on ' + t + ': \u201C' + esc(a.text) + '\u201D by ' + fmtDate(a.deadline - 1);
       case 'reward_won': return who(a.actor) + ' earned ' + (a.from === v ? 'your' : '<b>' + esc(nameOf(a.from)) + "'s</b>") + ' special reward for ' + t + ': \u201C' + esc(a.text) + '\u201D';
@@ -1466,6 +1519,7 @@ export function startGame(SYNCAPI) {
       case 'help_ok': return who(a.actor) + ' said yes · ' + (a.helper === v ? 'you help' : '<b>' + esc(nameOf(a.helper)) + '</b> helps') + ' with ' + t;
       case 'help_no': return who(a.actor) + ' said no to help with ' + t;
       case 'help_stop': return who(a.actor) + ' called off the help with ' + t;
+      case 'challenge_lapsed': return who(a.actor) + ' never collected the +' + a.bonus + ' challenge bonus on ' + t;
       case 'week_won': return who(a.actor) + ' won week ' + a.week + ' · ' + a.me + '–' + a.p + ' · banked a +' + WIN_BOOST + ' XP boost';
       case 'boost_used': return who(a.actor) + ' played a <b>+' + a.xp + ' XP boost</b>' + (a.lead ? ' and took the lead' : '');
       case 'taunt': return who(a.actor) + ' about week ' + a.week + ':';
@@ -1739,12 +1793,17 @@ export function startGame(SYNCAPI) {
     if (!t) return sheetWrap(pid, '<div class="sheet-top"><span class="ttl">TASK</span><button class="iconbtn" data-act="close-sheet" aria-label="Close">' + IC.close + '</button></div><p class="muted">This task no longer exists.</p>', s.fresh, 'Task');
     var o = other(pid), on = esc(nameOf(o)), age = ageDays(t), x = xpFor(t, pid), paused = isPaused(), open = t.status === 'open';
     var c = t.challenge, st = chState(t), bounty = bountyFor(t, pid), chB = challengeBonusFor(t, pid);
-    var forTxt = t.assignee === 'any' ? 'Anyone' : t.assignee === pid ? 'You' : on;
+    var forTxt = t.assignee === 'any' ? 'Anyone' : t.assignee === 'both' ? 'Both of you · you both get the points' : t.assignee === pid ? 'You' : on;
     var worth = '<b class="gold">+' + x + ' XP</b> for you' + (bounty || chB ? ' (' + SIZES[t.size].xp + ' base' + (bounty ? ' + ' + bounty + ' bounty' : '') + (chB ? ' + ' + chB + ' challenge' : '') + ')' : '') + ', plus first-of-day or combo bonus';
     var graceTxt = '';
-    if (t.assignee !== 'any') graceTxt = graceLabel(t.grace || 0) + (inGrace(t) ? ' · ' + (t.assignee === pid ? 'only you until ' : on + "'s until ") + fmtGrace(t) : ' · over, it can be stolen');
+    if (noSteal(t)) graceTxt = 'Can\'t be stolen';
+    else if (t.assignee !== 'any' && t.assignee !== 'both') graceTxt = graceLabel(t.grace || 0) + (inGrace(t) ? ' · ' + (t.assignee === pid ? 'only you until ' : on + "'s until ") + fmtGrace(t) : ' · over, it can be stolen');
     var thread = t.thread.map(function (m) { return '<div class="tmsg ' + (m.from === pid ? 'mine' : 'theirs') + '">' + msgHTML(m.from === pid ? 'me' : 'them', m.gif, m.text) + '<small>' + (m.from === pid ? 'You' : esc(nameOf(m.from))) + ' · ' + (m.kind === 'handback' ? 'handed back' : m.kind === 'comment' ? 'commented' : m.kind === 'reply' ? 'replied' : 'assigned') + ' · ' + fmtDate(m.at) + '</small></div>'; }).join('');
-    var inner = '<div class="sheet-top"><span class="ttl">' + (t.assignee === o ? on.toUpperCase() + "'S TASK" : t.assignee === 'any' ? "ANYONE'S TASK" : 'YOUR TASK') + '</span><button class="iconbtn" data-act="close-sheet" aria-label="Close">' + IC.close + '</button></div>' +
+    var dfOk = t.status === 'open' && canDoneFor(t, pid);
+    var inner = '<div class="sheet-top"><span class="ttl">' + (t.assignee === o ? on.toUpperCase() + "'S TASK" : t.assignee === 'any' ? "ANYONE'S TASK" : t.assignee === 'both' ? 'SHARED TASK' : 'YOUR TASK') + '</span>' +
+      (dfOk ? '<button class="iconbtn" data-act="more-menu" aria-label="More options" aria-expanded="' + !!s.menu + '">' + IC.dots + '</button>' : '') +
+      '<button class="iconbtn" data-act="close-sheet" aria-label="Close">' + IC.close + '</button></div>' +
+      (dfOk && s.menu ? '<div class="more-menu" role="menu"><button role="menuitem" data-act="done-for" data-id="' + t.id + '">' + IC.check + '<span><b>Mark done for ' + on + '</b><small>' + on + ' did it, so ' + on + ' gets the XP</small></span></button></div>' : '') +
       '<h3>' + esc(t.title) + '</h3>' +
       '<dl class="kv"><dt>Worth</dt><dd>' + worth + '</dd><dt>Size</dt><dd>' + SIZES[t.size].label + ' · ' + SIZES[t.size].xp + ' XP</dd><dt>For</dt><dd>' + forTxt + '</dd>' +
       (graceTxt ? '<dt>Grace period</dt><dd>' + graceTxt + '</dd>' : '') +
@@ -1784,6 +1843,7 @@ export function startGame(SYNCAPI) {
       else if (helpingMe(t, pid)) inner += '<button class="btn boostbtn" data-act="detail-done">DONE · BANK +' + helpBank(t) + ' BOOST</button>';
       else if (can && !(t.assignee === o && st !== 'failed')) inner += '<button class="btn gold" data-act="detail-done">' + label + ' · +' + x + '</button>';
       else if (st === 'accepted') inner += '<p class="muted">Locked to ' + on + ' until the challenge deadline.</p>';
+      else if (t.assignee === o && noSteal(t)) inner += '<p class="muted">' + on + ' marked this as can\'t be stolen. Only ' + on + ' can do it.</p>';
       else if (t.assignee === o && inGrace(t)) inner += '<p class="muted">' + on + ' has until ' + fmtGrace(t) + '. After that you can steal it, and the bounty grows every day.</p>';
       if (hasPartner(pid)) {
         var acts = [];
@@ -1881,7 +1941,8 @@ export function startGame(SYNCAPI) {
       inner += '<h3>Who\'s doing it?</h3><div class="bigopts">' +
         '<button class="bigopt' + (d.who === 'me' ? ' on' : '') + '" data-act="add-who" data-w="me"><span class="bt"><b>Me</b><span>It goes on your list</span></span></button>' +
         '<button class="bigopt' + (d.who === 'partner' ? ' on' : '') + '" data-act="add-who" data-w="partner"' + (hasP ? '' : ' disabled') + '><span class="bt"><b>' + (hasP ? esc(nameOf(o)) : 'Partner') + '</b><span>' + (hasP ? 'Assign it, with a note if you like' : 'Not joined yet') + '</span></span></button>' +
-        '<button class="bigopt' + (d.who === 'any' ? ' on' : '') + '" data-act="add-who" data-w="any"><span class="bt"><b>Anyone</b><span>Whoever gets there first takes the points</span></span></button></div>';
+        '<button class="bigopt' + (d.who === 'any' ? ' on' : '') + '" data-act="add-who" data-w="any"><span class="bt"><b>Anyone</b><span>Whoever gets there first takes the points</span></span></button>' +
+        '<button class="bigopt' + (d.who === 'both' ? ' on' : '') + '" data-act="add-who" data-w="both"' + (hasP ? '' : ' disabled') + '><span class="bt"><b>Both of us</b><span>Either of you does it, you both get the points</span></span></button></div>';
       if (d.who === 'partner') inner += '<span class="lbl">Grace period · how long only ' + esc(nameOf(o)) + ' can do it</span><div class="seg">' + GRACE.map(function (g) { return '<button class="' + (d.grace === g[0] ? 'on' : '') + '" data-act="sum-grace" data-g="' + g[0] + '">' + g[1] + '</button>'; }).join('') + '</div><span class="lbl">Note to ' + esc(nameOf(o)) + ' (optional)</span>' + composerHTML(pid, 'sheet', 'assign', 'select') + '<button class="btn gold" data-act="add-who-next">NEXT</button>';
       inner += skip;
     } else if (s.step === 'repeat') {
@@ -1904,8 +1965,8 @@ export function startGame(SYNCAPI) {
     var h = '<h3>' + (s.editId ? 'Edit task' : 'Ready to add?') + '</h3>' +
       '<div class="sum-block"><label class="lbl" for="' + pid + '-sum-title">Task</label><input class="field" id="' + pid + '-sum-title" data-bind="draft.title" data-rerender="1" maxlength="60" value="' + esc(d.title) + '"></div>' +
       '<div class="sum-block"><span class="lbl">How bad is it?</span>' + seg('sum-size', 'n', SIZE_KEYS.map(function (n) { return [n, SIZES[n].label + ' (' + SIZES[n].xp + ' XP)']; }), d.size) + '</div>' +
-      '<div class="sum-block"><span class="lbl">Who</span>' + seg('sum-who', 'w', [['me', 'Me'], ['partner', hasP ? esc(nameOf(o)) : 'Partner', !hasP], ['any', 'Anyone']], d.who) + '</div>';
-    if (d.who !== 'any') h += '<div class="sum-block"><span class="lbl">Grace period · how long only ' + (d.who === 'me' ? 'you' : esc(nameOf(o))) + ' can do it before it can be stolen</span>' + seg('sum-grace', 'g', GRACE, d.grace) + '</div>';
+      '<div class="sum-block"><span class="lbl">Who</span>' + seg('sum-who', 'w', [['me', 'Me'], ['partner', hasP ? esc(nameOf(o)) : 'Partner', !hasP], ['any', 'Anyone'], ['both', 'Both', !hasP]], d.who) + '</div>';
+    if (d.who === 'me' || d.who === 'partner') h += '<div class="sum-block"><span class="lbl">Grace period · how long only ' + (d.who === 'me' ? 'you' : esc(nameOf(o))) + ' can do it before it can be stolen. Never = it can\'t be stolen.</span>' + seg('sum-grace', 'g', GRACE, d.grace) + '</div>';
     if (d.who === 'partner') h += '<div class="sum-block"><span class="lbl">Note to ' + esc(nameOf(o)) + ' (optional)</span>' + composerHTML(pid, 'sheet', 'assign', 'select') + '</div>';
     h += '<div class="sum-block"><span class="lbl">Repeats</span>' + seg('sum-repeat', 'r', [['none', 'No'], ['daily', 'Daily'], ['alternate', 'Every other day'], ['weekly', 'Weekly'], ['biweekly', 'Every 2 weeks'], ['monthly', 'Monthly']], d.repeat) + (d.repeat === 'weekly' || d.repeat === 'biweekly' || d.repeat === 'monthly' ? dayPicker(d) : '') + '</div>';
     h += '<span class="xp-preview">Worth <b>' + xp + ' XP</b>' + (d.repeat !== 'none' ? ' each time' : '') + '</span>';
@@ -1982,7 +2043,7 @@ export function startGame(SYNCAPI) {
     var html = '<div class="toast' + (t.fresh ? ' enter' : '') + '" role="status">';
     if (t.kind === 'info') return html + '<div class="toast-row"><span class="toast-txt">' + esc(t.text) + '</span></div></div>';
     var xp = t.items.reduce(function (n, c) { return n + c.xp; }, 0);
-    var txt = t.items.length === 1 ? esc(t.items[0].title) + ' · <b>+' + xp + ' XP</b>' : t.items.length + ' tasks · <b>+' + xp + ' XP</b>';
+    var txt = t.items.length === 1 ? esc(t.items[0].title) + ' · <b>+' + xp + ' XP</b>' + (t.forName ? ' to ' + esc(t.forName) : '') : t.items.length + ' tasks · <b>+' + xp + ' XP</b>';
     var extra = t.items.length === 1 && t.items[0].breakdown.length > 1 ? '<small>' + t.items[0].breakdown.slice(1).map(esc).join(' · ') + '</small>' : '';
     html += '<div class="toast-row"><span class="toast-txt">' + txt + extra + '</span>' + (hasPartner(pid) ? '<button class="tbtn" data-act="toast-note">Add note</button>' : '') + '<button class="tbtn" data-act="toast-undo">Undo</button></div>';
     if (t.c && t.noteOpen) html += composerHTML(pid, 'toast', 'small', 'send');
@@ -2328,6 +2389,17 @@ export function startGame(SYNCAPI) {
   function newDraft() { var T = now(); return { title: '', size: null, who: null, repeat: null, weekday: wdIdx(T), monthDay: new Date(T).getDate(), grace: 1 }; }
   function draftDefaults(d) { if (d.size == null) d.size = 2; if (d.who == null) d.who = 'me'; if (d.repeat == null) d.repeat = 'none'; return d; }
 
+  function canDoneFor(t, pid) { var o = other(pid); return hasPartner(pid) && !isPaused() && isActive(t) && t.assignee !== pid && canComplete(t, o) && !helpingMe(t, pid); }
+  function doneFor(pid, id) {
+    var o = other(pid), r = completeTask(o, id, { markedBy: pid });
+    if (!r) return null;
+    var ui = UI[pid]; ui.sheet = null;
+    ui.toast = { kind: 'done', items: [r.comp], undo: [r.undo], actId: r.actId, c: newComposer(), noteOpen: false, fresh: true, forName: nameOf(o) };
+    ui.toast.expires = Date.now() + 5000;
+    if (UI[o] && !UI[o].closed) UI[o].fx = { me: fxKind(r) };
+    buzz('done');
+    return r;
+  }
   function doComplete(pid, id, opts) {
     var o0 = other(pid), m0 = S.members[pid] ? moodFor(pid) : null, m1 = hasPartner(pid) ? moodFor(o0) : null;
     var r = completeTask(pid, id, opts);
@@ -2400,7 +2472,10 @@ export function startGame(SYNCAPI) {
       case 'open-score': ui.tab = 'score'; ui.settings = false; ui.sheet = null; ui.badgeOpen = null; ui.badgeOwner = ds.who === 'partner' && hasPartner(pid) ? 'partner' : 'me'; break;
       case 'levels-open': openSheet(pid, { kind: 'levels', who: ds.who === other(pid) ? other(pid) : pid }); break;
       case 'score-who': ui.badgeOwner = ds.who === 'partner' && hasPartner(pid) ? 'partner' : 'me'; ui.badgeOpen = null; break;
-      case 'filter': ui.filter = ds.f; break;
+      case 'sort-cycle': ds = { f: ui.filter }; /* falls through: same as tapping the active filter */
+      case 'filter':
+        if (ui.filter === ds.f && ds.f !== 'done') { var si = SORTS.map(function (x) { return x[0]; }).indexOf(ui.sort || 'new'); ui.sort = SORTS[(si + 1) % SORTS.length][0]; infoToast(pid, 'Sorted: ' + sortLabel(ui.sort) + '.'); buzz('light'); }
+        ui.filter = ds.f; break;
       case 'open-settings': ui.settings = true; ui.sheet = null; ui.nameDraft = null; ui.pauseCompose = null; break;
       case 'close-settings': ui.clearAsk = null; ui.scoreEdit = null; ui.settings = false; ui.pauseCompose = null; ui.nameDraft = null; break;
       case 'close-sheet': ui.dogPicker = null;
@@ -2411,6 +2486,8 @@ export function startGame(SYNCAPI) {
 
       /* tasks */
       case 'complete': doComplete(pid, ds.id); break;
+      case 'more-menu': if (s) s.menu = !s.menu; break;
+      case 'done-for': doneFor(pid, ds.id); break;
       case 'open-task': openSheet(pid, { kind: 'detail', id: ds.id }); break;
       case 'detail-done': doComplete(pid, s.id); break;
       case 'detail-edit':
@@ -2565,7 +2642,7 @@ export function startGame(SYNCAPI) {
           ui.sheet = null;
           if (cr.task.assignee === o) { ui.filter = 'partner'; infoToast(pid, 'Assigned to ' + nameOf(o) + '.'); }
           else if (cr.task.repeat && cr.task.dueAt > now()) infoToast(pid, 'Added. First due ' + fmtDate(cr.task.dueAt) + '.');
-          else { ui.filter = cr.task.assignee === 'any' ? 'any' : 'mine'; infoToast(pid, 'Added "' + cr.task.title + '".'); }
+          else { ui.filter = cr.task.assignee === 'any' ? 'any' : cr.task.assignee === 'both' ? 'both' : 'mine'; infoToast(pid, 'Added "' + cr.task.title + '".'); }
         }
         break;
       case 'add-already': if (s && s.draft) draftDefaults(s.draft);
