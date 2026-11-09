@@ -1329,7 +1329,7 @@ export function startGame(SYNCAPI) {
   function fbHTML(pid) {
     var ui = UI[pid]; if (!fbAllowed(pid) || !S.members[pid]) return '';
     var f = ui.fb;
-    var btn = '<button class="fb-btn' + (f ? ' on' : '') + '" data-act="fb-toggle" aria-label="' + (f ? 'Cancel feedback' : 'Leave feedback') + '">' + (f ? IC.close : IC.pen) + '</button>';
+    var btn = '<button class="fb-btn' + (f ? ' on' : '') + (ui.toast && !ui.settings ? ' lift' : '') + '" data-act="fb-toggle" aria-label="' + (f ? 'Cancel feedback' : 'Leave feedback') + '">' + (f ? IC.close : IC.pen) + '</button>';
     if (!f) return btn;
     if (!f.target) return btn + '<div class="fb-hint" role="status">Tap the spot you want to comment on</div>';
     return '<div class="fb-pin" style="left:' + f.target.x + '%;top:' + f.target.y + '%"></div>' +

@@ -1,5 +1,8 @@
 # Changelog
 
+## v0.9.1 · 9 Nov 2026 · commit __COMMIT__
+- Feedback button moved to the bottom-left corner; it steps aside while a message is showing.
+
 ## v0.9.0 · 9 Nov 2026 · commit 51bc5e2
 - Duplicate tasks: ⋯ → Duplicate on any task, or the copy icon on the Done tab. Opens the add drawer filled in.
 - Drag and drop: long-press a task and drag it. Each of you has your own order; new tasks land on top. Tap-to-sort is gone.
