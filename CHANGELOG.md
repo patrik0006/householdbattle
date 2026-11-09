@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.9.10 · 9 Nov 2026 · commit __COMMIT__
+## v0.9.10 · 9 Nov 2026 · commit 8376cf5
 - Fix: the badge reveal no longer plays twice when the screen redraws (e.g. a sync) while a chest is open.
 
 ## v0.9.9 · 9 Nov 2026 · commit fd5b929
