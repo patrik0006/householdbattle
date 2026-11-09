@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.9.1 · 9 Nov 2026 · commit __COMMIT__
+## v0.9.1 · 9 Nov 2026 · commit 73cf17d
 - Feedback button moved to the bottom-left corner; it steps aside while a message is showing.
 
 ## v0.9.0 · 9 Nov 2026 · commit 51bc5e2
