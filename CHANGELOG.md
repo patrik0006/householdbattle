@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.9.0 · 9 Nov 2026 · commit __COMMIT__
+## v0.9.0 · 9 Nov 2026 · commit 51bc5e2
 - Duplicate tasks: ⋯ → Duplicate on any task, or the copy icon on the Done tab. Opens the add drawer filled in.
 - Drag and drop: long-press a task and drag it. Each of you has your own order; new tasks land on top. Tap-to-sort is gone.
 - Feedback mode (Patrik only): pencil button → tap a spot → write a note. Notes are copied into feedback/inbox.md by the 5-minute job.
