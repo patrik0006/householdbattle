@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.9.9 · 9 Nov 2026 · commit __COMMIT__
+## v0.9.9 · 9 Nov 2026 · commit fd5b929
 - New badge art: Daily Walkies and Slaver's Dog.
 - Badge replay once more: earned badges go back into chests (XP paid once).
 
