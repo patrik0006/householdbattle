@@ -92,7 +92,7 @@ export function startEngine() {
     { id: 'comeback', name: 'Comeback Kid', icon: 'up', metal: 1, rare: true, need: 1, desc: "Overtake your partner's weekly score on a Sunday.", value: function (cs) { return cs.filter(function (c) { return c.comeback; }).length; } },
     { id: 'boomerang', name: 'Smash!', icon: 'boom', metal: 1, rare: true, need: 1, desc: 'Finish a task your partner handed back to you.', value: function (cs) { return cs.filter(function (c) { return c.boomerang; }).length; } },
     { id: 'fetch', name: 'Fetch', icon: 'bone', metal: 2, rare: true, need: 1, desc: 'Complete a task within 10 minutes of your partner assigning it to you.', value: function (cs) { return cs.filter(function (c) { return c.fetch; }).length; } },
-    { id: 'dodger', name: 'Chore Dodger', icon: 'zzz', shame: true, need: 1, noXp: true, desc: 'Less than 5 XP in a whole week.', value: function () { return 0; } }
+    { id: 'dodger', name: 'Chore Dodger', icon: 'zzz', shame: true, need: 1, noXp: true, desc: 'Less than 5 points in a whole week.', value: function () { return 0; } }
   ];
   // keep the older helpers working
   BADGES.forEach(function (b) { b.tiers = [b.need]; b.xp = [b.noXp ? 0 : METAL_XP[b.metal || 1]]; });
@@ -219,7 +219,7 @@ export function startEngine() {
   function compsBy(pid) { return S.completions.filter(function (c) { return c.by === pid; }); }
   function adjFor(pid) { return (S.adjust || []).filter(function (a) { return a.pid === pid; }); }
   function totalXP(pid) { return compsBy(pid).reduce(function (s, c) { return s + c.xp; }, 0) + adjFor(pid).reduce(function (s, a) { return s + a.delta; }, 0); }
-  function weekXP(pid, t) { var ws = weekStart(t); return compsBy(pid).reduce(function (s, c) { return s + (c.at >= ws && c.at <= t ? c.xp : 0); }, 0) + adjFor(pid).reduce(function (s, a) { return s + (a.at >= ws && a.at <= t ? a.delta : 0); }, 0); }
+  function weekXP(pid, t) { var ws = weekStart(t); return compsBy(pid).reduce(function (s, c) { return s + (c.at >= ws && c.at <= t ? c.xp : 0); }, 0) + adjFor(pid).reduce(function (s, a) { return s + (a.at >= ws && a.at <= t && a.by !== 'badge' ? a.delta : 0); }, 0); } // badge XP counts toward your level only, not the weekly battle
   function maxPerDay(cs) { var m = {}, best = 0; cs.forEach(function (c) { var k = sod(c.at); m[k] = (m[k] || 0) + 1; if (m[k] > best) best = m[k]; }); return best; }
   function other(pid) { return pid === 'A' ? 'B' : 'A'; }
   function hasPartner(pid) { return !!S.members[other(pid)]; }
@@ -322,6 +322,15 @@ export function startEngine() {
     var b = badgeDef(e.id), xp = b ? (b.xp[Math.min(b.xp.length, e.tier || 1) - 1] || 0) : 0;
     if (xp) { S.adjust = S.adjust || []; S.adjust.push({ id: uid(), pid: pid, by: 'badge', badge: e.id, delta: xp, at: now() }); }
     return xp;
+  }
+  // Replay: hide every earned badge again and take back its XP, so the chests open one by one and pay out again.
+  function replayBadges() {
+    ['A', 'B'].forEach(function (p) {
+      if (!S.badges || !S.badges[p]) return;
+      var ids = {};
+      S.badges[p].forEach(function (e) { if (badgeDef(e.id) && e.revealed) { e.revealed = false; ids[e.id] = 1; } });
+      S.adjust = (S.adjust || []).filter(function (a) { return !(a.pid === p && a.by === 'badge' && ids[a.badge]); });
+    });
   }
   // Week-end check: Chore Dodger for anyone who earned less than 5 XP in a full, unpaused week.
   function checkWeekEnd() {
@@ -434,7 +443,7 @@ export function startEngine() {
     if (lvlA > lvlB) actIds.push(addAct({ kind: 'level', actor: pid, level: lvlA }).id);
     var nAct = S.activity.length, newB = awardBadges(pid, comp.id, T);
     S.activity.slice(nAct).forEach(function (a) { actIds.push(a.id); });
-    log('<b>' + esc(nameOf(pid)) + '</b> ' + (helping ? 'helped ' + esc(nameOf(helpOwner)) + ' with' : stolen ? 'stole' : 'completed') + ' "' + esc(t.title) + '" · +' + xp + ' XP = ' + parts.join(' ') + (opts.alreadyDone ? ' · logged as already done (no bounty)' : ''));
+    log('<b>' + esc(nameOf(pid)) + '</b> ' + (helping ? 'helped ' + esc(nameOf(helpOwner)) + ' with' : stolen ? 'stole' : 'completed') + ' "' + esc(t.title) + '" · +' + xp + ' pts = ' + parts.join(' ') + (opts.alreadyDone ? ' · logged as already done (no bounty)' : ''));
     if (tookLead) log('<b>' + esc(nameOf(pid)) + '</b> takes the weekly lead: ' + (myB + xp) + ' vs ' + pB + (comp.comeback ? ' (Sunday comeback)' : ''));
     if (lvlA > lvlB) log('<b>' + esc(nameOf(pid)) + '</b> reached level ' + lvlA + ' (' + levelTitle(lvlA) + ')');
 
@@ -470,18 +479,18 @@ export function startEngine() {
     var open = S.tasks.filter(function (t) { return t.status === 'open' && isActive(t); });
     var mk = function (kind, title, body, go) { return { kind: kind, title: title, body: body, go: go || { tab: 'tasks', filter: 'mine' } }; };
     var hp = open.filter(function (t) { var h = helpOn(t); return h && h.status === 'pending' && h.to === pid; })[0];
-    if (hp) return mk('help', on + (hp.help.kind === 'ask' ? ' needs a hand' : ' wants to help'), (hp.help.kind === 'ask' ? 'Help with “' + hp.title + '” and bank a +' + helpBank(hp) + ' XP boost.' : 'Let them take “' + hp.title + '”? Say yes or no.'), { taskId: hp.id });
+    if (hp) return mk('help', on + (hp.help.kind === 'ask' ? ' needs a hand' : ' wants to help'), (hp.help.kind === 'ask' ? 'Help with “' + hp.title + '” and bank a +' + helpBank(hp) + ' point boost.' : 'Let them take “' + hp.title + '”? Say yes or no.'), { taskId: hp.id });
     var chq = open.filter(function (t) { return t.challenge && chState(t) === 'pending' && t.challenge.to === pid; })[0];
     if (chq) return mk('challenge', on + ' challenged you', '“' + chq.title + '” for +' + chq.challenge.bonus + '. Accept or chicken out.', { taskId: chq.id });
     if (S.household.request && S.household.request.from === o) return mk('request', on + ' is waiting for you', 'Answer the ' + (S.household.request.type === 'pause' ? 'pause' : 'request') + ' in Settings.', { settings: true });
     var chd = open.filter(function (t) { return t.challenge && chState(t) === 'accepted' && t.challenge.to === pid && t.challenge.deadline - T <= DAY; })[0];
-    if (chd) return mk('deadline', 'Challenge ends tonight', '“' + chd.title + '”. +' + chd.challenge.bonus + ' XP, or ' + on + ' collects.', { taskId: chd.id });
+    if (chd) return mk('deadline', 'Challenge ends tonight', '“' + chd.title + '”. +' + chd.challenge.bonus + ' pts, or ' + on + ' collects.', { taskId: chd.id });
     var me = weekXP(pid, T), them = hasP ? weekXP(o, T) : 0, gap = them - me;
     if (hasP && gap > 0 && wdIdx(T) === 6) return mk('sunday', 'Last day. You’re ' + gap + ' behind.', boostsAvail(pid).length ? 'You have a boost waiting. Just saying.' : pickLine(['Comebacks happen on Sundays.', 'Still time. Barely.', on + ' is already celebrating.'], T));
     if (!push) return null;
-    if (hasP && gap > 10) return mk('behind', on + ' is ' + gap + ' XP ahead', boostsAvail(pid).length ? 'Your boost is ready to play.' : pickLine(['Your dog is starting to look worried.', 'This will not stand. Will it?', 'Just so you know.', 'Get your act together.'], T));
+    if (hasP && gap > 10) return mk('behind', on + ' is ' + gap + ' pts ahead', boostsAvail(pid).length ? 'Your boost is ready to play.' : pickLine(['Your dog is starting to look worried.', 'This will not stand. Will it?', 'Just so you know.', 'Get your act together.'], T));
     var steal = hasP ? open.filter(function (t) { return t.assignee === o && canComplete(t, pid); }).sort(function (a, b) { return xpFor(b, pid) - xpFor(a, pid); })[0] : null;
-    if (steal) return mk('steal', 'Up for grabs: ' + steal.title, on + ' let it slide. +' + xpFor(steal, pid) + ' XP if you take it.', { filter: 'partner', taskId: steal.id });
+    if (steal) return mk('steal', 'Up for grabs: ' + steal.title, on + ' let it slide. +' + xpFor(steal, pid) + ' pts if you take it.', { filter: 'partner', taskId: steal.id });
     var mine = open.filter(function (t) { return t.assignee === pid; }).sort(function (a, b) { return ageDays(b) - ageDays(a); })[0];
     if (mine && ageDays(mine) >= 7) return mk('old', '“' + mine.title + '” is getting lonely', 'It has waited ' + ageDays(mine) + ' days. Put it out of its misery.', { taskId: mine.id });
     var today = S.completions.filter(function (c) { return c.by === pid && c.at >= sod(T); }).length;
@@ -500,9 +509,9 @@ export function startEngine() {
   var EVENT_KINDS = { challenge_req: 1, reward_set: 1, help_req: 1 };
   function eventPush(a, pid) {
     var on = nameOf(a.actor), tl = '\u201C' + a.title + '\u201D';
-    if (a.kind === 'challenge_req') return { kind: 'challenge', title: on + ' challenged you', body: tl + ' for +' + a.bonus + ' XP. Accept or chicken out.', go: { taskId: a.taskId } };
+    if (a.kind === 'challenge_req') return { kind: 'challenge', title: on + ' challenged you', body: tl + ' for +' + a.bonus + ' pts. Accept or chicken out.', go: { taskId: a.taskId } };
     if (a.kind === 'reward_set') return { kind: 'reward', title: on + ' put a reward on a task', body: tl + ': \u201C' + a.text + '\u201D if you do it in time.', go: { taskId: a.taskId } };
-    if (a.kind === 'help_req') return { kind: 'help', title: a.ask ? on + ' needs a hand' : on + ' wants to help', body: a.ask ? 'Help with ' + tl + ' and bank a +' + a.banked + ' XP boost.' : 'Let them take ' + tl + '?', go: { taskId: a.taskId } };
+    if (a.kind === 'help_req') return { kind: 'help', title: a.ask ? on + ' needs a hand' : on + ' wants to help', body: a.ask ? 'Help with ' + tl + ' and bank a +' + a.banked + ' point boost.' : 'Let them take ' + tl + '?', go: { taskId: a.taskId } };
     return null;
   }
   function checkEvents(T) {
@@ -575,7 +584,7 @@ export function startEngine() {
       S.owed = S.owed.filter(function (o) { return o.compId !== u.compId; });
       S.adjust = (S.adjust || []).filter(function (a) { return !(a.compId === u.compId && a.by === 'shared'); });
       ['A', 'B'].forEach(function (p) { S.badges[p] = S.badges[p].filter(function (b) { return b.compId !== u.compId; }); if (S.boosts && S.boosts[p]) S.boosts[p] = S.boosts[p].filter(function (b) { return b.compId !== u.compId; }); });
-      if (c) log('<b>' + esc(nameOf(c.by)) + '</b> undid "' + esc(c.title) + '" (−' + c.xp + ' XP)');
+      if (c) log('<b>' + esc(nameOf(c.by)) + '</b> undid "' + esc(c.title) + '" (−' + c.xp + ' pts)');
     });
   }
 
@@ -605,7 +614,7 @@ export function startEngine() {
     var act = opts.alreadyDone ? null : assignee === o
       ? addAct({ kind: 'assign', actor: pid, target: o, taskId: t.id, title: t.title, size: t.size, note: note || null, gif: d.gif || null })
       : addAct({ kind: 'add', actor: pid, taskId: t.id, title: t.title, size: t.size, assignee: assignee });
-    log('<b>' + esc(nameOf(pid)) + '</b> added "' + esc(t.title) + '" · ' + SIZES[t.size].label + ' ' + SIZES[t.size].xp + ' XP · for ' + (assignee === 'any' ? 'Anyone' : assignee === 'both' ? 'Both' : esc(nameOf(assignee))) + (rep ? ' · ' + repLabel(rep) + ', first due ' + fmtDate(t.dueAt) : '') + (assignee !== 'any' ? ' · grace ' + graceLabel(t.grace) : ''));
+    log('<b>' + esc(nameOf(pid)) + '</b> added "' + esc(t.title) + '" · ' + SIZES[t.size].label + ' ' + SIZES[t.size].xp + ' pts · for ' + (assignee === 'any' ? 'Anyone' : assignee === 'both' ? 'Both' : esc(nameOf(assignee))) + (rep ? ' · ' + repLabel(rep) + ', first due ' + fmtDate(t.dueAt) : '') + (assignee !== 'any' ? ' · grace ' + graceLabel(t.grace) : ''));
     awardBadges(pid, null, T);
     return { task: t, actId: act ? act.id : null };
   }
@@ -707,7 +716,7 @@ export function startEngine() {
     task({ title: 'Change bed sheets', size: 3, assignee: 'B', createdBy: 'B', createdAt: at(-30, 12), repeat: { kind: 'biweekly', weekday: (twd + 4) % 7, anchor: addDays(today, 4) } });
     S.activity.sort(function (a, b) { return a.at - b.at; });
     S.seen = { A: today, B: T };
-    log('Loaded sample household. Patrik ' + weekXP('A', T) + ' vs Emelie ' + weekXP('B', T) + ' XP this week. Emelie has challenged Patrik on "Clean the pipes".');
+    log('Loaded sample household. Patrik ' + weekXP('A', T) + ' vs Emelie ' + weekXP('B', T) + ' pts this week. Emelie has challenged Patrik on "Clean the pipes".');
   }
 
   /* ================= Helpers ================= */
@@ -843,7 +852,7 @@ export function startEngine() {
     if (!h.paused) S.tasks.forEach(function (t) {
       var hp = helpOn(t);
       if (!hp || t.status !== 'open' || hp.status !== 'pending' || hp.to !== pid) return;
-      out += '<div class="banner boost" role="status"><div class="brow"><span class="btxt">' + (hp.kind === 'ask' ? pn + ' asks for help: <b>' + esc(t.title) + '</b> · you bank a +' + helpBank(t) + ' XP boost' : pn + ' offers to help with <b>' + esc(t.title) + '</b> · you get no XP for it') + '</span></div>' + (hp.note || hp.gif ? msgHTML('them', hp.gif, hp.note) : '') + '<div class="brow"><button class="bbtn gold" data-act="help-accept" data-id="' + t.id + '">Accept</button><button class="bbtn" data-act="help-decline" data-id="' + t.id + '">' + (hp.kind === 'ask' ? 'Not now' : 'No thanks') + '</button><button class="bbtn" data-act="open-task" data-id="' + t.id + '">Details</button></div></div>';
+      out += '<div class="banner boost" role="status"><div class="brow"><span class="btxt">' + (hp.kind === 'ask' ? pn + ' asks for help: <b>' + esc(t.title) + '</b> · you bank a +' + helpBank(t) + ' point boost' : pn + ' offers to help with <b>' + esc(t.title) + '</b> · you get no points for it') + '</span></div>' + (hp.note || hp.gif ? msgHTML('them', hp.gif, hp.note) : '') + '<div class="brow"><button class="bbtn gold" data-act="help-accept" data-id="' + t.id + '">Accept</button><button class="bbtn" data-act="help-decline" data-id="' + t.id + '">' + (hp.kind === 'ask' ? 'Not now' : 'No thanks') + '</button><button class="bbtn" data-act="open-task" data-id="' + t.id + '">Details</button></div></div>';
     });
     (S.owed || []).forEach(function (w) {
       if (w.from !== pid || w.delivered) return;
@@ -869,7 +878,7 @@ export function startEngine() {
     var hp = helpOn(t);
     if (hp && hp.status === 'pending' && hp.to === pid) return { sub: on + (hp.kind === 'ask' ? ' asks for your help · bank +' + helpBank(t) + ' boost' : ' offers to help with this'), cls: 'boost', hot: true };
     if (hp && hp.status === 'pending' && hp.from === pid) return { sub: (hp.kind === 'ask' ? 'You asked ' + on + ' for help' : 'You offered to help') + ' · waiting for an answer', cls: '' };
-    if (hp && hp.status === 'accepted' && hp.helper === pid) return { sub: 'Helping ' + on + ' · banks a +' + helpBank(t) + ' XP boost', cls: 'boost', hot: true };
+    if (hp && hp.status === 'accepted' && hp.helper === pid) return { sub: 'Helping ' + on + ' · banks a +' + helpBank(t) + ' point boost', cls: 'boost', hot: true };
     if (hp && hp.status === 'accepted') return { sub: on + ' is helping you with this', cls: 'boost' };
     if (rwOpen(t) && t.reward.to === pid) return { sub: 'Special reward from ' + on + ': \u201C' + esc(t.reward.text) + '\u201D if done by ' + fmtDeadline(t.reward.deadline), cls: 'gold', hot: true };
     if (rwOpen(t) && t.reward.from === pid) return { sub: 'Your reward for ' + on + ': \u201C' + esc(t.reward.text) + '\u201D · until ' + fmtDeadline(t.reward.deadline), cls: '' };
@@ -902,8 +911,8 @@ export function startEngine() {
   }
   function comboPills() { return '<span class="tip-pills">' + SIZE_KEYS.map(function (n) { return '<span>' + SIZES[n].label + ' <b>+' + SIZES[n].combo + '</b></span>'; }).join('') + '</span>'; }
   var TIPS = [
-    { id: 'first', icon: 'clock', ok: function (p, c) { return !c.claimed; }, head: function () { return 'First task of the day: +2 XP'; }, body: function () { return 'Finish any task today to grab the bonus.'; } },
-    { id: 'combo', icon: 'clock', ok: function (p, c) { return c.claimed; }, head: function (p, c) { return c.n === 1 ? 'Combo unlocked' : 'Combo ×' + c.n + ' · +' + c.combo + ' XP so far'; }, body: function (p, c) { return (c.n === 1 ? 'Every task you finish before midnight earns a bonus on top:' : 'Keep going until midnight. Each task adds:') + comboPills(); } },
+    { id: 'first', icon: 'clock', ok: function (p, c) { return !c.claimed; }, head: function () { return 'First task of the day: +2 pts'; }, body: function () { return 'Finish any task today to grab the bonus.'; } },
+    { id: 'combo', icon: 'clock', ok: function (p, c) { return c.claimed; }, head: function (p, c) { return c.n === 1 ? 'Combo unlocked' : 'Combo ×' + c.n + ' · +' + c.combo + ' pts so far'; }, body: function (p, c) { return (c.n === 1 ? 'Every task you finish before midnight earns a bonus on top:' : 'Keep going until midnight. Each task adds:') + comboPills(); } },
     { id: 'steal', icon: 'bolt', ok: function (p, c) { return c.steal > 0; }, head: function (p, c) { return c.steal + ' of ' + esc(nameOf(c.o)) + (c.steal === 1 ? "'s tasks is" : "'s tasks are") + ' up for grabs'; }, body: function () { return 'Their grace period is over. Finish one and the points are yours, bounty included.'; }, action: { act: 'filter', f: 'partner', label: 'Show them' } },
     { id: 'bounty', ok: function () { return true; }, head: function () { return 'Waiting pays'; }, body: function () { return 'Tasks for Anyone gain a bounty of +10% per day they wait, up to double points.'; } },
     { id: 'avatar', ok: function (p, c) { return c.hasP; }, head: function () { return 'Check the competition'; }, body: function (p, c) { return "Tap " + esc(nameOf(c.o)) + "'s dog at the top to see their level, stats and badges."; } },
@@ -920,7 +929,7 @@ export function startEngine() {
     { id: 'secret', ok: function () { return true; }, head: function () { return 'Secret badges'; }, body: function () { return 'Some badges stay hidden until you earn them. Early birds and thieves have an advantage.'; } },
     { id: 'pause', ok: function (p, c) { return c.hasP; }, head: function () { return 'Going away?'; }, body: function () { return 'Propose a pause in Settings. Once your partner accepts, everything freezes until you both restart.'; } },
     { id: 'coming', ok: function () { return true; }, head: function () { return 'Peek ahead'; }, body: function () { return 'Coming up, at the bottom of your list, shows recurring tasks before they are due.'; } },
-    { id: 'help', icon: 'bolt', ok: function (p, c) { return c.hasP; }, head: function () { return 'Lend a paw'; }, body: function () { return 'Open a task and tap Ask for help or Offer help. The helper gets no XP now, but banks 1.5× as a boost for when they fall behind.'; } },
+    { id: 'help', icon: 'bolt', ok: function (p, c) { return c.hasP; }, head: function () { return 'Lend a paw'; }, body: function () { return 'Open a task and tap Ask for help or Offer help. The helper gets no points now, but banks 1.5× as a boost for when they fall behind.'; } },
     { id: 'drag', ok: function () { return true; }, head: function () { return 'Swipe it away'; }, body: function () { return 'Drag any panel that slides up from the bottom down to close it.'; } }
   ];
   function tipKey(pid) { return 'hb-tips-' + pid; }
@@ -1048,7 +1057,7 @@ export function startEngine() {
       var list = lists[ui.filter];
       var todayList = S.completions.filter(function (c) { return c.by === pid && c.at >= sod(T); }), nToday = todayList.length;
       var comboToday = todayList.reduce(function (n, c) { return n + (c.combo || 0); }, 0);
-      var sgBox = ui.filter === 'mine' && !isPaused() ? suggHTML(pid) : '';
+      var sgBox = ui.filter === 'mine' && !isPaused() && !list.length ? suggHTML(pid) : ''; // suggestions only when Mine is empty
       if (ui.filter === 'mine' && !isPaused()) body += tipHTML(pid) + sgBox;
       if (!list.length) {
         if (ui.filter === 'mine' && !sgBox) body += '<div class="empty"><span class="disp">NOTHING LEFT FOR YOU</span><span>Suspicious.</span></div>';
@@ -1091,8 +1100,8 @@ export function startEngine() {
     var o = other(pid), on = esc(nameOf(o)), ask = t.assignee === pid, n = helpBank(t);
     var inner = '<div class="sheet-top"><button class="iconbtn" data-act="ch-back" aria-label="Back">' + IC.back + '</button><span class="ttl">' + (ask ? 'ASK FOR HELP' : 'OFFER HELP') + '</span><button class="iconbtn" data-act="close-sheet" aria-label="Close">' + IC.close + '</button></div>' +
       '<h3>' + esc(t.title) + '</h3>' +
-      '<div class="help-deal"><div><span class="lbl">' + (ask ? on : 'You') + '</span><b class="bst">' + IC.boltSm + '+' + n + ' boost</b><small>No XP now. A comeback card for when they fall behind.</small></div>' +
-      '<div><span class="lbl">' + (ask ? 'You' : on) + '</span><b>0 XP</b><small>The task gets done, but no points for it.</small></div></div>' +
+      '<div class="help-deal"><div><span class="lbl">' + (ask ? on : 'You') + '</span><b class="bst">' + IC.boltSm + '+' + n + ' boost</b><small>No points now. A comeback card for when they fall behind.</small></div>' +
+      '<div><span class="lbl">' + (ask ? 'You' : on) + '</span><b>0 points</b><small>The task gets done, but no points for it.</small></div></div>' +
       '<span class="lbl">Note to ' + on + ' (optional)</span>' + composerHTML(pid, 'sheet', ask ? 'helpask' : 'helpoffer', 'select') +
       '<button class="btn gold" data-act="help-send">' + (ask ? 'ASK ' + on.toUpperCase() : 'OFFER TO HELP') + '</button>';
     return sheetWrap(pid, inner, s.fresh, ask ? 'Ask for help' : 'Offer help');
@@ -1101,8 +1110,8 @@ export function startEngine() {
     var bs = boostsAvail(pid), behind = isBehind(pid), o = other(pid), gap = weekXP(o, now()) - weekXP(pid, now());
     var inner = '<div class="sheet-top"><span class="ttl">BOOSTS</span><button class="iconbtn" data-act="close-sheet" aria-label="Close">' + IC.close + '</button></div>' +
       '<div class="boost-big">' + IC.boltBig + '</div>' +
-      '<p class="muted" style="margin:0;text-align:center">' + (behind ? 'You are <b>' + gap + ' XP</b> behind ' + esc(nameOf(o)) + '. Play a boost to catch up.' : 'Boosts are comeback cards. You can only play one when you are behind ' + esc(nameOf(o)) + ' this week.') + '</p>' +
-      bs.map(function (b) { return '<div class="boost-row">' + IC.boltSm + '<span>' + esc(b.label) + '<small>Expires ' + fmtDate(b.until - 1) + '</small></span><button class="btn sm' + (behind ? ' gold' : '') + '" data-act="boost-use" data-id="' + b.id + '"' + (behind && !isPaused() ? '' : ' disabled') + '>+' + b.xp + ' XP</button></div>'; }).join('');
+      '<p class="muted" style="margin:0;text-align:center">' + (behind ? 'You are <b>' + gap + ' pts</b> behind ' + esc(nameOf(o)) + '. Play a boost to catch up.' : 'Boosts are comeback cards. You can only play one when you are behind ' + esc(nameOf(o)) + ' this week.') + '</p>' +
+      bs.map(function (b) { return '<div class="boost-row">' + IC.boltSm + '<span>' + esc(b.label) + '<small>Expires ' + fmtDate(b.until - 1) + '</small></span><button class="btn sm' + (behind ? ' gold' : '') + '" data-act="boost-use" data-id="' + b.id + '"' + (behind && !isPaused() ? '' : ' disabled') + '>+' + b.xp + ' pts</button></div>'; }).join('');
     return sheetWrap(pid, inner, s.fresh, 'Boosts');
   }
   function badgeModalHTML(pid, owner, id) {
@@ -1112,10 +1121,10 @@ export function startEngine() {
     var last = mine.slice().sort(function (a, b) { return b.at - a.at; })[0];
     var xpEarned = mine.reduce(function (n, b) { return n + (b.revealed ? (bd.xp[Math.min(bd.xp.length, b.tier || 1) - 1] || 0) : 0); }, 0);
     var desc = hid ? 'A rare badge. Keep playing to find out.' : badgeRule(bd, Math.max(1, t)) + (bd.shame ? ' The dog is disappointed.' : '');
-    var xpLine = hid ? '' : t ? (xpEarned ? '+' + xpEarned + ' XP' : 'No XP for this one') : (bd.xp[0] ? '+' + bd.xp[0] + ' XP' : '');
+    var xpLine = hid ? '' : t ? (xpEarned ? '+' + xpEarned + ' XP toward your level' : 'No XP for this one') : (bd.xp[0] ? '+' + bd.xp[0] + ' XP toward your level' : '');
     return '<div class="bmodal" role="dialog" aria-label="' + (hid ? 'Hidden rare badge' : esc(bd.name)) + '"><button class="overlay-hit" data-act="badge-close" aria-label="Close" tabindex="-1"></button>' +
       '<div class="bm-card"><button class="iconbtn bm-x" data-act="badge-close" aria-label="Close">' + IC.close + '</button>' +
-      '<div class="bm-img">' + badgeMedal(bd, t, 170) + '</div>' +
+      '<div class="bm-img">' + badgeMedal(bd, t, 340) + '</div>' +
       '<h3>' + (hid ? '???' : esc(bd.name)) + (bd.shame && dodgeCount(owner) > 1 ? ' ×' + dodgeCount(owner) : '') + '</h3>' +
       '<p class="bm-why">' + esc(desc) + '</p>' +
       (t && last ? '<p class="bm-date">' + fmtDate(last.at) + '</p>' : '') +
@@ -1164,7 +1173,7 @@ export function startEngine() {
         '<div class="r"><span>Handed back</span><span class="gold">' + sm.hb + '</span><span class="coral">' + sp.hb + '</span></div>' +
       '</section>' +
       rewardsSection(pid) +
-      '<section class="sect"><div class="page-title"><h4>' + (ui.badgeOwner === 'me' ? 'YOUR BADGES' : esc(nameOf(o)).toUpperCase() + "'S BADGES") + ' · ' + BADGES.filter(function (b) { return !b.shame && badgeTier(ownerP, b.id) > 0; }).length + ' / ' + BADGES.filter(function (b) { return !b.shame; }).length + '</h4></div><div class="badges">' + grid + '</div>' + '</section>' +
+      '<section class="sect badge-sect"><div class="page-title"><h4>' + (ui.badgeOwner === 'me' ? 'YOUR BADGES' : esc(nameOf(o)).toUpperCase() + "'S BADGES") + ' · ' + BADGES.filter(function (b) { return !b.shame && badgeTier(ownerP, b.id) > 0; }).length + ' / ' + BADGES.filter(function (b) { return !b.shame; }).length + '</h4></div><div class="badges">' + grid + '</div>' + '</section>' +
     '</div></div>' + pop;
   }
 
@@ -1234,14 +1243,19 @@ export function startEngine() {
   }
   var BADGE_ART = {
     first: '',
-    chacc: ''
+    chacc: '',
+    hardlab: '',
+    bloodhound: '',
+    epic: '',
+    begins: '',
+    roll: ''
   };
   // Your artwork wins over the placeholder medal. Multi-tier badges get a bronze/silver/gold coin in the corner.
   // Badges without finished art all share one placeholder.
   var BADGE_PLACEHOLDER = "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20100%20114%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%234A4270%22/%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%232A2450%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath%20d%3D%22M50%204%20L92%2018%20V56%20C92%2082%2074%20100%2050%20110%20C26%20100%208%2082%208%2056%20V18%20Z%22%20fill%3D%22url%28%23g%29%22%20stroke%3D%22%238C84B8%22%20stroke-width%3D%223%22/%3E%3Cpath%20d%3D%22M50%2013%20L84%2024%20V56%20C84%2077%2070%2092%2050%20101%20C30%2092%2016%2077%2016%2056%20V24%20Z%22%20fill%3D%22none%22%20stroke%3D%22%238C84B8%22%20stroke-width%3D%221.5%22%20stroke-dasharray%3D%224%204%22%20opacity%3D%22.6%22/%3E%3Cg%20fill%3D%22%23B9B2E0%22%3E%3Cellipse%20cx%3D%2250%22%20cy%3D%2266%22%20rx%3D%2212%22%20ry%3D%2210%22/%3E%3Ccircle%20cx%3D%2235%22%20cy%3D%2251%22%20r%3D%225.5%22/%3E%3Ccircle%20cx%3D%2245%22%20cy%3D%2244%22%20r%3D%225.5%22/%3E%3Ccircle%20cx%3D%2255%22%20cy%3D%2244%22%20r%3D%225.5%22/%3E%3Ccircle%20cx%3D%2265%22%20cy%3D%2251%22%20r%3D%225.5%22/%3E%3C/g%3E%3C/svg%3E";
   function badgeMedal(b, tier, size) {
     var art = BADGE_ART[b.id] || BADGE_PLACEHOLDER;
-    var multi = false, h = Math.round(size * 1.14);
+    var multi = false, h = size; // the artwork is square; shown exactly as drawn
     return '<span class="bart' + (tier ? '' : ' locked') + '" style="width:' + size + 'px;height:' + h + 'px"><img src="' + art + '" alt="">' +
       (multi && tier ? '<i class="tcoin t' + Math.min(3, tier) + '" aria-hidden="true">' + ['', 'I', 'II', 'III'][Math.min(3, tier)] + '</i>' : '') + '</span>';
   }
@@ -1305,7 +1319,7 @@ export function startEngine() {
         '<div class="ws-duel"><div class="ws-side' + (crown === 'me' ? ' won' : '') + '">' + (crown === 'me' ? '<span class="ws-crown">' + IC.crown + '</span>' : '') + dogAvatar(pid, pid) + '<b class="ws-score" data-to="' + me.xp + '">0</b><span>' + esc(nameOf(pid)) + '</span></div>' +
         '<span class="ws-vs">VS</span><div class="ws-side them' + (crown === 'them' ? ' won' : '') + '">' + (crown === 'them' ? '<span class="ws-crown">' + IC.crown + '</span>' : '') + dogAvatar(o, pid) + '<b class="ws-score" data-to="' + th.xp + '">0</b><span>' + esc(nameOf(o)) + '</span></div></div>' +
         '<h2 class="ws-result">' + (!win ? 'DEAD EVEN' : iWon ? 'YOU WIN!' : esc(nameOf(o)).toUpperCase() + ' WINS') + '</h2>' +
-        (win ? '<p class="ws-sub">' + (iWon ? 'You banked a <b>+' + WIN_BOOST + ' XP boost</b>. Play it whenever you fall behind.' : esc(nameOf(o)) + ' banked a +' + WIN_BOOST + ' XP comeback boost. Stay ahead.') + '</p>' : '<p class="ws-sub">Nobody gets the boost. Tense.</p>');
+        (win ? '<p class="ws-sub">' + (iWon ? 'You banked a <b>+' + WIN_BOOST + ' point boost</b>. Play it whenever you fall behind.' : esc(nameOf(o)) + ' banked a +' + WIN_BOOST + ' point comeback boost. Stay ahead.') + '</p>' : '<p class="ws-sub">Nobody gets the boost. Tense.</p>');
     } else if (step < steps - 1) body = cards[step - 1];
     else {
       var bs = me.badges.concat(th.badges);
@@ -1330,7 +1344,7 @@ export function startEngine() {
   function fbHTML(pid) {
     var ui = UI[pid]; if (!fbAllowed(pid) || !S.members[pid]) return '';
     var f = ui.fb;
-    var btn = '<button class="fb-btn' + (f ? ' on' : '') + (ui.toast && !ui.settings ? ' lift' : '') + '" data-act="fb-toggle" aria-label="' + (f ? 'Cancel feedback' : 'Leave feedback') + '">' + (f ? IC.close : IC.pen) + '</button>';
+    var btn = '<button class="fb-btn' + (f ? ' on' : '') + (ui.sheet ? ' insheet' : ui.toast && !ui.settings ? ' lift' : '') + '" data-act="fb-toggle" aria-label="' + (f ? 'Cancel feedback' : 'Leave feedback') + '">' + (f ? IC.close : IC.pen) + '</button>';
     if (!f) return btn;
     if (!f.target) return btn + '<div class="fb-hint" role="status">Tap the spot you want to comment on</div>';
     return '<div class="fb-pin" style="left:' + f.target.x + '%;top:' + f.target.y + '%"></div>' +
@@ -1367,7 +1381,7 @@ export function startEngine() {
     var ui = UI[pid]; if (!ui.udModal || ui.chest || ui.closed || ui.summary) return '';
     var T = effNow(), gap = weekXP(other(pid), T) - weekXP(pid, T);
     return '<div class="bmodal ud-modal" role="dialog" aria-label="Underdog bonus"><button class="overlay-hit" data-act="ud-close" aria-label="Close" tabindex="-1"></button><div class="bm-card">' +
-      '<div class="ud-flame">' + IC.fireBig + '</div><span class="bm-kind">UNDERDOG BONUS</span><h3>+' + UNDERDOG_PCT + '% XP</h3>' +
+      '<div class="ud-flame">' + IC.fireBig + '</div><span class="bm-kind">UNDERDOG BONUS</span><h3>+' + UNDERDOG_PCT + '% points</h3>' +
       '<p class="bm-why">You\'re ' + Math.max(gap, UNDERDOG_GAP + 1) + ' behind ' + esc(nameOf(other(pid))) + '. Every task gives ' + UNDERDOG_PCT + '% extra until you\'re within ' + UNDERDOG_GAP + '.</p>' +
       '<button class="btn gold" data-act="ud-close">LET\'S GO</button></div></div>';
   }
@@ -1386,20 +1400,22 @@ export function startEngine() {
     var b = badgeDef(e.id), tier = e.tier || 1, multi = b.tiers.length > 1, rareish = b.rare || tier === 3;
     var xp = b.xp[Math.min(b.xp.length, tier) - 1] || 0, cls = b.shame ? 'shame' : rareish ? 'rare' : 'common';
     if (c.stage !== 'open') {
-      return '<div class="chest-ov ' + cls + '" role="dialog" aria-label="You found a badge"><div class="chest-wrap">' +
+      // No hint about metal or rarity before it's opened: every chest looks and opens the same.
+      var closedCls = b.shame ? 'shame' : 'common';
+      return '<div class="chest-ov ' + closedCls + '" role="dialog" aria-label="You found a badge"><div class="chest-wrap">' +
         '<span class="chest-kick">' + (b.shame ? 'Oh no…' : 'You found something!') + '</span>' +
-        '<div class="chest-hold" data-hold="' + (b.shame ? 0 : rareish ? 1500 : 900) + '">' +
-          '<svg class="chest-ring" viewBox="0 0 220 220" aria-hidden="true"><circle cx="110" cy="110" r="100" class="track"/><circle cx="110" cy="110" r="100" class="prog" pathLength="100"/></svg>' + chestSVG(cls) + '</div>' +
+        '<div class="chest-hold" data-hold="' + (b.shame ? 0 : 900) + '">' +
+          '<svg class="chest-ring" viewBox="0 0 220 220" aria-hidden="true"><circle cx="110" cy="110" r="100" class="track"/><circle cx="110" cy="110" r="100" class="prog" pathLength="100"/></svg>' + chestSVG(closedCls) + '</div>' +
         '<span class="chest-hint">' + (b.shame ? 'It creaks open by itself…' : 'Press and hold to open') + '</span>' +
-        (rareish && !b.shame ? '<span class="chest-rare">RARE!</span>' : '') + '</div></div>';
+        '</div></div>';
     }
     return '<div class="chest-ov ' + cls + ' opened" role="dialog" aria-label="' + esc(b.name) + '"><div class="chest-wrap">' +
       '<div class="rays"></div>' + confetti(b.shame) +
-      '<div class="medal-pop">' + badgeMedal(b, tier, 150) + '</div>' +
+      '<div class="medal-pop">' + badgeMedal(b, tier, 300) + '</div>' +
       '<span class="chest-tier">' + (b.shame ? 'HALL OF SHAME' : (multi ? TIER_NAME[tier].toUpperCase() + ' · ' : '') + (b.rare ? 'RARE BADGE' : 'BADGE')) + '</span>' +
       '<h3 class="chest-name">' + esc(b.name) + (b.shame && dodgeCount(pid) > 1 ? ' ×' + dodgeCount(pid) : '') + '</h3>' +
       '<p class="chest-rule">' + esc(badgeRule(b, tier)) + (b.shame ? ' The dog is disappointed.' : '') + '</p>' +
-      (xp ? '<span class="chest-xp">+' + xp + ' XP</span>' : '') +
+      (xp ? '<span class="chest-xp">+' + xp + ' XP</span><span class="chest-xpnote">toward your level · not this week\'s score</span>' : '') +
       '<button class="btn gold" data-act="chest-collect">' + (b.shame ? 'FINE…' : 'COLLECT') + '</button></div></div>';
   }
   function confetti(sad) {
@@ -1461,7 +1477,6 @@ export function startEngine() {
       var sub = st === 'done' ? 'Reached' : st === 'here' ? (mine ? 'You are here' : esc(nameOf(who)) + ' is here') : (l === li.lvl + 1 ? li.toNext + ' XP to go' : need + ' XP');
       var side = x > 50 ? 'left' : 'right';
       nodes += '<div class="lp-node ' + st + ' ' + side + '" style="left:' + x + '%;top:' + y + 'px">' +
-        (st === 'here' ? '<span class="lp-dog">' + dogAvatar(who, pid) + '</span>' : '') +
         '<span class="lp-badge">' + levelBadge(l, st === 'here' ? 64 : 52, st === 'locked' ? 'locked' : '') + '</span>' +
         '<span class="lp-label"><b>' + esc(levelTitle(l)) + '</b><span>Lvl ' + l + ' · ' + sub + '</span></span></div>';
     }
@@ -1476,7 +1491,7 @@ export function startEngine() {
       (ahead.length > 1 ? '<path d="' + curve(ahead) + '" fill="none" stroke="#5A5296" stroke-width="5" stroke-dasharray="2 9" stroke-linecap="round" vector-effect="non-scaling-stroke"></path>' : '') +
       (walked.length > 1 ? '<path d="' + curve(walked) + '" fill="none" stroke="#FFC93C" stroke-width="5" stroke-linecap="round" vector-effect="non-scaling-stroke"></path>' : '') + '</svg>';
     var inner = '<div class="sheet-top"><span class="ttl">' + nm.toUpperCase() + ' PATH</span><button class="iconbtn" data-act="close-sheet" aria-label="Close">' + IC.close + '</button></div>' +
-      '<p class="muted" style="margin:0">' + xp + ' XP in total. Every task moves ' + (mine ? 'you' : esc(nameOf(who))) + ' along the trail.</p>' +
+      '<p class="muted" style="margin:0">' + xp + ' XP in total. Every point earned in the weekly battle is also XP, and badges add extra XP. XP never resets.</p>' +
       '<div class="lp-map" style="height:' + H + 'px">' + svg + nodes + '</div>';
     return sheetWrap(pid, inner, s.fresh, 'Level path');
   }
@@ -1502,8 +1517,8 @@ export function startEngine() {
     var t = '<b>' + esc(a.title || '') + '</b>';
     switch (a.kind) {
       case 'join': return who(a.actor) + ' joined the household';
-      case 'add': return who(a.actor) + ' added ' + t + ' · ' + SIZES[a.size].label + ' ' + SIZES[a.size].xp + ' XP' + (a.assignee === 'any' ? ' for anyone' : a.assignee === 'both' ? ' for both of you' : '');
-      case 'assign': return who(a.actor) + ' assigned ' + (a.target === v ? 'you' : '<b>' + esc(nameOf(a.target)) + '</b>') + ' ' + t + ' · ' + SIZES[a.size].xp + ' XP';
+      case 'add': return who(a.actor) + ' added ' + t + ' · ' + SIZES[a.size].label + ' ' + SIZES[a.size].xp + ' pts' + (a.assignee === 'any' ? ' for anyone' : a.assignee === 'both' ? ' for both of you' : '');
+      case 'assign': return who(a.actor) + ' assigned ' + (a.target === v ? 'you' : '<b>' + esc(nameOf(a.target)) + '</b>') + ' ' + t + ' · ' + SIZES[a.size].xp + ' pts';
       case 'handback': return who(a.actor) + ' handed back ' + t;
       case 'complete': return (a.markedBy ? who(a.markedBy) + ' marked ' + t + ' done for ' + (a.actor === v ? 'you' : '<b>' + esc(nameOf(a.actor)) + '</b>') + ' · +' + a.xp : who(a.actor) + ' completed ' + t + ' · +' + a.xp) + (a.shared ? ' · ' + (a.actor === v ? esc(nameOf(other(v))) : 'you') + ' also got +' + a.shared : '') + (a.already ? ' (already done, just logged)' : '') + (a.challenge === 'won' ? ' · challenge won' : a.challenge === 'collect' ? ' · collected the challenge bonus' : '');
       case 'challenge_req': return who(a.actor) + ' challenged ' + (a.target === v ? 'you' : '<b>' + esc(nameOf(a.target)) + '</b>') + ': ' + t + ' · +' + a.bonus + ' by ' + fmtDate(a.deadline - 1);
@@ -1514,7 +1529,7 @@ export function startEngine() {
       case 'reward_withdrawn': return who(a.actor) + ' did ' + t + ' ' + (a.actor === v ? 'yourself' : 'themselves') + ', so the special reward is off';
       case 'reward_delivered': return who(a.actor) + ' delivered the special reward: \u201C' + esc(a.text) + '\u201D';
       case 'comment': return who(a.actor) + ' commented on ' + t;
-      case 'adjust': return who(a.actor) + ' changed ' + (a.target === v ? (a.actor === v ? 'your own' : 'your') : '<b>' + esc(nameOf(a.target)) + "'s</b>") + ' week score to ' + a.to + ' (' + (a.delta > 0 ? '+' : '') + a.delta + ' XP)';
+      case 'adjust': return who(a.actor) + ' changed ' + (a.target === v ? (a.actor === v ? 'your own' : 'your') : '<b>' + esc(nameOf(a.target)) + "'s</b>") + ' week score to ' + a.to + ' (' + (a.delta > 0 ? '+' : '') + a.delta + ' pts)';
       case 'challenge_ok': return who(a.actor) + ' accepted the challenge: ' + t;
       case 'challenge_no': return who(a.actor) + ' declined the challenge: ' + t;
       case 'challenge_cancel': return who(a.actor) + ' cancelled the challenge: ' + t;
@@ -1522,7 +1537,7 @@ export function startEngine() {
       case 'challenge_failed': return who(a.actor) + ' missed the challenge on ' + t + '. +' + a.bonus + ' bonus goes to ' + (a.from === v ? 'you' : '<b>' + esc(nameOf(a.from)) + '</b>');
       case 'steal': return who(a.actor) + ' stole ' + (a.owner === v ? 'your' : '<b>' + esc(nameOf(a.owner)) + "'s</b>") + ' task ' + t + ' · +' + a.xp;
       case 'level': return who(a.actor) + ' reached level ' + a.level + ' · ' + levelTitle(a.level);
-      case 'badge': var b = badgeDef(a.badge); if (!b) return who(a.actor) + ' earned a badge'; return b.shame ? who(a.actor) + ' earned <b>' + esc(b.name) + '</b>. Less than 5 XP all week.' : who(a.actor) + ' earned ' + (b.tiers.length > 1 ? TIER_NAME[a.tier || 1] + ' ' : '') + '<b>' + esc(b.name) + '</b>' + (b.rare ? ' · rare' : '');
+      case 'badge': var b = badgeDef(a.badge); if (!b) return who(a.actor) + ' earned a badge'; return b.shame ? who(a.actor) + ' earned <b>' + esc(b.name) + '</b>. Less than 5 points all week.' : who(a.actor) + ' earned ' + (b.tiers.length > 1 ? TIER_NAME[a.tier || 1] + ' ' : '') + '<b>' + esc(b.name) + '</b>' + (b.rare ? ' · rare' : '');
       case 'edit': return who(a.actor) + ' changed ' + t + ': ' + esc(a.changes);
       case 'delete': return who(a.actor) + ' deleted ' + t;
       case 'pause_req': return who(a.actor) + ' proposed a pause';
@@ -1532,21 +1547,21 @@ export function startEngine() {
       case 'resume_ok': return who(a.actor) + ' accepted. Household active again.';
       case 'resume_no': return who(a.actor) + ' said not now to restarting';
       case 'req_cancel': return who(a.actor) + ' cancelled the request about ' + (REQ_WHAT[a.type] || 'the pause');
-      case 'helped': return who(a.actor) + ' helped ' + (a.owner2 === v ? 'you' : '<b>' + esc(nameOf(a.owner2)) + '</b>') + ' with ' + t + ' · banked a <b class="bst">+' + a.banked + ' XP boost</b>';
+      case 'helped': return who(a.actor) + ' helped ' + (a.owner2 === v ? 'you' : '<b>' + esc(nameOf(a.owner2)) + '</b>') + ' with ' + t + ' · banked a <b class="bst">+' + a.banked + ' point boost</b>';
       case 'help_req': return who(a.actor) + (a.ask ? ' asked ' + (a.target === v ? 'you' : '<b>' + esc(nameOf(a.target)) + '</b>') + ' for help with ' : ' offered to help ' + (a.target === v ? 'you' : '<b>' + esc(nameOf(a.target)) + '</b>') + ' with ') + t;
       case 'help_ok': return who(a.actor) + ' said yes · ' + (a.helper === v ? 'you help' : '<b>' + esc(nameOf(a.helper)) + '</b> helps') + ' with ' + t;
       case 'help_no': return who(a.actor) + ' said no to help with ' + t;
       case 'help_stop': return who(a.actor) + ' called off the help with ' + t;
       case 'challenge_lapsed': return who(a.actor) + ' never collected the +' + a.bonus + ' challenge bonus on ' + t;
-      case 'week_won': return who(a.actor) + ' won week ' + a.week + ' · ' + a.me + '–' + a.p + ' · banked a +' + WIN_BOOST + ' XP boost';
-      case 'boost_used': return who(a.actor) + ' played a <b>+' + a.xp + ' XP boost</b>' + (a.lead ? ' and took the lead' : '');
+      case 'week_won': return who(a.actor) + ' won week ' + a.week + ' · ' + a.me + '–' + a.p + ' · banked a +' + WIN_BOOST + ' point boost';
+      case 'boost_used': return who(a.actor) + ' played a <b>+' + a.xp + ' point boost</b>' + (a.lead ? ' and took the lead' : '');
       case 'taunt': return who(a.actor) + ' about week ' + a.week + ':';
-      case 'underdog_on': return who(a.actor) + (a.actor === v ? ' are' : ' is') + ' the underdog now · +' + UNDERDOG_PCT + '% XP until ' + (a.actor === v ? 'you catch' : 'they catch') + ' up';
+      case 'underdog_on': return who(a.actor) + (a.actor === v ? ' are' : ' is') + ' the underdog now · +' + UNDERDOG_PCT + '% points until ' + (a.actor === v ? 'you catch' : 'they catch') + ' up';
       case 'underdog_off': return who(a.actor) + (a.actor === v ? ' are' : ' is') + ' back in the fight · underdog bonus off';
       case 'clear_req': return who(a.actor) + ' asked about ' + REQ_WHAT[a.type];
       case 'clear_no': return who(a.actor) + ' said not now to ' + REQ_WHAT[a.type];
       case 'cleared': return (a.type === 'clearweek' ? "This week's history was cleared" : 'All history was cleared') + (S.members[other(a.actor)] ? ' · accepted by ' + who(a.actor) : '');
-      case 'showoff': return who(a.actor) + ' showed off ' + a.items.length + (a.items.length === 1 ? ' task' : ' tasks') + ' · ' + a.total + ' XP';
+      case 'showoff': return who(a.actor) + ' showed off ' + a.items.length + (a.items.length === 1 ? ' task' : ' tasks') + ' · ' + a.total + ' pts';
       default: return '';
     }
   }
@@ -1751,7 +1766,7 @@ export function startEngine() {
         (ed ? '<button data-act="score-step" data-p="' + p + '" data-d="-1" aria-label="Lower ' + esc(label) + '">−</button><b style="min-width:36px;text-align:center;font-variant-numeric:tabular-nums">' + v + '</b><button data-act="score-step" data-p="' + p + '" data-d="1" aria-label="Raise ' + esc(label) + '">+</button>'
             : '') + '</div>';
     }
-    var h = '<section class="sect"><h4>THIS WEEK\'S SCORE</h4>' + row(pid, 'Your XP') + (hasP ? row(o, nameOf(o) + "'s XP") : '');
+    var h = '<section class="sect"><h4>THIS WEEK\'S SCORE</h4>' + row(pid, 'Your points') + (hasP ? row(o, nameOf(o) + "'s points") : '');
     if (!ed) h += '<p>Fix a mistake, like a task someone forgot to tick. Changes show up in Activity for both of you.</p><button class="btn ghost" data-act="score-edit"' + (isPaused() ? ' disabled' : '') + '>Edit week score</button>';
     else h += '<div class="seg">' + [-5, -1, 1, 5].map(function (d) { return '<button data-act="score-step-all" data-d="' + d + '">' + (d > 0 ? '+' : '') + d + ' you</button>'; }).join('') + '</div><div class="btn-row"><button class="btn gold" data-act="score-save">SAVE</button><button class="btn ghost" data-act="score-cancel">Cancel</button></div>';
     return h + '</section>';
@@ -1812,7 +1827,7 @@ export function startEngine() {
     var o = other(pid), on = esc(nameOf(o)), age = ageDays(t), x = xpFor(t, pid), paused = isPaused(), open = t.status === 'open';
     var c = t.challenge, st = chState(t), bounty = bountyFor(t, pid), chB = challengeBonusFor(t, pid);
     var forTxt = t.assignee === 'any' ? 'Anyone' : t.assignee === 'both' ? 'Both of you · you both get the points' : t.assignee === pid ? 'You' : on;
-    var worth = '<b class="gold">+' + x + ' XP</b> for you' + (bounty || chB ? ' (' + SIZES[t.size].xp + ' base' + (bounty ? ' + ' + bounty + ' bounty' : '') + (chB ? ' + ' + chB + ' challenge' : '') + ')' : '') + ', plus first-of-day or combo bonus';
+    var worth = '<b class="gold">+' + x + ' pts</b> for you' + (bounty || chB ? ' (' + SIZES[t.size].xp + ' base' + (bounty ? ' + ' + bounty + ' bounty' : '') + (chB ? ' + ' + chB + ' challenge' : '') + ')' : '') + ', plus first-of-day or combo bonus';
     var graceTxt = '';
     if (noSteal(t)) graceTxt = 'Can\'t be stolen';
     else if (t.assignee !== 'any' && t.assignee !== 'both') graceTxt = graceLabel(t.grace || 0) + (inGrace(t) ? ' · ' + (t.assignee === pid ? 'only you until ' : on + "'s until ") + fmtGrace(t) : ' · over, it can be stolen');
@@ -1822,9 +1837,9 @@ export function startEngine() {
       (mnOk ? '<button class="iconbtn" data-act="more-menu" aria-label="More options" aria-expanded="' + !!s.menu + '">' + IC.dots + '</button>' : '') +
       '<button class="iconbtn" data-act="close-sheet" aria-label="Close">' + IC.close + '</button></div>' +
       (mnOk && s.menu ? '<div class="more-menu" role="menu"><button role="menuitem" data-act="dup-task" data-id="' + t.id + '">' + IC.copy + '<span><b>Duplicate</b><small>Make a new task just like this one</small></span></button>' +
-        (dfOk ? '<button role="menuitem" data-act="done-for" data-id="' + t.id + '">' + IC.check + '<span><b>Mark done for ' + on + '</b><small>' + on + ' did it, so ' + on + ' gets the XP</small></span></button>' : '') + '</div>' : '') +
+        (dfOk ? '<button role="menuitem" data-act="done-for" data-id="' + t.id + '">' + IC.check + '<span><b>Mark done for ' + on + '</b><small>' + on + ' did it, so ' + on + ' gets the points</small></span></button>' : '') + '</div>' : '') +
       '<h3>' + esc(t.title) + '</h3>' +
-      '<dl class="kv"><dt>Worth</dt><dd>' + worth + '</dd><dt>Size</dt><dd>' + SIZES[t.size].label + ' · ' + SIZES[t.size].xp + ' XP</dd><dt>For</dt><dd>' + forTxt + '</dd>' +
+      '<dl class="kv"><dt>Worth</dt><dd>' + worth + '</dd><dt>Size</dt><dd>' + SIZES[t.size].label + ' · ' + SIZES[t.size].xp + ' pts</dd><dt>For</dt><dd>' + forTxt + '</dd>' +
       (graceTxt ? '<dt>Grace period</dt><dd>' + graceTxt + '</dd>' : '') +
       '<dt>Added by</dt><dd>' + (t.createdBy === pid ? 'You' : esc(nameOf(t.createdBy))) + ' · ' + fmtDate(t.createdAt) + '</dd>' +
       (t.repeat ? '<dt>Repeats</dt><dd>' + repLabel(t.repeat) + (isUpcoming(t) ? ' · next ' + fmtDate(t.dueAt) : '') + '</dd>' : '') +
@@ -1843,7 +1858,7 @@ export function startEngine() {
       var hTxt = hp.status === 'pending'
         ? (hp.from === pid ? (hp.kind === 'ask' ? 'You asked ' + on + ' for help.' : 'You offered to help ' + on + '.') + ' Waiting for an answer.' : (hp.kind === 'ask' ? on + ' asks for your help.' : on + ' offers to help you.'))
         : (hp.helper === pid ? 'You are helping ' + on + '.' : on + ' is helping you.');
-      inner += '<div class="strip help-strip" style="align-items:flex-start">' + IC.boltSm + '<span class="tx"><b>HELP</b><span>' + hTxt + ' The helper gets no XP now, but banks a <b class="bst">+' + helpBank(t) + ' XP boost</b> for when they fall behind.' + (hp.status === 'accepted' && hp.helper !== pid ? ' You get no XP for it.' : '') + '</span>' + (hp.note || hp.gif ? msgHTML(hp.from === pid ? 'me' : 'them', hp.gif, hp.note) : '') + '</span></div>';
+      inner += '<div class="strip help-strip" style="align-items:flex-start">' + IC.boltSm + '<span class="tx"><b>HELP</b><span>' + hTxt + ' The helper gets no points now, but banks a <b class="bst">+' + helpBank(t) + ' point boost</b> for when they fall behind.' + (hp.status === 'accepted' && hp.helper !== pid ? ' You get no points for it.' : '') + '</span>' + (hp.note || hp.gif ? msgHTML(hp.from === pid ? 'me' : 'them', hp.gif, hp.note) : '') + '</span></div>';
       if (!paused && hp.status === 'pending' && hp.to === pid) inner += '<div class="btn-row"><button class="btn gold" data-act="help-accept" data-id="' + t.id + '">ACCEPT</button><button class="btn ghost" data-act="help-decline" data-id="' + t.id + '">' + (hp.kind === 'ask' ? 'Not now' : 'No thanks') + '</button></div>';
       if (!paused && (hp.status === 'pending' && hp.from === pid || hp.status === 'accepted')) inner += '<button class="btn ghost" data-act="help-cancel" data-id="' + t.id + '">' + (hp.status === 'pending' ? 'Cancel' : hp.helper === pid ? 'Stop helping' : 'I\'ll do it myself') + '</button>';
     }
@@ -1866,14 +1881,14 @@ export function startEngine() {
       else if (t.assignee === o && inGrace(t)) inner += '<p class="muted">' + on + ' has until ' + fmtGrace(t) + '. After that you can steal it, and the bounty grows every day.</p>';
       if (hasPartner(pid)) {
         var acts = [];
-        if (can && t.assignee === o && st !== 'failed' && !helpingMe(t, pid)) acts.push('<button class="btn gold sm3 stealbtn" data-act="detail-done">Steal (+' + x + ' XP)</button>');
+        if (can && t.assignee === o && st !== 'failed' && !helpingMe(t, pid)) acts.push('<button class="btn gold sm3 stealbtn" data-act="detail-done">Steal (+' + x + ' pts)</button>');
         acts.push('<button class="btn ghost sm3" data-act="comment-open">Comment</button>');
         if (canChallenge(t, pid)) acts.push('<button class="btn ghost sm3" data-act="ch-open">Challenge</button>');
         if (canReward(t, pid)) acts.push('<button class="btn ghost sm3" data-act="gift-open">Reward</button>');
         if (canHelp(t, pid)) acts.push('<button class="btn ghost sm3" data-act="help-open">' + (t.assignee === pid ? 'Ask for help' : 'Offer help') + '</button>');
-        inner += '<span class="lbl" style="margin-top:2px">' + (t.assignee === o ? on + "'s task" : 'Talk to ' + on) + '</span><div class="btn-grid' + (acts.length === 4 ? ' four' : '') + '">' + acts.join('') + '</div>';
+        inner += '<span class="lbl sect-lbl">' + (t.assignee === o ? on + "'s task" : 'Talk to ' + on) + '</span><div class="btn-grid' + (acts.length === 4 ? ' four' : '') + '">' + acts.join('') + '</div>';
       }
-      inner += '<span class="lbl" style="margin-top:2px">Manage</span>';
+      inner += '<span class="lbl sect-lbl">Manage</span>';
       inner += '<div class="btn-row"><button class="btn ghost" data-act="detail-edit">Edit</button>' + (t.assignee === pid && t.assignedBy === o && st !== 'accepted' ? '<button class="btn ghost" data-act="detail-handback">Hand back</button>' : '') + '<button class="btn danger" data-act="detail-delete">Delete</button></div>';
     }
     return sheetWrap(pid, inner, s.fresh, 'Task details');
@@ -1886,7 +1901,7 @@ export function startEngine() {
     var inner = '<div class="sheet-top"><button class="iconbtn" data-act="ch-back" aria-label="Back">' + IC.back + '</button><span class="ttl">CHALLENGE ' + on.toUpperCase() + '</span><button class="iconbtn" data-act="close-sheet" aria-label="Close">' + IC.close + '</button></div>' +
       '<h3>' + esc(t ? t.title : '') + '</h3><p class="muted" style="margin:0">If ' + on + ' accepts and does it in time, ' + on + ' gets the bonus. If ' + on + ' misses the deadline, the bonus is yours when you do it.</p>' +
       '<div class="sum-block"><span class="lbl">Bonus</span><div class="seg">' + [3, 5, 10, 20].map(function (b) { return '<button class="' + (s.bonus === b ? 'on' : '') + '" data-act="ch-bonus" data-b="' + b + '">+' + b + '</button>'; }).join('') + '</div>' +
-      '<div class="stepper"><button data-act="ch-step" data-d="-1" aria-label="Less">−</button><span>+<b>' + s.bonus + '</b> XP bonus</span><button data-act="ch-step" data-d="1" aria-label="More">+</button></div></div>' +
+      '<div class="stepper"><button data-act="ch-step" data-d="-1" aria-label="Less">−</button><span>+<b>' + s.bonus + '</b> bonus points</span><button data-act="ch-step" data-d="1" aria-label="More">+</button></div></div>' +
       '<div class="sum-block"><span class="lbl">Deadline (end of day)</span><div class="seg">' + days.map(function (d) { return '<button class="' + (s.day === d[0] ? 'on' : '') + '" data-act="ch-day" data-n="' + d[0] + '">' + d[1] + '</button>'; }).join('') + '</div></div>' +
       '<span class="lbl">Note to ' + on + ' (optional)</span>' + composerHTML(pid, 'sheet', 'challenge', 'select') +
       '<button class="btn gold" data-act="ch-send">SEND CHALLENGE</button>';
@@ -1955,7 +1970,7 @@ export function startEngine() {
         '<label class="lbl" for="' + pid + '-add-title">Or type something else</label><input class="field" id="' + pid + '-add-title" data-bind="draft.title" data-rerender="1" data-enter="add-next" maxlength="60" placeholder="e.g. Fix the wobbly chair" value="' + esc(d.title) + '">' +
         '<button class="btn gold" data-act="add-next"' + (d.title.trim() ? '' : ' disabled') + '>NEXT</button>';
     } else if (s.step === 'size') {
-      inner += '<h3>How bad is it?</h3><div class="bigopts">' + SIZE_KEYS.map(function (n) { var ex = SIZES[n].ex[(s.exSeed + n) % SIZES[n].ex.length]; return '<button class="bigopt' + (d.size === n ? ' on' : '') + '" data-act="add-size" data-n="' + n + '"><span class="bt"><b>' + SIZES[n].label + ' (' + SIZES[n].xp + ' XP)</b><span>Like ' + esc(ex.charAt(0).toLowerCase() + ex.slice(1)) + '</span></span></button>'; }).join('') + '</div>' + skip;
+      inner += '<h3>How bad is it?</h3><div class="bigopts">' + SIZE_KEYS.map(function (n) { var ex = SIZES[n].ex[(s.exSeed + n) % SIZES[n].ex.length]; return '<button class="bigopt' + (d.size === n ? ' on' : '') + '" data-act="add-size" data-n="' + n + '"><span class="bt"><b>' + SIZES[n].label + ' (' + SIZES[n].xp + ' pts)</b><span>Like ' + esc(ex.charAt(0).toLowerCase() + ex.slice(1)) + '</span></span></button>'; }).join('') + '</div>' + skip;
     } else if (s.step === 'who') {
       inner += '<h3>Who\'s doing it?</h3><div class="bigopts">' +
         '<button class="bigopt' + (d.who === 'me' ? ' on' : '') + '" data-act="add-who" data-w="me"><span class="bt"><b>Me</b><span>It goes on your list</span></span></button>' +
@@ -1983,12 +1998,12 @@ export function startEngine() {
     var xp = SIZES[d.size].xp;
     var h = '<h3>' + (s.editId ? 'Edit task' : 'Ready to add?') + '</h3>' +
       '<div class="sum-block"><label class="lbl" for="' + pid + '-sum-title">Task</label><input class="field" id="' + pid + '-sum-title" data-bind="draft.title" data-rerender="1" maxlength="60" value="' + esc(d.title) + '"></div>' +
-      '<div class="sum-block"><span class="lbl">How bad is it?</span>' + seg('sum-size', 'n', SIZE_KEYS.map(function (n) { return [n, SIZES[n].label + ' (' + SIZES[n].xp + ' XP)']; }), d.size) + '</div>' +
+      '<div class="sum-block"><span class="lbl">How bad is it?</span>' + seg('sum-size', 'n', SIZE_KEYS.map(function (n) { return [n, SIZES[n].label + ' (' + SIZES[n].xp + ' pts)']; }), d.size) + '</div>' +
       '<div class="sum-block"><span class="lbl">Who</span>' + seg('sum-who', 'w', [['me', 'Me'], ['partner', hasP ? esc(nameOf(o)) : 'Partner', !hasP], ['any', 'Anyone'], ['both', 'Both', !hasP]], d.who) + '</div>';
     if (d.who === 'me' || d.who === 'partner') h += '<div class="sum-block"><span class="lbl">Grace period · how long only ' + (d.who === 'me' ? 'you' : esc(nameOf(o))) + ' can do it before it can be stolen. Never = it can\'t be stolen.</span>' + seg('sum-grace', 'g', GRACE, d.grace) + '</div>';
     if (d.who === 'partner') h += '<div class="sum-block"><span class="lbl">Note to ' + esc(nameOf(o)) + ' (optional)</span>' + composerHTML(pid, 'sheet', 'assign', 'select') + '</div>';
     h += '<div class="sum-block"><span class="lbl">Repeats</span>' + seg('sum-repeat', 'r', [['none', 'No'], ['daily', 'Daily'], ['alternate', 'Every other day'], ['weekly', 'Weekly'], ['biweekly', 'Every 2 weeks'], ['monthly', 'Monthly']], d.repeat) + (d.repeat === 'weekly' || d.repeat === 'biweekly' || d.repeat === 'monthly' ? dayPicker(d) : '') + '</div>';
-    h += '<span class="xp-preview">Worth <b>' + xp + ' XP</b>' + (d.repeat !== 'none' ? ' each time' : '') + '</span>';
+    h += '<span class="xp-preview">Worth <b>' + xp + ' pts</b>' + (d.repeat !== 'none' ? ' each time' : '') + '</span>';
     var ok = !!d.title.trim();
     if (s.editId) h += '<button class="btn gold" data-act="add-save"' + (ok ? '' : ' disabled') + '>SAVE</button>';
     else {
@@ -2002,7 +2017,7 @@ export function startEngine() {
     var o = other(pid), hasP = hasPartner(pid), c = s.comp;
     var kicker = c.help ? 'YOU HELPED ' + esc(nameOf(c.help.owner)).toUpperCase() : s.gift ? 'GIFT UNLOCKED!' : s.levelUp ? 'LEVEL UP!' : s.challengeWon ? 'CHALLENGE WON!' : s.challengeCollect ? 'BONUS COLLECTED' : s.tookLead ? 'YOU TAKE THE LEAD' : s.stolen ? 'TASK STOLEN!' : 'TASK COMPLETE';
     var pool = c.help ? 'helpdone' : s.gift ? 'gift' : s.challengeWon ? 'chwin' : s.challengeCollect ? 'chcollect' : s.tookLead ? 'lead' : s.stolen ? 'steal' : s.levelUp ? 'level' : 'big';
-    var html = '<div class="reward-head"><span class="reward-kicker">' + kicker + '</span><span style="font-size:var(--fs-md);color:var(--soft)">' + esc(c.title) + '</span>' + (c.help ? '<span class="reward-xp bst' + (s.fresh ? ' pop' : '') + '">+<span data-count="' + c.help.banked + '">' + (s.fresh ? 0 : c.help.banked) + '</span> <small>BOOST</small></span><span class="muted" style="text-align:center">No XP now. Saved for when you fall behind.</span></div>' : '<span class="reward-xp' + (s.fresh ? ' pop' : '') + '"><span data-count="' + c.xp + '">' + (s.fresh ? 0 : c.xp) + '</span> <small>XP</small></span></div>') +
+    var html = '<div class="reward-head"><span class="reward-kicker">' + kicker + '</span><span style="font-size:var(--fs-md);color:var(--soft)">' + esc(c.title) + '</span>' + (c.help ? '<span class="reward-xp bst' + (s.fresh ? ' pop' : '') + '">+<span data-count="' + c.help.banked + '">' + (s.fresh ? 0 : c.help.banked) + '</span> <small>BOOST</small></span><span class="muted" style="text-align:center">No points now. Saved for when you fall behind.</span></div>' : '<span class="reward-xp' + (s.fresh ? ' pop' : '') + '"><span data-count="' + c.xp + '">' + (s.fresh ? 0 : c.xp) + '</span> <small>PTS</small></span></div>') +
       '<div class="bd">' + c.breakdown.map(function (b) { return '<span>' + esc(b) + '</span>'; }).join('') + '</div>';
     if (s.gift) html += '<div class="gift' + (s.fresh ? ' pop' : '') + '">' + IC.gift + '<span class="disp">CONGRATS!</span><small>You earned ' + esc(nameOf(s.gift.from)) + "'s special reward</small><span class=\"gift-text\">\u201C" + esc(s.gift.text) + '\u201D</span><small>' + esc(nameOf(s.gift.from)) + ' has been told to pay up. You\'ll find it under Score.</small></div>';
     if (hasP) {
@@ -2052,7 +2067,7 @@ export function startEngine() {
       var on = !s.excluded[c.id];
       inner += '<label class="done-row" style="cursor:pointer"><input type="checkbox" data-act="showoff-toggle" data-id="' + c.id + '"' + (on ? ' checked' : '') + ' style="width:20px;height:20px;accent-color:#FFC93C"><span class="t"><span style="text-decoration:none">' + esc(c.title) + '</span><span>' + fmtDate(c.at) + ' ' + fmtTime(c.at) + '</span></span><span class="xp">+' + c.xp + '</span></label>';
     });
-    inner += '<span class="xp-preview">' + picked.length + (picked.length === 1 ? ' task' : ' tasks') + ' · <b>' + total + ' XP</b></span><span class="lbl">Note to ' + esc(nameOf(o)) + ' (optional)</span>' + composerHTML(pid, 'sheet', 'showoff', 'select') +
+    inner += '<span class="xp-preview">' + picked.length + (picked.length === 1 ? ' task' : ' tasks') + ' · <b>' + total + ' pts</b></span><span class="lbl">Note to ' + esc(nameOf(o)) + ' (optional)</span>' + composerHTML(pid, 'sheet', 'showoff', 'select') +
       '<button class="btn gold" data-act="showoff-send"' + (picked.length && hasPartner(pid) ? '' : ' disabled') + '>SEND TO ' + esc(nameOf(o)).toUpperCase() + '</button>';
     return sheetWrap(pid, inner, s.fresh, 'Show off');
   }
@@ -2062,7 +2077,7 @@ export function startEngine() {
     var html = '<div class="toast' + (t.fresh ? ' enter' : '') + '" role="status">';
     if (t.kind === 'info') return html + '<div class="toast-row"><span class="toast-txt">' + esc(t.text) + '</span></div></div>';
     var xp = t.items.reduce(function (n, c) { return n + c.xp; }, 0);
-    var txt = t.items.length === 1 ? esc(t.items[0].title) + ' · <b>+' + xp + ' XP</b>' + (t.forName ? ' to ' + esc(t.forName) : '') : t.items.length + ' tasks · <b>+' + xp + ' XP</b>';
+    var txt = t.items.length === 1 ? esc(t.items[0].title) + ' · <b>+' + xp + ' pts</b>' + (t.forName ? ' to ' + esc(t.forName) : '') : t.items.length + ' tasks · <b>+' + xp + ' pts</b>';
     var extra = t.items.length === 1 && t.items[0].breakdown.length > 1 ? '<small>' + t.items[0].breakdown.slice(1).map(esc).join(' · ') + '</small>' : '';
     html += '<div class="toast-row"><span class="toast-txt">' + txt + extra + '</span>' + (hasPartner(pid) ? '<button class="tbtn" data-act="toast-note">Add note</button>' : '') + '<button class="tbtn" data-act="toast-undo">Undo</button></div>';
     if (t.c && t.noteOpen) html += composerHTML(pid, 'toast', 'small', 'send');
@@ -2095,7 +2110,7 @@ export function startEngine() {
     } else if (ob.step === 'starter') {
       var picks = LIBRARY.slice(0, 8), n = Object.keys(ob.starter).filter(function (k) { return ob.starter[k]; }).length;
       x += '<h2>Pick a few to start</h2><p>Tap the chores your household has. You can change everything later.</p><div class="starter">' +
-        picks.map(function (l) { var on = !!ob.starter[l.title]; return '<button class="' + (on ? 'on' : '') + '" aria-pressed="' + on + '" data-act="ob-starter" data-title="' + esc(l.title) + '">' + esc(l.title) + '<small>' + SIZES[l.size].label + ' · ' + SIZES[l.size].xp + ' XP' + (l.rep !== 'none' ? ' · ' + { daily: 'daily', alternate: 'every other day', weekly: 'weekly', biweekly: 'every 2 weeks', monthly: 'monthly' }[l.rep] : '') + '</small></button>'; }).join('') +
+        picks.map(function (l) { var on = !!ob.starter[l.title]; return '<button class="' + (on ? 'on' : '') + '" aria-pressed="' + on + '" data-act="ob-starter" data-title="' + esc(l.title) + '">' + esc(l.title) + '<small>' + SIZES[l.size].label + ' · ' + SIZES[l.size].xp + ' pts' + (l.rep !== 'none' ? ' · ' + { daily: 'daily', alternate: 'every other day', weekly: 'weekly', biweekly: 'every 2 weeks', monthly: 'monthly' }[l.rep] : '') + '</small></button>'; }).join('') +
         '</div><div class="grow"></div><button class="btn gold" data-act="ob-starter-add"' + (n ? '' : ' disabled') + '>ADD ' + n + (n === 1 ? ' TASK' : ' TASKS') + '</button><button class="textlink" data-act="ob-starter-skip">Skip</button>';
     }
     return x + '</div>';
@@ -2759,7 +2774,7 @@ export function startEngine() {
         if (!items.length) break;
         var total = items.reduce(function (n, x) { return n + x.xp; }, 0);
         addAct({ kind: 'showoff', actor: pid, items: items.map(function (x) { return { title: x.title, xp: x.xp }; }), total: total, note: noteValue(s.c) || null, gif: s.c.gif || null });
-        log('<b>' + esc(nameOf(pid)) + '</b> showed off ' + items.length + ' tasks (' + total + ' XP) to ' + esc(nameOf(o)));
+        log('<b>' + esc(nameOf(pid)) + '</b> showed off ' + items.length + ' tasks (' + total + ' pts) to ' + esc(nameOf(o)));
         ui.sheet = null; infoToast(pid, 'Sent to ' + nameOf(o) + '.'); break;
 
       /* score */
@@ -2803,9 +2818,9 @@ export function startEngine() {
         bU.used = true; bU.usedAt = T;
         S.adjust = S.adjust || []; S.adjust.push({ id: uid(), pid: pid, by: 'boost', delta: bxU, at: T });
         addAct({ kind: 'boost_used', actor: pid, xp: bxU, lead: myB2 + bxU > pB2 });
-        log('<b>' + esc(nameOf(pid)) + '</b> played a +' + bxU + ' XP boost');
+        log('<b>' + esc(nameOf(pid)) + '</b> played a +' + bxU + ' point boost');
         ui.sheet = null; ui.fx = { me: 'level', them: myB2 + bxU > pB2 ? 'flinch' : null }; buzz('big');
-        infoToast(pid, 'Boost used: +' + bxU + ' XP.'); break;
+        infoToast(pid, 'Boost used: +' + bxU + ' pts.'); break;
       case 'ud-info': ui.udModal = true; break;
       case 'chest-collect':
         if (!ui.chest) break;
@@ -2833,7 +2848,7 @@ export function startEngine() {
           if (!delta) return;
           S.adjust.push({ id: uid(), pid: p, by: pid, delta: delta, at: T });
           addAct({ kind: 'adjust', actor: pid, target: p, delta: delta, to: ui.scoreEdit[p] });
-          log('<b>' + esc(nameOf(pid)) + '</b> set ' + (p === pid ? 'their own' : esc(nameOf(p)) + "'s") + ' week score to ' + ui.scoreEdit[p] + ' (' + (delta > 0 ? '+' : '') + delta + ' XP)');
+          log('<b>' + esc(nameOf(pid)) + '</b> set ' + (p === pid ? 'their own' : esc(nameOf(p)) + "'s") + ' week score to ' + ui.scoreEdit[p] + ' (' + (delta > 0 ? '+' : '') + delta + ' pts)');
         });
         ui.scoreEdit = null; infoToast(pid, 'Week score saved.'); break;
       case 'save-name':
@@ -2937,7 +2952,7 @@ export function startEngine() {
     var o = other(pid), T = now(), changes = [];
     var newTitle = d.title.trim();
     if (newTitle !== t.title) { changes.push('renamed from "' + t.title + '"'); t.title = newTitle; }
-    if (d.size !== t.size) { changes.push('now ' + SIZES[d.size].label + ' · ' + SIZES[d.size].xp + ' XP (was ' + SIZES[t.size].xp + ')'); t.size = d.size; }
+    if (d.size !== t.size) { changes.push('now ' + SIZES[d.size].label + ' · ' + SIZES[d.size].xp + ' pts (was ' + SIZES[t.size].xp + ')'); t.size = d.size; }
     if (d.grace != null && d.grace !== (t.grace || 0)) { changes.push('grace period ' + graceLabel(d.grace).toLowerCase()); t.grace = d.grace; }
     var newRep = repFromDraft(d, T), oldLbl = repLabel(t.repeat), newLbl = repLabel(newRep);
     if (oldLbl !== newLbl) {
