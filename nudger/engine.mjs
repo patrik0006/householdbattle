@@ -1248,7 +1248,9 @@ export function startEngine() {
     bloodhound: '',
     epic: '',
     begins: '',
-    roll: ''
+    roll: '',
+    walkies: '',
+    slaver: ''
   };
   // Your artwork wins over the placeholder medal. Multi-tier badges get a bronze/silver/gold coin in the corner.
   // Badges without finished art all share one placeholder.
