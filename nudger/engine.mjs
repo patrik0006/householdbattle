@@ -113,6 +113,8 @@ export function startEngine() {
     check: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
     dots: '<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>',
     sort: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4v16M3 16l4 4 4-4M17 20V4M13 8l4-4 4 4"/></svg>',
+    copy: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2.5"/><path d="M5 15H4.5A1.5 1.5 0 0 1 3 13.5v-9A1.5 1.5 0 0 1 4.5 3h9A1.5 1.5 0 0 1 15 4.5V5"/></svg>',
+    pen: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/></svg>',
     boltSm: '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"/></svg>',
     boltBig: '<svg width="56" height="56" viewBox="0 0 24 24" aria-hidden="true"><path fill="#4FB4FF" d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"/></svg>',
     crown: '<svg width="38" height="30" viewBox="0 0 38 30" aria-hidden="true"><path d="M3 26 L1 6 L11 14 L19 2 L27 14 L37 6 L35 26 Z" fill="#FFC93C" stroke="#7A4A08" stroke-width="2" stroke-linejoin="round"/><circle cx="19" cy="18" r="3" fill="#FF7A59"/></svg>',
@@ -278,15 +280,19 @@ export function startEngine() {
   function xpFor(t, pid) { var x = SIZES[t.size].xp + bountyFor(t, pid) + challengeBonusFor(t, pid); return isUnderdog(pid) ? x + underdogExtra(x) : x; }
   function isActive(t) { return t.status === 'open' && (!t.repeat || t.dueAt <= effNow()); }
   function isUpcoming(t) { return t.status === 'open' && t.repeat && t.dueAt > effNow(); }
-  // Sorting: tap the active filter again to cycle. Newest first (default) -> easiest first -> A to Z.
-  var SORTS = [['new', 'Newest first'], ['easy', 'Easiest first'], ['az', 'A to Z']];
-  function sortLabel(k) { for (var i = 0; i < SORTS.length; i++) if (SORTS[i][0] === k) return SORTS[i][1]; return SORTS[0][1]; }
+  // Order: long-press a task and drag it. Each of you has your own order. New tasks land on top.
   function sortTasks(list, pid) {
-    var k = (UI[pid] && UI[pid].sort) || 'new';
+    var ord = (S.members[pid] && S.members[pid].order) || [], pos = {};
+    ord.forEach(function (id, i) { pos[id] = i; });
     var byNew = function (a, b) { return (b.ageStart - a.ageStart) || (b.createdAt - a.createdAt); };
-    return list.sort(k === 'easy' ? function (a, b) { return (a.size - b.size) || byNew(a, b); }
-      : k === 'az' ? function (a, b) { return a.title.localeCompare(b.title, 'sv', { sensitivity: 'base' }) || byNew(a, b); } : byNew);
+    return list.sort(function (a, b) {
+      var pa = pos[a.id], pb = pos[b.id];
+      if (pa == null && pb == null) return byNew(a, b);
+      if (pa == null) return -1; if (pb == null) return 1; // not placed yet = newer, on top
+      return pa - pb;
+    });
   }
+
   function fmtDeadline(t) { var d = sod(t - 1); return (d === sod(effNow()) ? 'today' : d === addDays(sod(effNow()), 1) ? 'tomorrow' : fmtDate(d)) + ' 23:59'; }
   function getTask(id) { for (var i = 0; i < S.tasks.length; i++) if (S.tasks[i].id === id) return S.tasks[i]; return null; }
   function badgeDef(id) { for (var i = 0; i < BADGES.length; i++) if (BADGES[i].id === id) return BADGES[i]; return null; }
@@ -880,7 +886,7 @@ export function startEngine() {
   }
   function taskRow(pid, t) {
     var x = xpFor(t, pid), can = canComplete(t, pid), rs = rowStatus(pid, t);
-    return '<div class="task' + (rs.hot ? ' old' : '') + (can ? '' : ' locked') + '">' +
+    return '<div class="task' + (rs.hot ? ' old' : '') + (can ? '' : ' locked') + '" data-tid="' + t.id + '">' +
       '<button class="tick" data-act="complete" data-id="' + t.id + '" aria-label="Complete ' + esc(t.title) + '"' + (can ? '' : ' disabled') + '><i></i></button>' +
       '<button class="row-body" data-act="open-task" data-id="' + t.id + '"><span class="row-title">' + esc(t.title) + '</span><span class="row-sub ' + rs.cls + '">' + rs.sub + '</span></button>' +
       (helpingMe(t, pid) ? '<span class="xp bst">' + IC.boltSm + '+' + helpBank(t) + '</span></div>' : '<span class="xp' + (isUnderdog(pid) ? ' ud' : '') + '">' + (isUnderdog(pid) ? IC.fireSm : '') + '+' + x + '</span></div>');
@@ -1036,7 +1042,7 @@ export function startEngine() {
       doneToday.forEach(function (c) {
         var ca = S.activity.find(function (x) { return x.compId === c.id && REPLYABLE.indexOf(x.kind) >= 0; });
         var rep1 = ca && (ca.replies || []).find(function (r) { return r.from === pid; });
-        body += '<div class="done-row">' + avatar(c.by, pid, 'sm') + '<div class="t"><span>' + esc(c.title) + '</span><span>' + (c.by === pid ? 'You' : esc(nameOf(c.by))) + (c.stolen ? ' stole it' : '') + ' · ' + fmtTime(c.at) + (rep1 ? ' · you replied' : '') + '</span></div>' + (ca && canReply(ca, pid) ? '<button class="rbtn" data-act="reply-open" data-id="' + ca.id + '">Reply</button>' : '') + '<span class="xp">+' + c.xp + '</span></div>';
+        body += '<div class="done-row">' + avatar(c.by, pid, 'sm') + '<div class="t"><span>' + esc(c.title) + '</span><span>' + (c.by === pid ? 'You' : esc(nameOf(c.by))) + (c.stolen ? ' stole it' : '') + ' · ' + fmtTime(c.at) + (rep1 ? ' · you replied' : '') + '</span></div>' + (ca && canReply(ca, pid) ? '<button class="rbtn" data-act="reply-open" data-id="' + ca.id + '">Reply</button>' : '') + (isPaused() ? '' : '<button class="iconbtn sm dupbtn" data-act="dup-done" data-id="' + c.id + '" aria-label="Duplicate ' + esc(c.title) + '">' + IC.copy + '</button>') + '<span class="xp">+' + c.xp + '</span></div>';
       });
     } else {
       var list = lists[ui.filter];
@@ -1044,14 +1050,13 @@ export function startEngine() {
       var comboToday = todayList.reduce(function (n, c) { return n + (c.combo || 0); }, 0);
       var sgBox = ui.filter === 'mine' && !isPaused() ? suggHTML(pid) : '';
       if (ui.filter === 'mine' && !isPaused()) body += tipHTML(pid) + sgBox;
-      if (list.length > 1) body += '<button class="sortrow" data-act="sort-cycle" aria-label="Sorted: ' + sortLabel(ui.sort) + '. Tap to change.">' + IC.sort + '<span>' + sortLabel(ui.sort) + '</span></button>';
       if (!list.length) {
         if (ui.filter === 'mine' && !sgBox) body += '<div class="empty"><span class="disp">NOTHING LEFT FOR YOU</span><span>Suspicious.</span></div>';
         else if (ui.filter === 'any') body += '<div class="empty"><span class="disp">NO OPEN TASKS</span><span>Add one with the + button.</span></div>';
         else if (ui.filter === 'both') body += '<div class="empty"><span class="disp">NOTHING SHARED</span><span>Add a task for Both. Either of you does it, you both get the points.</span></div>';
         else body += '<div class="empty"><span class="disp">' + (hasPartner(pid) ? esc(nameOf(o)).toUpperCase() + ' IS ALL CLEAR' : 'NO PARTNER YET') + '</span><span>' + (hasPartner(pid) ? 'Nothing to steal. Annoying.' : 'Share your invite code from Settings.') + '</span></div>';
       }
-      list.forEach(function (t) { body += taskRow(pid, t); });
+      body += '<div class="tasklist">'; list.forEach(function (t) { body += taskRow(pid, t); }); body += '</div>';
       if (upcoming.length) body += '<button class="linkrow" data-act="upcoming-open">Coming up · ' + upcoming.length + IC.chev + '</button>';
     }
     return headerHTML(pid) + chips + '<div class="scroll" data-scroll="tasks-' + ui.filter + '"><div class="list">' + body + '</div></div>';
@@ -1321,6 +1326,18 @@ export function startEngine() {
     var body = el.querySelector('.ws-body'), x0 = null;
     body.addEventListener('pointerdown', function (e) { x0 = e.clientX; });
     body.addEventListener('pointerup', function (e) { if (x0 == null) return; var dx = e.clientX - x0; x0 = null; if (Math.abs(dx) > 50) { var b = el.querySelector(dx < 0 ? '[data-act="sum-next"]' : '[data-act="sum-prev"]'); if (b) b.click(); } });
+  }
+  function fbHTML(pid) {
+    var ui = UI[pid]; if (!fbAllowed(pid) || !S.members[pid]) return '';
+    var f = ui.fb;
+    var btn = '<button class="fb-btn' + (f ? ' on' : '') + '" data-act="fb-toggle" aria-label="' + (f ? 'Cancel feedback' : 'Leave feedback') + '">' + (f ? IC.close : IC.pen) + '</button>';
+    if (!f) return btn;
+    if (!f.target) return btn + '<div class="fb-hint" role="status">Tap the spot you want to comment on</div>';
+    return '<div class="fb-pin" style="left:' + f.target.x + '%;top:' + f.target.y + '%"></div>' +
+      '<div class="fb-card" role="dialog" aria-label="Feedback"><span class="lbl">Feedback · ' + esc(f.target.screen) + '</span>' +
+      (f.target.text ? '<span class="fb-on">On: \u201C' + esc(f.target.text.slice(0, 60)) + '\u201D</span>' : '') +
+      '<textarea class="field" id="' + pid + '-fb" data-bind="fb.note" rows="3" maxlength="600" placeholder="What should change here?">' + esc(f.note || '') + '</textarea>' +
+      '<div class="btn-row"><button class="btn ghost" data-act="fb-toggle">Cancel</button><button class="btn gold" data-act="fb-send">SEND</button></div></div>' + btn;
   }
   function notifHTML(pid) {
     return ''; // real app: nudges arrive as Android notifications
@@ -1800,11 +1817,12 @@ export function startEngine() {
     if (noSteal(t)) graceTxt = 'Can\'t be stolen';
     else if (t.assignee !== 'any' && t.assignee !== 'both') graceTxt = graceLabel(t.grace || 0) + (inGrace(t) ? ' · ' + (t.assignee === pid ? 'only you until ' : on + "'s until ") + fmtGrace(t) : ' · over, it can be stolen');
     var thread = t.thread.map(function (m) { return '<div class="tmsg ' + (m.from === pid ? 'mine' : 'theirs') + '">' + msgHTML(m.from === pid ? 'me' : 'them', m.gif, m.text) + '<small>' + (m.from === pid ? 'You' : esc(nameOf(m.from))) + ' · ' + (m.kind === 'handback' ? 'handed back' : m.kind === 'comment' ? 'commented' : m.kind === 'reply' ? 'replied' : 'assigned') + ' · ' + fmtDate(m.at) + '</small></div>'; }).join('');
-    var dfOk = t.status === 'open' && canDoneFor(t, pid);
+    var dfOk = t.status === 'open' && canDoneFor(t, pid), mnOk = !isPaused();
     var inner = '<div class="sheet-top"><span class="ttl">' + (t.assignee === o ? on.toUpperCase() + "'S TASK" : t.assignee === 'any' ? "ANYONE'S TASK" : t.assignee === 'both' ? 'SHARED TASK' : 'YOUR TASK') + '</span>' +
-      (dfOk ? '<button class="iconbtn" data-act="more-menu" aria-label="More options" aria-expanded="' + !!s.menu + '">' + IC.dots + '</button>' : '') +
+      (mnOk ? '<button class="iconbtn" data-act="more-menu" aria-label="More options" aria-expanded="' + !!s.menu + '">' + IC.dots + '</button>' : '') +
       '<button class="iconbtn" data-act="close-sheet" aria-label="Close">' + IC.close + '</button></div>' +
-      (dfOk && s.menu ? '<div class="more-menu" role="menu"><button role="menuitem" data-act="done-for" data-id="' + t.id + '">' + IC.check + '<span><b>Mark done for ' + on + '</b><small>' + on + ' did it, so ' + on + ' gets the XP</small></span></button></div>' : '') +
+      (mnOk && s.menu ? '<div class="more-menu" role="menu"><button role="menuitem" data-act="dup-task" data-id="' + t.id + '">' + IC.copy + '<span><b>Duplicate</b><small>Make a new task just like this one</small></span></button>' +
+        (dfOk ? '<button role="menuitem" data-act="done-for" data-id="' + t.id + '">' + IC.check + '<span><b>Mark done for ' + on + '</b><small>' + on + ' did it, so ' + on + ' gets the XP</small></span></button>' : '') + '</div>' : '') +
       '<h3>' + esc(t.title) + '</h3>' +
       '<dl class="kv"><dt>Worth</dt><dd>' + worth + '</dd><dt>Size</dt><dd>' + SIZES[t.size].label + ' · ' + SIZES[t.size].xp + ' XP</dd><dt>For</dt><dd>' + forTxt + '</dd>' +
       (graceTxt ? '<dt>Grace period</dt><dd>' + graceTxt + '</dd>' : '') +
@@ -2197,7 +2215,7 @@ export function startEngine() {
     maybeAskNudges(pid);
     underdogNotice(pid);
     maybeOpenChest(pid);
-    return '<div class="app' + (paused ? ' is-paused' : '') + '">' + (SYNC.status === 'offline' ? '<div class="netbar" role="status">Offline. Your changes will sync when you\'re back online.</div>' : '') + main + fab + (ui.settings ? '' : toastHTML(pid)) + sheetHTML(pid) + dogPickerHTML(pid) + chestHTML(pid) + udModalHTML(pid) + weekSumHTML(pid) + notifHTML(pid) + '</div>';
+    return '<div class="app' + (paused ? ' is-paused' : '') + '">' + (SYNC.status === 'offline' ? '<div class="netbar" role="status">Offline. Your changes will sync when you\'re back online.</div>' : '') + main + fab + (ui.settings ? '' : toastHTML(pid)) + sheetHTML(pid) + dogPickerHTML(pid) + chestHTML(pid) + udModalHTML(pid) + weekSumHTML(pid) + notifHTML(pid) + fbHTML(pid) + '</div>';
   }
 
   var phoneEl = {}, reduceMotion = false;
@@ -2341,6 +2359,7 @@ export function startEngine() {
     if (REPLAYING || !phoneEl[pid]) return;
     var root = phoneEl[pid], ui = UI[pid];
     if (ui.animLock) return; // catch-up animation running; it re-renders when done
+    if (ui.dragging) { ui.renderLater = true; return; } // a task is being dragged; render when it's dropped
     var ae = document.activeElement, focus = null;
     if (ae && root.contains(ae) && ae.id) { focus = { id: ae.id, s: null, e: null }; try { focus.s = ae.selectionStart; focus.e = ae.selectionEnd; } catch (e) { } }
     var scrolls = {};
@@ -2381,6 +2400,7 @@ export function startEngine() {
     requestAnimationFrame(step);
   }
 
+  function fbCount() { try { return JSON.parse(localStorage.getItem('hb-feedback') || '[]').length; } catch (e) { return 0; } }
   function renderAll() { renderPhone(ME); }
   function commit() { sweep(); if (!REPLAYING) { renderAll(); saveCache(); } }
 
@@ -2390,6 +2410,37 @@ export function startEngine() {
   function newDraft() { var T = now(); return { title: '', size: null, who: null, repeat: null, weekday: wdIdx(T), monthDay: new Date(T).getDate(), grace: 1 }; }
   function draftDefaults(d) { if (d.size == null) d.size = 2; if (d.who == null) d.who = 'me'; if (d.repeat == null) d.repeat = 'none'; return d; }
 
+  // Duplicate a task (open or done): opens the add drawer filled in, ready to tweak and add.
+  function dupDraft(pid, t, c) {
+    var T = now(), src = t || {};
+    return { title: (t ? t.title : c.title), size: (t ? t.size : c.size) || 2, grace: src.grace != null ? src.grace : 1,
+      who: t ? whoFromAssignee(pid, t.assignee) : 'me', repeat: src.repeat ? src.repeat.kind : 'none',
+      weekday: src.repeat && src.repeat.weekday != null ? src.repeat.weekday : wdIdx(T), monthDay: src.repeat && src.repeat.day ? src.repeat.day : new Date(T).getDate() };
+  }
+  function openDup(pid, d) { var ui = UI[pid]; ui.sheet = null; openSheet(pid, { kind: 'add', step: 'summary', draft: d, orig: JSON.stringify(d), more: false, editId: null, from: 'duplicate', c: newComposer(), exSeed: 0 }); }
+  /* ---------- 0.9.0: feedback mode (tap a spot, write a note) ---------- */
+  function fbAllowed(pid) { return pid === 'A'; } // the real app swaps this for "is this Patrik's account"
+  function fbScreen(pid) {
+    var ui = UI[pid];
+    if (ui.sheet) return 'Sheet: ' + ui.sheet.kind + (ui.sheet.step ? ' (' + ui.sheet.step + ')' : '');
+    if (ui.settings) return 'Settings';
+    return ui.tab === 'tasks' ? 'Tasks › ' + ({ mine: 'Mine', any: 'Anyone', both: 'Both', partner: "Partner's", done: 'Done' }[ui.filter] || ui.filter) : ui.tab === 'score' ? 'Score' : 'Activity';
+  }
+  function fbDescribe(el) {
+    var bits = [], n = el, steps = 0;
+    while (n && steps < 4 && !(n.classList && n.classList.contains('app'))) {
+      var lab = n.getAttribute && (n.getAttribute('aria-label') || n.getAttribute('data-act'));
+      var cls = n.className && typeof n.className === 'string' ? n.className.split(' ')[0] : '';
+      if (lab || cls) bits.push((cls ? '.' + cls : n.tagName.toLowerCase()) + (lab ? ' [' + lab + ']' : ''));
+      n = n.parentElement; steps++;
+    }
+    var txt = (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+    return { path: bits.join(' < '), text: txt };
+  }
+  function fbSave(pid, rec) {
+    try { var all = JSON.parse(localStorage.getItem('hb-feedback') || '[]'); all.push(rec); localStorage.setItem('hb-feedback', JSON.stringify(all)); } catch (e) { }
+    log('Feedback from <b>' + esc(nameOf(pid)) + '</b> on ' + esc(rec.screen) + ': ' + esc(rec.note));
+  }
   function canDoneFor(t, pid) { var o = other(pid); return hasPartner(pid) && !isPaused() && isActive(t) && t.assignee !== pid && canComplete(t, o) && !helpingMe(t, pid); }
   function doneFor(pid, id) {
     var o = other(pid), r = completeTask(o, id, { markedBy: pid });
@@ -2473,10 +2524,11 @@ export function startEngine() {
       case 'open-score': ui.tab = 'score'; ui.settings = false; ui.sheet = null; ui.badgeOpen = null; ui.badgeOwner = ds.who === 'partner' && hasPartner(pid) ? 'partner' : 'me'; break;
       case 'levels-open': openSheet(pid, { kind: 'levels', who: ds.who === other(pid) ? other(pid) : pid }); break;
       case 'score-who': ui.badgeOwner = ds.who === 'partner' && hasPartner(pid) ? 'partner' : 'me'; ui.badgeOpen = null; break;
-      case 'sort-cycle': ds = { f: ui.filter }; /* falls through: same as tapping the active filter */
-      case 'filter':
-        if (ui.filter === ds.f && ds.f !== 'done') { var si = SORTS.map(function (x) { return x[0]; }).indexOf(ui.sort || 'new'); ui.sort = SORTS[(si + 1) % SORTS.length][0]; infoToast(pid, 'Sorted: ' + sortLabel(ui.sort) + '.'); buzz('light'); }
-        ui.filter = ds.f; break;
+      case 'filter': ui.filter = ds.f; break;
+      case 'reorder':
+        if (!S.members[pid]) break;
+        var vis = String(ds.ids || '').split(',').filter(Boolean), keep = (S.members[pid].order || []).filter(function (id) { return vis.indexOf(id) < 0 && getTask(id) && getTask(id).status === 'open'; });
+        S.members[pid].order = vis.concat(keep); break;
       case 'open-settings': ui.settings = true; ui.sheet = null; ui.nameDraft = null; ui.pauseCompose = null; break;
       case 'close-settings': ui.clearAsk = null; ui.scoreEdit = null; ui.settings = false; ui.pauseCompose = null; ui.nameDraft = null; break;
       case 'close-sheet': ui.dogPicker = null;
@@ -2488,7 +2540,14 @@ export function startEngine() {
       /* tasks */
       case 'complete': doComplete(pid, ds.id); break;
       case 'more-menu': if (s) s.menu = !s.menu; break;
+      case 'fb-toggle': ui.fb = ui.fb ? null : { target: null, note: '' }; break;
+      case 'fb-send':
+        if (!ui.fb || !ui.fb.target || !(ui.fb.note || '').trim()) break;
+        var fbr = { id: uid(), at: Date.now(), by: nameOf(pid), version: (typeof APP_VERSION !== 'undefined' ? APP_VERSION : 'proto 0.9.0'), screen: ui.fb.target.screen, spot: ui.fb.target.path, text: ui.fb.target.text, note: ui.fb.note.trim(), x: ui.fb.target.x, y: ui.fb.target.y };
+        fbSave(pid, fbr); ui.fb = null; infoToast(pid, 'Feedback saved. Thanks!'); break;
       case 'done-for': doneFor(pid, ds.id); break;
+      case 'dup-task': t = getTask(ds.id); if (t && !isPaused()) openDup(pid, dupDraft(pid, t, null)); break;
+      case 'dup-done': var cD = S.completions.filter(function (c) { return c.id === ds.id; })[0]; if (cD && !isPaused()) openDup(pid, dupDraft(pid, getTask(cD.taskId) || null, cD)); break;
       case 'open-task': openSheet(pid, { kind: 'detail', id: ds.id }); break;
       case 'detail-done': doComplete(pid, s.id); break;
       case 'detail-edit':
@@ -2920,8 +2979,75 @@ export function startEngine() {
     if (!t0 || !row || t0.assignee !== other(pid) || row.classList.contains('zip')) return false;
     row.classList.add('zip'); setTimeout(go, 220); return true;
   }
+  // Long-press a task row, then drag it up or down.
+  function bindDrag(pid, root) {
+    var hold = null, d = null, HOLD_MS = 380;
+    function rows() { return Array.prototype.slice.call(root.querySelectorAll('.tasklist > .task[data-tid]')); }
+    function cancelHold() { if (hold) { clearTimeout(hold.timer); hold = null; } }
+    root.addEventListener('pointerdown', function (e) {
+      if (e.button > 0 || d) return;
+      var row = e.target.closest && e.target.closest('.task[data-tid]');
+      if (!row || !root.contains(row) || e.target.closest('[data-act="complete"]') || isPaused() || UI[pid].sheet) return;
+      if (rows().length < 2) return;
+      hold = { x: e.clientX, y: e.clientY, row: row, id: e.pointerId };
+      hold.timer = setTimeout(function () { start(hold); }, HOLD_MS);
+    });
+    function start(h) {
+      if (!h) return; hold = null;
+      var list = rows(), ui = UI[pid];
+      h.row = root.querySelector('.tasklist > .task[data-tid="' + h.row.getAttribute('data-tid') + '"]'); // the list may have re-rendered while holding
+      if (!h.row) return;
+      d = { row: h.row, y0: h.y, list: list, idx: list.indexOf(h.row), to: list.indexOf(h.row), h: h.row.getBoundingClientRect().height + 9, moved: false };
+      ui.dragging = true; buzz('light');
+      h.row.classList.add('dragging');
+      list.forEach(function (r) { if (r !== h.row) r.classList.add('shift'); });
+      root.classList.add('is-dragging');
+    }
+    root.addEventListener('pointermove', function (e) {
+      if (hold && (Math.abs(e.clientX - hold.x) > 8 || Math.abs(e.clientY - hold.y) > 8)) cancelHold();
+      if (!d) return;
+      e.preventDefault();
+      var dy = e.clientY - d.y0; d.moved = d.moved || Math.abs(dy) > 4;
+      d.row.style.transform = 'translateY(' + dy + 'px) scale(1.02)';
+      var to = Math.max(0, Math.min(d.list.length - 1, d.idx + Math.round(dy / d.h)));
+      if (to !== d.to) { d.to = to; buzz('light'); }
+      d.list.forEach(function (r, i) {
+        if (r === d.row) return;
+        var shift = 0;
+        if (d.to > d.idx && i > d.idx && i <= d.to) shift = -d.h;
+        if (d.to < d.idx && i < d.idx && i >= d.to) shift = d.h;
+        r.style.transform = shift ? 'translateY(' + shift + 'px)' : '';
+      });
+    });
+    root.addEventListener('touchmove', function (e) { if (d) e.preventDefault(); }, { passive: false });
+    function end() {
+      cancelHold(); if (!d) return;
+      var dd = d, ui = UI[pid]; d = null; ui.dragging = false;
+      root.classList.remove('is-dragging');
+      var ids = dd.list.map(function (r) { return r.getAttribute('data-tid'); });
+      var moved = ids.splice(dd.idx, 1)[0]; ids.splice(dd.to, 0, moved);
+      root.dataset.justDragged = '1'; setTimeout(function () { delete root.dataset.justDragged; }, 50);
+      if (dd.to !== dd.idx) act(pid, 'reorder', { ids: ids.join(',') });
+      else { ui.renderLater = false; renderPhone(pid); }
+      if (ui.renderLater) { ui.renderLater = false; renderPhone(pid); }
+    }
+    root.addEventListener('pointerup', end); root.addEventListener('pointercancel', end);
+    root.addEventListener('contextmenu', function (e) { if (d || hold) e.preventDefault(); });
+    root.addEventListener('click', function (e) { if (root.dataset.justDragged) { e.stopPropagation(); e.preventDefault(); } }, true);
+  }
   function bindPhone() {
-    var root = phoneEl[ME];
+    var root = phoneEl[ME], pid = ME;
+    bindDrag(ME, root);
+    root.addEventListener('click', function (e) {
+      var ui = UI[pid]; if (!ui.fb || ui.fb.target) return;
+      if (e.target.closest('.fb-btn')) return;
+      e.preventDefault(); e.stopPropagation();
+      var app = root.querySelector('.app'), r = app.getBoundingClientRect();
+      var info = fbDescribe(e.target);
+      ui.fb.target = { screen: fbScreen(pid), path: info.path, text: info.text, x: Math.round((e.clientX - r.left) / r.width * 100), y: Math.round((e.clientY - r.top) / r.height * 100) };
+      renderPhone(pid);
+      setTimeout(function () { var ta = document.getElementById(pid + '-fb'); if (ta) ta.focus(); }, 30);
+    }, true);
     root.addEventListener('click', function (e) {
       var el = e.target.closest('[data-act]');
       if (!el || !root.contains(el) || el.disabled) return;
@@ -2942,6 +3068,7 @@ export function startEngine() {
       else if (b === 'ob.code') { ui.ob.code = v.toUpperCase(); if (ui.ob.error) { ui.ob.error = ''; } }
       else if (b === 'draft.title' && ui.sheet && ui.sheet.draft) ui.sheet.draft.title = v;
       else if (b === 'nameDraft') ui.nameDraft = v;
+      else if (b === 'fb.note' && ui.fb) ui.fb.note = v;
       else if (b === 'gift.text' && ui.sheet && ui.sheet.kind === 'gift') ui.sheet.text = v;
       else if (b.indexOf('c:') === 0) { var c = getComposer(ME, b.slice(2)); if (c) c.text = v; }
       if (el.getAttribute('data-rerender')) renderPhone(ME);
