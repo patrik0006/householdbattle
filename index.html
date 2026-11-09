@@ -664,7 +664,7 @@ button.pcard { width: 100%; border: 0; color: inherit; text-align: left; cursor:
 @keyframes spin { to { rotate: 360deg; } }
 @keyframes raysIn { from { scale: 0.2; opacity: 0; } }
 .medal-pop { animation: medalOut 0.9s cubic-bezier(.2,1.4,.4,1) both; transform-style: preserve-3d; }
-@keyframes medalOut { 0% { translate: 0 80px; scale: 0.2; rotate: y 0deg; opacity: 0; } 40% { opacity: 1; } 70% { translate: 0 -12px; scale: 1.08; rotate: y 540deg; } 100% { translate: 0 0; scale: 1; rotate: y 720deg; } }
+@keyframes medalOut { 0% { translate: 0 80px; scale: 0.2; rotate: y 0deg; opacity: 0; } 40% { opacity: 1; } 70% { translate: 0 -12px; scale: 1.08; rotate: y 300deg; } 100% { translate: 0 0; scale: 1; rotate: y 360deg; } } /* one flip */
 .chest-ov.shame .medal-pop { animation: sadOut 1.1s ease-out both; }
 @keyframes sadOut { 0% { translate: 0 40px; opacity: 0; } 60% { translate: 0 6px; opacity: 1; } 100% { translate: 0 10px; rotate: 6deg; } }
 .chest-tier { font-family: var(--display); letter-spacing: 1.5px; color: var(--gold); animation: fadeUp 0.4s 0.5s both; }
@@ -683,7 +683,7 @@ button.pcard { width: 100%; border: 0; color: inherit; text-align: left; cursor:
 
 /* ---------- badge artwork ---------- */
 .bart { position: relative; display: inline-flex; align-items: center; justify-content: center; flex: none; }
-.bart img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 4px 0 rgba(0,0,0,0.3)); }
+.bart img { width: 100%; height: 100%; object-fit: contain; }
 .bart.locked img { filter: grayscale(1) brightness(0.45) contrast(0.9); opacity: 0.6; }
 .bart .tcoin { position: absolute; right: -2px; bottom: 2px; width: 34%; aspect-ratio: 1; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-style: normal; font-family: var(--display); font-size: clamp(9px, 0.14em, 16px); border: 2px solid rgba(0,0,0,0.45); box-shadow: 0 2px 0 rgba(0,0,0,0.35); color: rgba(0,0,0,0.6); }
 .bart .tcoin.t1 { background: radial-gradient(circle at 35% 30%, #F6C9A0, #C27A45 55%, #6E3B1A); }
@@ -822,8 +822,18 @@ button.pcard { width: 100%; border: 0; color: inherit; text-align: left; cursor:
 .more-menu span { display: flex; flex-direction: column; gap: 2px; }
 .more-menu small { color: var(--muted); font-size: var(--fs-xs); }
 
+/* ---------- 0.9.7: big badges in the chest and badge view ---------- */
+.bm-card .bm-x { z-index: 3; }
+.bm-img { pointer-events: none; }
+/* ---------- 0.9.4 ---------- */
+.chest-xpnote { color: var(--soft); font-size: var(--fs-xs); margin-top: -6px; }
+/* ---------- 0.9.3: more air above section labels ---------- */
+.sheet .sum-block + .sum-block, .sheet .sum-block ~ .sum-block { margin-top: 10px; }
+.sheet .lbl.sect-lbl { margin-top: 12px; }
+.badge-sect { margin-top: 14px; }
 /* ---------- 0.9.0 ---------- */
-.fb-btn.lift { bottom: 140px; } /* step aside while a toast is showing */
+.fb-btn.lift { bottom: 140px; }
+.fb-btn.insheet { bottom: auto; top: 8px; left: auto; right: 10px; } /* out of the way of sheet buttons */ /* step aside while a toast is showing */
 .tasklist { display: flex; flex-direction: column; gap: 9px; }
 .dupbtn { color: var(--muted); width: 36px; height: 36px; flex: none; }
 .task { transition: transform 0.18s ease; touch-action: pan-y; -webkit-touch-callout: none; user-select: none; }
@@ -859,8 +869,8 @@ body { background: var(--bg); overscroll-behavior: none; -webkit-tap-highlight-c
 <div id="phone" class="phone" role="application" aria-label="HouseholdBattle"></div>
 <noscript>HouseholdBattle needs JavaScript.</noscript>
 <script type="module">
-import { createSync } from './sync.js?v=0.9.1';
-import { startGame } from './app.js?v=0.9.1';
+import { createSync } from './sync.js?v=0.9.8';
+import { startGame } from './app.js?v=0.9.8';
 createSync().then(startGame).catch(function (e) {
   document.getElementById('phone').innerHTML = '<div class="app"><div class="ob"><div class="logo">HOUSEHOLD<br>BATTLE</div><p>Couldn\'t start. Check your connection and try again.</p><button class="btn gold" onclick="location.reload()">TRY AGAIN</button></div></div>';
   console.error(e);

@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.9.8 · 9 Nov 2026 · commit __COMMIT__
+- Points vs XP: the weekly battle uses points (pts); your level uses XP. Every point is also XP; badges give XP only.
+- Badge XP counts toward your level only, not the weekly score.
+- New badge art: Now it begins, First Blood, On a Roll, Beast of Burden, Blood Hound, Epic Win, Are you not entertained!? (used exactly as drawn).
+- Badges twice as big in the chest and badge view; the badge flips once; chests give no hint of metal or rarity before opening.
+- One-time badge replay: earned badges go back into chests and open one after another (XP paid once).
+- Suggestions only show when Mine is empty.
+- More space above section labels; no dog on the level path; feedback pencil moves top-right while a sheet is open.
+
 ## v0.9.1 · 9 Nov 2026 · commit 73cf17d
 - Feedback button moved to the bottom-left corner; it steps aside while a message is showing.
 
