@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.9.8 · 9 Nov 2026 · commit __COMMIT__
+## v0.9.8 · 9 Nov 2026 · commit fbf6e5b
 - Points vs XP: the weekly battle uses points (pts); your level uses XP. Every point is also XP; badges give XP only.
 - Badge XP counts toward your level only, not the weekly score.
 - New badge art: Now it begins, First Blood, On a Roll, Beast of Burden, Blood Hound, Epic Win, Are you not entertained!? (used exactly as drawn).
