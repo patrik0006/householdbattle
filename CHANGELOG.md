@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.9.9 · 9 Nov 2026 · commit __COMMIT__
+- New badge art: Daily Walkies and Slaver's Dog.
+- Badge replay once more: earned badges go back into chests (XP paid once).
+
 ## v0.9.8 · 9 Nov 2026 · commit fbf6e5b
 - Points vs XP: the weekly battle uses points (pts); your level uses XP. Every point is also XP; badges give XP only.
 - Badge XP counts toward your level only, not the weekly score.
