@@ -121,6 +121,10 @@ async function firebaseSync() {
       await F.setDoc(userRef(me().uid), { push: { token, code: info.code, pid: info.pid, at: Date.now(), ua: navigator.userAgent.slice(0, 120) } }, { merge: true });
       return token;
     },
+    // Feedback notes wait on users/{uid}.feedback until the job copies them into the repo.
+    async sendFeedback(rec) {
+      await F.setDoc(userRef(me().uid), { feedback: F.arrayUnion(rec) }, { merge: true });
+    },
     // Gemini through Firebase AI Logic (free Gemini Developer API tier). Returns the model's text.
     async ai(prompt) {
       const AI = await import(FB + 'firebase-ai.js');
@@ -198,6 +202,7 @@ function mockSync(name) {
       return { rev: d.rev, json: out.json, replayed: out.replayed };
     },
     async leaveHousehold() { const db = read(); db.users[uid] = { householdId: null }; write(db); },
+    async sendFeedback(rec) { await delay(); const db = read(); const u = db.users[uid] = db.users[uid] || {}; u.feedback = (u.feedback || []).concat([rec]); write(db); },
     async registerPush(swReg, info) { await delay(); const db = read(); db.users[uid] = Object.assign({}, db.users[uid], { push: { token: 'mock-token-' + name, code: info.code, pid: info.pid, at: Date.now() } }); write(db); return 'mock-token-' + name; },
     async ai(prompt) {
       await delay(); if (offline() || window.__hbAiFail) throw new Error('unavailable');

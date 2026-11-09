@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.9.0 · 9 Nov 2026 · commit __COMMIT__
+- Duplicate tasks: ⋯ → Duplicate on any task, or the copy icon on the Done tab. Opens the add drawer filled in.
+- Drag and drop: long-press a task and drag it. Each of you has your own order; new tasks land on top. Tap-to-sort is gone.
+- Feedback mode (Patrik only): pencil button → tap a spot → write a note. Notes are copied into feedback/inbox.md by the 5-minute job.
+
 ## v0.8.0 · 8 Nov 2026 · commit 43b536c
 - Both: tasks for both of you, with their own tab. Either of you does it, you both get the base XP.
 - Can't be stolen: new grace option Never.

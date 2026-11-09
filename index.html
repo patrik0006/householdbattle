@@ -822,6 +822,20 @@ button.pcard { width: 100%; border: 0; color: inherit; text-align: left; cursor:
 .more-menu span { display: flex; flex-direction: column; gap: 2px; }
 .more-menu small { color: var(--muted); font-size: var(--fs-xs); }
 
+/* ---------- 0.9.0 ---------- */
+.tasklist { display: flex; flex-direction: column; gap: 9px; }
+.dupbtn { color: var(--muted); width: 36px; height: 36px; flex: none; }
+.task { transition: transform 0.18s ease; touch-action: pan-y; -webkit-touch-callout: none; user-select: none; }
+.is-dragging .task { transition: transform 0.18s ease; }
+.task.dragging { transition: none; position: relative; z-index: 5; box-shadow: 0 12px 28px rgba(0,0,0,0.45); background: var(--card2, #3A3170); }
+.fb-btn { position: absolute; left: 12px; bottom: 150px; opacity: 0.85; z-index: 70; width: 40px; height: 40px; border-radius: 50%; border: 1px dashed var(--muted); background: rgba(26,21,64,0.85); color: var(--soft); display: flex; align-items: center; justify-content: center; }
+.fb-btn.on { border-style: solid; border-color: var(--coral); color: var(--coral); }
+.fb-hint { position: absolute; left: 50%; top: 10px; translate: -50% 0; z-index: 71; background: var(--coral); color: #1A1540; font-weight: 600; padding: 8px 14px; border-radius: 999px; font-size: var(--fs-xs); white-space: nowrap; pointer-events: none; }
+.fb-pin { position: absolute; z-index: 71; width: 18px; height: 18px; margin: -9px 0 0 -9px; border-radius: 50%; background: var(--coral); box-shadow: 0 0 0 6px rgba(255,122,89,0.3); pointer-events: none; }
+.fb-card { position: absolute; left: 10px; right: 10px; bottom: 10px; z-index: 72; background: var(--card); border: 1px solid var(--coral); border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 -8px 30px rgba(0,0,0,0.4); }
+.fb-on { color: var(--muted); font-size: var(--fs-xs); }
+.fb-card textarea { resize: none; font: inherit; }
+
 /* ---------- Real app: one full-screen phone instead of the test bench ---------- */
 html, body { height: 100%; }
 body { background: var(--bg); overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
@@ -844,8 +858,8 @@ body { background: var(--bg); overscroll-behavior: none; -webkit-tap-highlight-c
 <div id="phone" class="phone" role="application" aria-label="HouseholdBattle"></div>
 <noscript>HouseholdBattle needs JavaScript.</noscript>
 <script type="module">
-import { createSync } from './sync.js?v=0.8.0';
-import { startGame } from './app.js?v=0.8.0';
+import { createSync } from './sync.js?v=0.9.0';
+import { startGame } from './app.js?v=0.9.0';
 createSync().then(startGame).catch(function (e) {
   document.getElementById('phone').innerHTML = '<div class="app"><div class="ob"><div class="logo">HOUSEHOLD<br>BATTLE</div><p>Couldn\'t start. Check your connection and try again.</p><button class="btn gold" onclick="location.reload()">TRY AGAIN</button></div></div>';
   console.error(e);
