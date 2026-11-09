@@ -822,6 +822,16 @@ button.pcard { width: 100%; border: 0; color: inherit; text-align: left; cursor:
 .more-menu span { display: flex; flex-direction: column; gap: 2px; }
 .more-menu small { color: var(--muted); font-size: var(--fs-xs); }
 
+/* ---------- 0.9.10: the reveal plays once, even if the screen redraws ---------- */
+.chest-ov.opened .medal-pop { animation-delay: calc(0s - var(--el, 0ms)); }
+.chest-ov.opened .chest-tier { animation-delay: calc(0.5s - var(--el, 0ms)); }
+.chest-ov.opened .chest-name { animation-delay: calc(0.6s - var(--el, 0ms)); }
+.chest-ov.opened .chest-rule { animation-delay: calc(0.7s - var(--el, 0ms)); }
+.chest-ov.opened .chest-xp { animation-delay: calc(0.85s - var(--el, 0ms)); }
+.chest-ov.opened .btn.gold { animation-delay: calc(0.95s - var(--el, 0ms)); }
+.chest-ov.opened .rays { animation-delay: calc(0s - var(--el, 0ms)), calc(0s - var(--el, 0ms)); }
+.chest-ov.opened.settled .btn.gold { animation: none; }
+.chest-ov.opened.settled .medal-pop, .chest-ov.opened.settled .chest-tier, .chest-ov.opened.settled .chest-name, .chest-ov.opened.settled .chest-rule, .chest-ov.opened.settled .chest-xp { animation: none; }
 /* ---------- 0.9.7: big badges in the chest and badge view ---------- */
 .bm-card .bm-x { z-index: 3; }
 .bm-img { pointer-events: none; }
@@ -869,8 +879,8 @@ body { background: var(--bg); overscroll-behavior: none; -webkit-tap-highlight-c
 <div id="phone" class="phone" role="application" aria-label="HouseholdBattle"></div>
 <noscript>HouseholdBattle needs JavaScript.</noscript>
 <script type="module">
-import { createSync } from './sync.js?v=0.9.9';
-import { startGame } from './app.js?v=0.9.9';
+import { createSync } from './sync.js?v=0.9.10';
+import { startGame } from './app.js?v=0.9.10';
 createSync().then(startGame).catch(function (e) {
   document.getElementById('phone').innerHTML = '<div class="app"><div class="ob"><div class="logo">HOUSEHOLD<br>BATTLE</div><p>Couldn\'t start. Check your connection and try again.</p><button class="btn gold" onclick="location.reload()">TRY AGAIN</button></div></div>';
   console.error(e);

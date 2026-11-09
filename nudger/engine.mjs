@@ -1411,8 +1411,11 @@ export function startEngine() {
         '<span class="chest-hint">' + (b.shame ? 'It creaks open by itself…' : 'Press and hold to open') + '</span>' +
         '</div></div>';
     }
-    return '<div class="chest-ov ' + cls + ' opened" role="dialog" aria-label="' + esc(b.name) + '"><div class="chest-wrap">' +
-      '<div class="rays"></div>' + confetti(b.shame) +
+    // A redraw while open must not restart the reveal: carry on from where the animation got to.
+    if (!c.openedAt) c.openedAt = Date.now();
+    var el = Date.now() - c.openedAt;
+    return '<div class="chest-ov ' + cls + ' opened' + (el > 2500 ? ' settled' : '') + '" style="--el:' + el + 'ms" role="dialog" aria-label="' + esc(b.name) + '"><div class="chest-wrap">' +
+      '<div class="rays"></div>' + (el < 150 ? confetti(b.shame) : '') +
       '<div class="medal-pop">' + badgeMedal(b, tier, 300) + '</div>' +
       '<span class="chest-tier">' + (b.shame ? 'HALL OF SHAME' : (multi ? TIER_NAME[tier].toUpperCase() + ' · ' : '') + (b.rare ? 'RARE BADGE' : 'BADGE')) + '</span>' +
       '<h3 class="chest-name">' + esc(b.name) + (b.shame && dodgeCount(pid) > 1 ? ' ×' + dodgeCount(pid) : '') + '</h3>' +
@@ -1444,12 +1447,12 @@ export function startEngine() {
       p = holding ? Math.min(1, p + dt / ms) : Math.max(0, p - dt / 400);
       set();
       if (holding && ts - lastBuzz > 140) { lastBuzz = ts; try { if (navigator.vibrate) navigator.vibrate(p > 0.7 ? 20 : 8); } catch (e) { } }
-      if (p >= 1) { c.stage = 'open'; renderPhone(pid); return; }
+      if (p >= 1) { c.stage = 'open'; c.openedAt = Date.now(); renderPhone(pid); return; }
       if (holding || p > 0) raf = requestAnimationFrame(tick); else { raf = 0; last = 0; }
     }
     function down(e) { if (e) e.preventDefault(); holding = true; if (!raf) { last = 0; raf = requestAnimationFrame(tick); } }
     function up() { holding = false; }
-    if (!ms) { setTimeout(function () { if (ui.chest === c) { c.stage = 'open'; renderPhone(pid); } }, reduceMotion ? 300 : 1400); return; }
+    if (!ms) { setTimeout(function () { if (ui.chest === c) { c.stage = 'open'; c.openedAt = Date.now(); renderPhone(pid); } }, reduceMotion ? 300 : 1400); return; }
     hold.addEventListener('pointerdown', down); window.addEventListener('pointerup', up, { once: false }); hold.addEventListener('pointerleave', up); hold.addEventListener('pointercancel', up);
     hold.addEventListener('contextmenu', function (e) { e.preventDefault(); });
     hold.setAttribute('tabindex', '0'); hold.setAttribute('role', 'button'); hold.setAttribute('aria-label', 'Hold to open the chest');

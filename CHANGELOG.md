@@ -1,5 +1,8 @@
 # Changelog
 
+## v0.9.10 · 9 Nov 2026 · commit __COMMIT__
+- Fix: the badge reveal no longer plays twice when the screen redraws (e.g. a sync) while a chest is open.
+
 ## v0.9.9 · 9 Nov 2026 · commit fd5b929
 - New badge art: Daily Walkies and Slaver's Dog.
 - Badge replay once more: earned badges go back into chests (XP paid once).
