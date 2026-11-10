@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.10.0 · Laika · 10 Nov 2026 · commit __COMMIT__
+## v0.10.0 · Laika · 10 Nov 2026 · commit a266ba6
 - Every release now gets a famous dog's name. This one is Laika, the first dog in orbit.
 - A What's new card like this one shows the first time you open a new version.
 - When a new version comes out while the app is open, a bar at the top lets you reload.
