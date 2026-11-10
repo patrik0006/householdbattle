@@ -1346,7 +1346,7 @@ export function startGame(SYNCAPI) {
   function maybeOpenSummary(pid) {
     if (window.__noChest) return; // test switch
     var ui = UI[pid], m = S.members[pid];
-    if (ui.summary || !m || !hasPartner(pid) || ui.sheet || ui.settings || ui.closed || ui.animLock || isPaused()) return;
+    if (ui.whatsNew || ui.summary || !m || !hasPartner(pid) || ui.sheet || ui.settings || ui.closed || ui.animLock || isPaused()) return;
     var last = addDays(weekStart(now()), -7);
     if ((m.sumSeen || 0) >= addDays(last, 1)) return;
     if (S.members[other(pid)].joinedAt > addDays(last, 7)) return;
@@ -1393,6 +1393,27 @@ export function startGame(SYNCAPI) {
     var body = el.querySelector('.ws-body'), x0 = null;
     body.addEventListener('pointerdown', function (e) { x0 = e.clientX; });
     body.addEventListener('pointerup', function (e) { if (x0 == null) return; var dx = e.clientX - x0; x0 = null; if (Math.abs(dx) > 50) { var b = el.querySelector(dx < 0 ? '[data-act="sum-next"]' : '[data-act="sum-prev"]'); if (b) b.click(); } });
+  }
+  /* ---------- 0.10: version names (famous real dogs, one per release; fixes keep the name) ---------- */
+  var VERSION_NAMES = { '0.10': 'Laika', '0.11': 'Balto', '0.12': 'Hachiko', '0.13': 'Togo', '0.14': 'Rin Tin Tin', '0.15': 'Greyfriars Bobby', '0.16': 'Pickles', '0.17': 'Barry', '0.18': 'Stubby', '0.19': 'Bamse' };
+  function versionName(v) { var m = String(v || '').match(/^(\d+\.\d+)/); return m && VERSION_NAMES[m[1]] ? VERSION_NAMES[m[1]] : ''; }
+  function versionLabel(v) { var n = versionName(v); return v + (n ? ' \u00b7 ' + n : ''); }
+  /* ---------- 0.9.14: what's new + update ready ---------- */
+  // ui.whatsNew = { groups: [{ v: '0.9.13', items: [...] }] }  shown on the first open of a new version
+  // ui.updateReady = true  a newer version is out while the app is open
+  function whatsNewHTML(pid) {
+    var ui = UI[pid], w = ui.whatsNew; if (!w || ui.closed) return '';
+    var last = w.groups[0] ? w.groups[0].v : '';
+    return '<div class="wn-ov" role="dialog" aria-label="What’s new"><div class="wn-card">' +
+      '<span class="wn-kick">WHAT’S NEW</span><h3 class="wn-ver">Version ' + esc(versionLabel(last)) + '</h3>' +
+      '<div class="wn-body">' + w.groups.map(function (g, i) {
+        return (w.groups.length > 1 ? '<span class="lbl">' + esc(versionLabel(g.v)) + '</span>' : '') + '<ul>' + g.items.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>';
+      }).join('') + '</div>' +
+      '<button class="btn gold" data-act="wn-close">NICE!</button></div></div>';
+  }
+  function updateBarHTML(pid) {
+    var ui = UI[pid]; if (!ui.updateReady || ui.closed) return '';
+    return '<div class="upd-bar" role="status"><span>A new version is ready</span><button class="bbtn gold" data-act="app-reload">Reload</button><button class="iconbtn sm" data-act="upd-later" aria-label="Later">' + IC.close + '</button></div>';
   }
   function fbHTML(pid) {
     var ui = UI[pid]; if (!fbAllowed(pid) || !S.members[pid]) return '';
@@ -1442,7 +1463,7 @@ export function startGame(SYNCAPI) {
     var ui = UI[pid];
     if (ui.udModal) return;
     if (window.__noChest) return; // test switch
-    if (ui.summary) return;
+    if (ui.summary || ui.whatsNew) return;
     if (ui.chest || ui.sheet || ui.settings || ui.closed || ui.animLock || ui.ob.step !== 'done' && !S.members[pid]) return;
     var e = nextChest(pid); if (!e) return;
     ui.chest = { key: e.key, stage: 'drop' };
@@ -1725,7 +1746,7 @@ export function startGame(SYNCAPI) {
       historyHTML(pid) +
       installSettingsHTML() +
       '<section class="sect"><h4>ACCOUNT</h4><p>Signed in as ' + esc(APP.user ? (APP.user.email || APP.user.name) : '') + '.</p><button class="btn ghost" data-act="sign-out">Sign out</button>' +
-      '<p class="muted" style="margin:6px 0 0;font-size:12px">HouseholdBattle ' + APP_VERSION + '</p></section>' +
+      '<p class="muted" style="margin:6px 0 0;font-size:12px">HouseholdBattle ' + versionLabel(APP_VERSION) + '</p></section>' +
     '</div></div>';
   }
 
@@ -2288,7 +2309,7 @@ export function startGame(SYNCAPI) {
     maybeAskNudges(pid);
     underdogNotice(pid);
     maybeOpenChest(pid);
-    return '<div class="app' + (paused ? ' is-paused' : '') + '">' + (SYNC.status === 'offline' ? '<div class="netbar" role="status">Offline. Your changes will sync when you\'re back online.</div>' : '') + main + fab + (ui.settings ? '' : toastHTML(pid)) + sheetHTML(pid) + dogPickerHTML(pid) + chestHTML(pid) + udModalHTML(pid) + weekSumHTML(pid) + notifHTML(pid) + fbHTML(pid) + '</div>';
+    return '<div class="app' + (paused ? ' is-paused' : '') + '">' + (SYNC.status === 'offline' ? '<div class="netbar" role="status">Offline. Your changes will sync when you\'re back online.</div>' : '') + main + fab + (ui.settings ? '' : toastHTML(pid)) + sheetHTML(pid) + dogPickerHTML(pid) + chestHTML(pid) + udModalHTML(pid) + weekSumHTML(pid) + notifHTML(pid) + updateBarHTML(pid) + whatsNewHTML(pid) + fbHTML(pid) + '</div>';
   }
 
   var phoneEl = {}, reduceMotion = false;
@@ -2613,6 +2634,9 @@ export function startGame(SYNCAPI) {
       /* tasks */
       case 'complete': doComplete(pid, ds.id); break;
       case 'more-menu': if (s) s.menu = !s.menu; break;
+      case 'wn-close': ui.whatsNew = null; break;
+      case 'upd-later': ui.updateReady = false; ui.updateDismissed = true; break;
+      case 'app-reload': ui.updateReady = false; if (window.__hbReload) { window.__hbReload(); return; } infoToast(pid, 'Reloaded (simulated on the test bench).'); break;
       case 'fb-toggle': ui.fb = ui.fb ? null : { target: null, note: '' }; break;
       case 'fb-send':
         if (!ui.fb || !ui.fb.target || !(ui.fb.note || '').trim()) break;
@@ -3074,17 +3098,31 @@ export function startGame(SYNCAPI) {
       var list = rows(), ui = UI[pid];
       h.row = root.querySelector('.tasklist > .task[data-tid="' + h.row.getAttribute('data-tid') + '"]'); // the list may have re-rendered while holding
       if (!h.row) return;
-      d = { row: h.row, y0: h.y, list: list, idx: list.indexOf(h.row), to: list.indexOf(h.row), h: h.row.getBoundingClientRect().height + 9, moved: false };
+      var sc = h.row.parentElement; while (sc && sc !== root && !(sc.scrollHeight > sc.clientHeight && /auto|scroll/.test(getComputedStyle(sc).overflowY))) sc = sc.parentElement;
+      d = { row: h.row, y0: h.y, list: list, idx: list.indexOf(h.row), to: list.indexOf(h.row), h: h.row.getBoundingClientRect().height + 9, moved: false, sc: sc && sc !== root ? sc : null, top0: sc && sc !== root ? sc.scrollTop : 0, maxTop: sc && sc !== root ? sc.scrollHeight - sc.clientHeight : 0, lastY: h.y };
+      autoScroll();
       ui.dragging = true; buzz('light');
       h.row.classList.add('dragging');
       list.forEach(function (r) { if (r !== h.row) r.classList.add('shift'); });
       root.classList.add('is-dragging');
     }
+    // Near the top or bottom edge of the list, keep scrolling while you hold (faster closer to the edge).
+    function autoScroll() {
+      if (!d || !d.sc) return;
+      var r = d.sc.getBoundingClientRect(), edge = 70, v = 0;
+      if (d.lastY < r.top + edge) v = -Math.ceil((r.top + edge - d.lastY) / 6);
+      else if (d.lastY > r.bottom - edge) v = Math.ceil((d.lastY - (r.bottom - edge)) / 6);
+      if (v) { var before = d.sc.scrollTop; d.sc.scrollTop = Math.max(0, Math.min(d.maxTop, before + Math.max(-18, Math.min(18, v)))); if (d.sc.scrollTop !== before) place(d.lastY); } // never past the real end of the list
+      requestAnimationFrame(autoScroll);
+    }
     root.addEventListener('pointermove', function (e) {
       if (hold && (Math.abs(e.clientX - hold.x) > 8 || Math.abs(e.clientY - hold.y) > 8)) cancelHold();
       if (!d) return;
       e.preventDefault();
-      var dy = e.clientY - d.y0; d.moved = d.moved || Math.abs(dy) > 4;
+      d.lastY = e.clientY; place(e.clientY);
+    });
+    function place(y) {
+      var dy = y - d.y0 + (d.sc ? d.sc.scrollTop - d.top0 : 0); d.moved = d.moved || Math.abs(dy) > 4;
       d.row.style.transform = 'translateY(' + dy + 'px) scale(1.02)';
       var to = Math.max(0, Math.min(d.list.length - 1, d.idx + Math.round(dy / d.h)));
       if (to !== d.to) { d.to = to; buzz('light'); }
@@ -3095,7 +3133,7 @@ export function startGame(SYNCAPI) {
         if (d.to < d.idx && i < d.idx && i >= d.to) shift = d.h;
         r.style.transform = shift ? 'translateY(' + shift + 'px)' : '';
       });
-    });
+    }
     root.addEventListener('touchmove', function (e) { if (d) e.preventDefault(); }, { passive: false });
     function end() {
       cancelHold(); if (!d) return;
@@ -3109,6 +3147,7 @@ export function startGame(SYNCAPI) {
       if (ui.renderLater) { ui.renderLater = false; renderPhone(pid); }
     }
     root.addEventListener('pointerup', end); root.addEventListener('pointercancel', end);
+    document.addEventListener('pointerup', function () { if (d || hold) end(); }); // let go anywhere, even outside the phone
     root.addEventListener('contextmenu', function (e) { if (d || hold) e.preventDefault(); });
     root.addEventListener('click', function (e) { if (root.dataset.justDragged) { e.stopPropagation(); e.preventDefault(); } }, true);
   }
@@ -3607,7 +3646,42 @@ export function startGame(SYNCAPI) {
   function afterReady() {
     if (pendingNudge && openNudge(pendingNudge)) pendingNudge = null;
     refreshPush();
+    checkWhatsNew();
+    setTimeout(checkForUpdate, 5000);
   }
   if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', function (e) { if (e.data && e.data.nudge) openNudge(e.data.nudge); });
+
+  /* ================= 0.10: What's new + update ready ================= */
+  function cmpVer(a, b) { var x = String(a).split('.').map(Number), y = String(b).split('.').map(Number); for (var i = 0; i < 3; i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) - (y[i] || 0); } return 0; }
+  // Release notes come from CHANGELOG.md: "## v0.10.0 · …" headings followed by "- " bullets.
+  function parseNotes(md, after, upto) {
+    var groups = [], cur = null;
+    String(md).split('\n').forEach(function (line) {
+      var h = line.match(/^## v(\d+\.\d+\.\d+)/);
+      if (h) { cur = (cmpVer(h[1], after) > 0 && cmpVer(h[1], upto) <= 0) ? { v: h[1], items: [] } : null; if (cur) groups.push(cur); return; }
+      if (cur && /^- /.test(line)) cur.items.push(line.slice(2).replace(/\*\*/g, '').trim());
+    });
+    return groups.filter(function (g) { return g.items.length; }).sort(function (a, b) { return cmpVer(b.v, a.v); }).slice(0, 3);
+  }
+  function checkWhatsNew() {
+    var seen = null; try { seen = localStorage.getItem('hb-seen-version'); } catch (e) { }
+    try { localStorage.setItem('hb-seen-version', APP_VERSION); } catch (e) { }
+    if (!seen || cmpVer(seen, APP_VERSION) >= 0) return; // first install: no pop-up
+    fetch('CHANGELOG.md?nocache=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.ok ? r.text() : ''; }).then(function (md) {
+      var groups = parseNotes(md, seen, APP_VERSION);
+      if (!groups.length) return;
+      UI[ME].whatsNew = { groups: groups }; renderPhone(ME);
+    }).catch(function () { });
+  }
+  function checkForUpdate() {
+    if (SYNC.api.kind === 'mock' && !window.__hbTestUpdate) return;
+    fetch('version.js?nocache=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.ok ? r.text() : ''; }).then(function (t) {
+      var m = String(t).match(/APP_VERSION\s*=\s*'([^']+)'/);
+      if (m && cmpVer(m[1], APP_VERSION) > 0 && !UI[ME].updateDismissed) { UI[ME].updateReady = true; renderPhone(ME); }
+    }).catch(function () { });
+  }
+  window.__hbReload = function () { location.reload(); };
+  setInterval(checkForUpdate, 10 * 60 * 1000);
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') checkForUpdate(); });
 
 }
