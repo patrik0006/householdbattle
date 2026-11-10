@@ -1,5 +1,5 @@
 // HouseholdBattle service worker: the app opens offline and updates itself in the background.
-const VERSION = '0.9.13';
+const VERSION = '0.10.0';
 const CACHE = 'hb-' + VERSION;
 const SHELL = ['./', 'index.html', 'app.js?v=' + VERSION, 'sync.js?v=' + VERSION, 'sync.js', 'version.js', 'firebase-config.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png'];
 
@@ -15,6 +15,8 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(req.url);
   // Firebase talks to its own servers; never cache those calls.
   if (/googleapis\.com$|firebaseapp\.com$/.test(url.hostname) && !/fonts\.googleapis\.com$/.test(url.hostname)) return;
+  // Update checks (version.js / CHANGELOG.md with ?nocache) always go to the network and are never cached.
+  if (url.searchParams.has('nocache')) return;
   const isPage = req.mode === 'navigate';
   if (isPage) {
     // Page: network first so updates arrive quickly, cache when offline.

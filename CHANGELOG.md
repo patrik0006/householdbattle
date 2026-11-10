@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.10.0 · Laika · 10 Nov 2026 · commit __COMMIT__
+- Every release now gets a famous dog's name. This one is Laika, the first dog in orbit.
+- A What's new card like this one shows the first time you open a new version.
+- When a new version comes out while the app is open, a bar at the top lets you reload.
+- Dragging a task up or down now scrolls the list when you reach the edge.
+
 ## v0.9.13 · 10 Nov 2026 · commit 4f5b108
 - Reminders per task: Off, Once, 2× a day (09:00 and 18:00), Daily, Every 2 days, Weekly. Bundled, quiet hours respected.
 - New repeat: Twice a day (done before 12:00, back at 12:00; after that, back next morning).
