@@ -31,3 +31,15 @@ Notes moved here from inbox.md once acted on. Newest at the bottom.
 - **Spot:** “Talk to Emelie” · `.lbl < .sheet [Task details] < .overlay` (at 10% across, 74% down)
 - **Note:** A litte more space above this label
 - **Status:** Done in v0.9.3 (test bench): more space above the "Talk to …" and Manage labels.
+
+## 2026-11-09 17:14 · Patrik · v0.9.8 <!-- xzdecgp5k -->
+- **Screen:** Tasks › Anyone
+- **Spot:** “+1 bounty · grows daily” · `.row-sub < .row-body [open-task] < .task < .tasklist` (at 54% across, 73% down)
+- **Note:** There should be a bounty on/off setting when creating tasks
+- **Status:** Done in v0.9.11 (test bench): Bounty On/Off switch when creating or editing a task.
+
+## 2026-11-10 08:40 · Patrik · v0.9.10 <!-- xvmcxotnv -->
+- **Screen:** Tasks › Anyone
+- **Spot:** “+1 bounty · maxed out” · `.row-sub < .row-body [open-task] < .task < .tasklist` (at 45% across, 69% down)
+- **Note:** Repeating tasks shouldn't have bounty if it has 'reset', so if it's daily it will never get a bounty but every other day it will get plus one
+- **Status:** Done in v0.9.11 (test bench): repeating tasks' bounty is capped at their repeat gap minus one day (daily never, every other day max +1).
