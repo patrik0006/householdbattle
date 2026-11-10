@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.9.13 · 10 Nov 2026 · commit __COMMIT__
+- Reminders per task: Off, Once, 2× a day (09:00 and 18:00), Daily, Every 2 days, Weekly. Bundled, quiet hours respected.
+- New repeat: Twice a day (done before 12:00, back at 12:00; after that, back next morning).
+- Bounty On/Off per task; repeating tasks' bounty capped at their repeat gap (daily never).
+- Badges give no XP any more.
+- New badges: Good Boy (silver) and Howl at the Moon (bronze, rare). Early Bird is now bronze.
+- Art: new bronze tint for Now it begins, First Blood, On a Roll, Blood Hound, Early Bird, Howl at the Moon; new Alpha and Good Boy.
+
 ## v0.9.10 · 9 Nov 2026 · commit 8376cf5
 - Fix: the badge reveal no longer plays twice when the screen redraws (e.g. a sync) while a chest is open.
 

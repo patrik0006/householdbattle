@@ -69,7 +69,7 @@ export function startEngine() {
   function weekly(list) { var m = {}, best = 0; list.forEach(function (t) { var k = weekStart(t); m[k] = (m[k] || 0) + 1; if (m[k] > best) best = m[k]; }); return best; }
   function actsBy(pid, kinds) { return S.activity.filter(function (a) { return a.actor === pid && kinds.indexOf(a.kind) >= 0; }); }
   // One version per badge. metal (1 bronze, 2 silver, 3 gold) shows how hard it is and sets the XP.
-  var METAL_XP = [0, 5, 15, 30];
+  var METAL_XP = [0, 0, 0, 0]; // badges give no XP (since 0.9.11); the metal only shows how hard it is
   function streakDays(cs) { var days = {}; cs.forEach(function (c) { days[sod(c.at)] = 1; }); var ks = Object.keys(days).map(Number).sort(function (a, b) { return a - b; }), best = 0, run = 0, prev = null; ks.forEach(function (k) { run = prev != null && addDays(prev, 1) === k ? run + 1 : 1; prev = k; if (run > best) best = run; }); return best; }
   function twoDayMax(cs) { var m = {}; cs.forEach(function (c) { var k = sod(c.at); m[k] = (m[k] || 0) + 1; }); var best = 0; Object.keys(m).forEach(function (k) { var n = m[k] + (m[addDays(+k, 1)] || 0); if (n > best) best = n; }); return best; }
   var BADGES = [
@@ -88,10 +88,12 @@ export function startEngine() {
     { id: 'argos', name: 'Argos', icon: 'house', metal: 1, rare: true, need: 7, desc: 'Come back to the app after a week or more away.', value: function (cs, pid) { return (S.argos && S.argos[pid]) || 0; } },
     { id: 'bluff', name: 'Alpha', icon: 'cards', metal: 2, rare: true, need: 1, desc: 'Collect the bonus from a challenge your partner failed.', value: function (cs) { return cs.filter(function (c) { return c.challengeCollect; }).length; } },
     { id: 'bounty', name: 'Bounty Hunter', icon: 'target', metal: 2, rare: true, need: 1, desc: 'Collect a maxed-out bounty.', value: function (cs) { return cs.filter(function (c) { return c.bounty && c.bounty >= SIZES[c.size].xp; }).length; } },
-    { id: 'early', name: 'Early Bird', icon: 'sun', metal: 2, rare: true, need: 1, desc: 'Complete a task before 07:00.', value: function (cs) { return cs.filter(function (c) { return c.hour < 7; }).length; } },
+    { id: 'early', name: 'Early Bird', icon: 'sun', metal: 1, rare: true, need: 1, desc: 'Complete a task before 07:00.', value: function (cs) { return cs.filter(function (c) { return c.hour < 7; }).length; } },
     { id: 'comeback', name: 'Comeback Kid', icon: 'up', metal: 1, rare: true, need: 1, desc: "Overtake your partner's weekly score on a Sunday.", value: function (cs) { return cs.filter(function (c) { return c.comeback; }).length; } },
     { id: 'boomerang', name: 'Smash!', icon: 'boom', metal: 1, rare: true, need: 1, desc: 'Finish a task your partner handed back to you.', value: function (cs) { return cs.filter(function (c) { return c.boomerang; }).length; } },
     { id: 'fetch', name: 'Fetch', icon: 'bone', metal: 2, rare: true, need: 1, desc: 'Complete a task within 10 minutes of your partner assigning it to you.', value: function (cs) { return cs.filter(function (c) { return c.fetch; }).length; } },
+    { id: 'goodboy', name: 'Good Boy', icon: 'paw', metal: 2, need: 1, weekly: true, desc: 'Finish every task your partner assigned you in one week (at least 3), with none left over.', value: function () { return 0; } },
+    { id: 'howl', name: 'Howl at the Moon', icon: 'zzz', metal: 1, rare: true, need: 1, desc: 'Complete a task after 23:00.', value: function (cs) { return cs.filter(function (c) { return c.hour >= 23; }).length; } },
     { id: 'dodger', name: 'Chore Dodger', icon: 'zzz', shame: true, need: 1, noXp: true, desc: 'Less than 5 points in a whole week.', value: function () { return 0; } }
   ];
   // keep the older helpers working
@@ -175,7 +177,7 @@ export function startEngine() {
   }
   function nextOcc(rep, from) {
     var d = sod(from), i;
-    if (rep.kind === 'daily') return d;
+    if (rep.kind === 'daily' || rep.kind === 'twice') return d;
     if (rep.kind === 'weekly') { for (i = 0; i < 7; i++) { var t = addDays(d, i); if (wdIdx(t) === rep.weekday) return t; } }
     if (rep.kind === 'alternate') {
       var a2 = sod(rep.anchor);
@@ -201,6 +203,7 @@ export function startEngine() {
   function repLabel(rep) {
     if (!rep) return '';
     if (rep.kind === 'daily') return 'Every day';
+    if (rep.kind === 'twice') return 'Twice a day';
     if (rep.kind === 'alternate') return 'Every other day';
     if (rep.kind === 'weekly') return 'Every ' + WD_LONG[rep.weekday];
     if (rep.kind === 'biweekly') return 'Every other ' + WD_LONG[rep.weekday];
@@ -218,7 +221,7 @@ export function startEngine() {
   function levelTitle(l) { return l <= LEVEL_TITLES.length ? LEVEL_TITLES[l - 1] : LEVEL_TITLES[LEVEL_TITLES.length - 1] + ' ' + roman(l - LEVEL_TITLES.length + 1); }
   function compsBy(pid) { return S.completions.filter(function (c) { return c.by === pid; }); }
   function adjFor(pid) { return (S.adjust || []).filter(function (a) { return a.pid === pid; }); }
-  function totalXP(pid) { return compsBy(pid).reduce(function (s, c) { return s + c.xp; }, 0) + adjFor(pid).reduce(function (s, a) { return s + a.delta; }, 0); }
+  function totalXP(pid) { return compsBy(pid).reduce(function (s, c) { return s + c.xp; }, 0) + adjFor(pid).reduce(function (s, a) { return s + (a.by === 'badge' ? 0 : a.delta); }, 0); } // XP from old badge payouts no longer counts
   function weekXP(pid, t) { var ws = weekStart(t); return compsBy(pid).reduce(function (s, c) { return s + (c.at >= ws && c.at <= t ? c.xp : 0); }, 0) + adjFor(pid).reduce(function (s, a) { return s + (a.at >= ws && a.at <= t && a.by !== 'badge' ? a.delta : 0); }, 0); } // badge XP counts toward your level only, not the weekly battle
   function maxPerDay(cs) { var m = {}, best = 0; cs.forEach(function (c) { var k = sod(c.at); m[k] = (m[k] || 0) + 1; if (m[k] > best) best = m[k]; }); return best; }
   function other(pid) { return pid === 'A' ? 'B' : 'A'; }
@@ -239,7 +242,14 @@ export function startEngine() {
     var ge = graceEnd(t); if (T < ge) return 0;
     return Math.floor((T - ge) / DAY) + 1;
   }
-  function bountyFor(t, pid) { var b = SIZES[t.size].xp, d = bountyDays(t, pid); return d <= 0 ? 0 : Math.min(b, Math.ceil(b * 0.1 * d)); }
+  // A repeating task comes round again, so its bounty never builds past its own gap: daily never, every other day at most 1 day's worth.
+  var REPEAT_DAYS = { twice: 1, daily: 1, alternate: 2, weekly: 7, biweekly: 14, monthly: 30 };
+  function bountyFor(t, pid) {
+    if (t.noBounty) return 0;
+    var b = SIZES[t.size].xp, d = bountyDays(t, pid);
+    if (t.repeat && REPEAT_DAYS[t.repeat.kind]) d = Math.min(d, REPEAT_DAYS[t.repeat.kind] - 1);
+    return d <= 0 ? 0 : Math.min(b, Math.ceil(b * 0.1 * d));
+  }
   // After a missed challenge, the challenger has as long as the challenge lasted to collect the bonus.
   function collectEnd(c) { var days = Math.max(1, Math.round((c.deadline - sod(c.at || c.deadline - DAY)) / DAY)); return addDays(c.deadline, days); } // same number of days, ending at midnight
   function chState(t) {
@@ -333,6 +343,7 @@ export function startEngine() {
     });
   }
   // Week-end check: Chore Dodger for anyone who earned less than 5 XP in a full, unpaused week.
+  function weekBadge(p, id, at) { S.badges[p].push({ key: uid(), id: id, tier: 1, at: at, compId: null, revealed: false }); addAct({ kind: 'badge', actor: p, badge: id, tier: 1, at: at }); log('<b>' + esc(nameOf(p)) + '</b> earned ' + badgeDef(id).name); }
   function checkWeekEnd() {
     var ws = weekStart(now());
     if (S.dodgeChecked == null) { S.dodgeChecked = ws; return; }
@@ -350,6 +361,11 @@ export function startEngine() {
       }
       ['A', 'B'].forEach(function (p) {
         var m = S.members[p]; if (!m || m.joinedAt > w) return;
+        // Good Boy: everything your partner assigned you this week (3 or more) done by you, none left over
+        if (!badgeTier(p, 'goodboy')) {
+          var o = other(p), given = S.tasks.filter(function (t) { return t.assignedBy === o && t.assignedAt >= w && t.assignedAt <= we; });
+          if (given.length >= 3 && given.every(function (t) { return S.completions.some(function (c) { return c.taskId === t.id && c.by === p && c.at <= we; }); })) weekBadge(p, 'goodboy', we + 1);
+        }
         if (weekXP(p, we) < 5) { S.badges[p].push({ key: uid(), id: 'dodger', tier: 1, at: we + 1, compId: null, revealed: false }); addAct({ kind: 'badge', actor: p, badge: 'dodger', tier: 1, at: we + 1 }); }
       });
     }
@@ -425,7 +441,8 @@ export function startEngine() {
     S.completions.push(comp);
     t.challenge = null; t.reward = null;
     if (t.repeat) {
-      var next = nextOcc(t.repeat, addDays(sod(T), 1));
+      // twice a day: done before 12:00 -> back at 12:00; done after -> back tomorrow morning
+      var next = t.repeat.kind === 'twice' ? (T < sod(T) + 12 * HOUR ? sod(T) + 12 * HOUR : addDays(sod(T), 1)) : nextOcc(t.repeat, addDays(sod(T), 1));
       t.dueAt = next; t.ageStart = next; t.thread = []; t.handedBackBy = null;
     } else { t.status = 'done'; t.doneAt = T; t.doneBy = pid; }
     var actIds = [];
@@ -514,6 +531,34 @@ export function startEngine() {
     if (a.kind === 'help_req') return { kind: 'help', title: a.ask ? on + ' needs a hand' : on + ' wants to help', body: a.ask ? 'Help with ' + tl + ' and bank a +' + a.banked + ' point boost.' : 'Let them take ' + tl + '?', go: { taskId: a.taskId } };
     return null;
   }
+  /* ---------- 0.9.13: per-task reminders ---------- */
+  var REMIND_OPTS = [['off', 'Off'], ['once', 'Once'], ['twice', '2× a day'], ['daily', 'Daily'], ['alt', 'Every 2 days'], ['weekly', 'Weekly']];
+  function remindLabel(k) { for (var i = 0; i < REMIND_OPTS.length; i++) if (REMIND_OPTS[i][0] === (k || 'off')) return REMIND_OPTS[i][1]; return 'Off'; }
+  function remindFor(t, p) { return t.assignee === p || t.assignee === 'any' || t.assignee === 'both' || helpingMe(t, p); }
+  // Is a reminder for task t due for person p at time T? Reminders go out at your nudge hour; twice a day at 09:00 and 18:00.
+  function remindDue(t, p, T, n) {
+    var h = new Date(T).getHours(), day = sod(T), last = (t.remindAt && t.remindAt[p]) || 0, at = nudgeHour(p);
+    if (t.remind === 'twice') { var slots = [9, 18].filter(function (x) { return !inQuiet(x, n.quiet) && h >= x; }); return slots.length > 0 && last < day + slots[slots.length - 1] * HOUR; }
+    if (h < at) return false;
+    if (t.remind === 'once') return !last;
+    if (t.remind === 'daily') return last < day;
+    if (t.remind === 'alt') return last < addDays(day, -1);
+    if (t.remind === 'weekly') return last < addDays(day, -6);
+    return false;
+  }
+  function checkReminders(T) {
+    ['A', 'B'].forEach(function (p) {
+      var m = S.members[p], n = nudgePrefs(p); if (!m || !n || n.level === 'off' || n.perm !== 'granted') return;
+      if (inQuiet(new Date(T).getHours(), n.quiet)) return;
+      var due = S.tasks.filter(function (t) { return t.status === 'open' && t.remind && isActive(t) && remindFor(t, p) && remindDue(t, p, T, n); });
+      if (!due.length) return;
+      var nd = due.length === 1
+        ? { kind: 'remind', title: 'Reminder: ' + due[0].title, body: '+' + xpFor(due[0], p) + ' pts waiting. Go on.', go: { taskId: due[0].id } }
+        : { kind: 'remind', title: due.length + ' tasks waiting', body: due.slice(0, 3).map(function (t) { return t.title; }).join(', ') + (due.length > 3 ? ' and ' + (due.length - 3) + ' more' : ''), go: { tab: 'tasks', filter: 'mine' } };
+      sendNudge(p, nd, T, false, true).event = 'remind';
+      due.forEach(function (t) { t.remindAt = t.remindAt || {}; t.remindAt[p] = T; });
+    });
+  }
   function checkEvents(T) {
     ['A', 'B'].forEach(function (p) {
       var m = S.members[p], n = nudgePrefs(p); if (!m || !n || n.level === 'off' || n.perm !== 'granted') return;
@@ -530,6 +575,7 @@ export function startEngine() {
     var T = now();
     if (isPaused()) return;
     checkEvents(T);
+    checkReminders(T);
     ['A', 'B'].forEach(function (p) {
       var m = S.members[p], n = nudgePrefs(p); if (!m || !n || n.level === 'off' || n.perm !== 'granted') return;
       if (m.lastNudge && m.lastNudge >= sod(T)) return;
@@ -591,6 +637,7 @@ export function startEngine() {
   function repFromDraft(d, T) {
     if (d.repeat === 'none') return null;
     if (d.repeat === 'daily') return { kind: 'daily' };
+    if (d.repeat === 'twice') return { kind: 'twice' };
     if (d.repeat === 'weekly') return { kind: 'weekly', weekday: d.weekday };
     if (d.repeat === 'alternate') return { kind: 'alternate', anchor: sod(T) };
     if (d.repeat === 'biweekly') return { kind: 'biweekly', weekday: d.weekday, anchor: nextOcc({ kind: 'weekly', weekday: d.weekday }, T) };
@@ -605,7 +652,7 @@ export function startEngine() {
     var T = now(), o = other(pid);
     var assignee = assigneeFromWho(pid, d.who);
     var rep = repFromDraft(d, T);
-    var t = { id: uid(), title: d.title.trim(), size: d.size, assignee: assignee, assignedBy: assignee === o ? pid : null, assignedAt: assignee === o ? T : null, createdBy: pid, createdAt: T, ageStart: T, repeat: rep, dueAt: null, status: 'open', thread: [], handedBackBy: null, grace: d.grace != null ? d.grace : 1, challenge: null };
+    var t = { id: uid(), title: d.title.trim(), size: d.size, assignee: assignee, assignedBy: assignee === o ? pid : null, assignedAt: assignee === o ? T : null, createdBy: pid, createdAt: T, ageStart: T, repeat: rep, dueAt: null, status: 'open', thread: [], handedBackBy: null, grace: d.grace != null ? d.grace : 1, noBounty: d.bounty === false, remind: d.remind && d.remind !== 'off' ? d.remind : null, challenge: null };
     if (rep) { t.dueAt = nextOcc(rep, T); t.ageStart = Math.max(t.dueAt, T); }
     if (opts.alreadyDone && rep) { t.dueAt = sod(T); t.ageStart = T; }
     var note = (d.note || '').trim();
@@ -885,7 +932,7 @@ export function startEngine() {
     if (t.assignee === o && hasPartner(pid) && noSteal(t)) return { sub: on + "'s · can't be stolen", cls: '' };
     if (t.assignee === pid && hasPartner(pid) && noSteal(t) && !st) { var b0 = [SIZES[t.size].label, "can't be stolen"]; if (t.repeat) b0.splice(1, 0, repLabel(t.repeat)); return { sub: b0.join(' · '), cls: '' }; }
     if (t.assignee === o && hasPartner(pid) && inGrace(t)) return { sub: on + "'s until " + fmtGrace(t) + ' · then you can steal it', cls: '' };
-    if (bounty > 0) return { sub: (t.assignee === o ? 'Up for grabs · ' : '') + '+' + bounty + ' bounty · ' + (bounty >= SIZES[t.size].xp ? 'maxed out' : 'grows daily'), cls: 'gold' };
+    if (bounty > 0) return { sub: (t.assignee === o ? 'Up for grabs · ' : '') + '+' + bounty + ' bounty · ' + (bounty >= SIZES[t.size].xp || (t.repeat && REPEAT_DAYS[t.repeat.kind] && bountyDays(t, pid) >= REPEAT_DAYS[t.repeat.kind] - 1) ? 'maxed out' : 'grows daily'), cls: 'gold' };
     if (t.assignee === pid && hasPartner(pid) && !inGrace(t) && !st) return { sub: on + ' can steal this now · waiting ' + ageDays(t) + (ageDays(t) === 1 ? ' day' : ' days'), cls: 'coral' };
     if (last && t.assignee === pid && last.from === o) return { sub: 'From ' + on + ': "' + esc(last.text) + '"', cls: 'coral' };
     if (last && t.assignee === o && last.from === pid) return { sub: 'You: "' + esc(last.text) + '"', cls: '' };
@@ -1121,7 +1168,7 @@ export function startEngine() {
     var last = mine.slice().sort(function (a, b) { return b.at - a.at; })[0];
     var xpEarned = mine.reduce(function (n, b) { return n + (b.revealed ? (bd.xp[Math.min(bd.xp.length, b.tier || 1) - 1] || 0) : 0); }, 0);
     var desc = hid ? 'A rare badge. Keep playing to find out.' : badgeRule(bd, Math.max(1, t)) + (bd.shame ? ' The dog is disappointed.' : '');
-    var xpLine = hid ? '' : t ? (xpEarned ? '+' + xpEarned + ' XP toward your level' : 'No XP for this one') : (bd.xp[0] ? '+' + bd.xp[0] + ' XP toward your level' : '');
+    var xpLine = '';
     return '<div class="bmodal" role="dialog" aria-label="' + (hid ? 'Hidden rare badge' : esc(bd.name)) + '"><button class="overlay-hit" data-act="badge-close" aria-label="Close" tabindex="-1"></button>' +
       '<div class="bm-card"><button class="iconbtn bm-x" data-act="badge-close" aria-label="Close">' + IC.close + '</button>' +
       '<div class="bm-img">' + badgeMedal(bd, t, 340) + '</div>' +
@@ -1250,7 +1297,11 @@ export function startEngine() {
     begins: '',
     roll: '',
     walkies: '',
-    slaver: ''
+    slaver: '',
+    bluff: '',
+    goodboy: '',
+    howl: '',
+    early: ''
   };
   // Your artwork wins over the placeholder medal. Multi-tier badges get a bronze/silver/gold coin in the corner.
   // Badges without finished art all share one placeholder.
@@ -1496,7 +1547,7 @@ export function startEngine() {
       (ahead.length > 1 ? '<path d="' + curve(ahead) + '" fill="none" stroke="#5A5296" stroke-width="5" stroke-dasharray="2 9" stroke-linecap="round" vector-effect="non-scaling-stroke"></path>' : '') +
       (walked.length > 1 ? '<path d="' + curve(walked) + '" fill="none" stroke="#FFC93C" stroke-width="5" stroke-linecap="round" vector-effect="non-scaling-stroke"></path>' : '') + '</svg>';
     var inner = '<div class="sheet-top"><span class="ttl">' + nm.toUpperCase() + ' PATH</span><button class="iconbtn" data-act="close-sheet" aria-label="Close">' + IC.close + '</button></div>' +
-      '<p class="muted" style="margin:0">' + xp + ' XP in total. Every point earned in the weekly battle is also XP, and badges add extra XP. XP never resets.</p>' +
+      '<p class="muted" style="margin:0">' + xp + ' XP in total. Every point you earn in the weekly battle is also XP. XP never resets.</p>' +
       '<div class="lp-map" style="height:' + H + 'px">' + svg + nodes + '</div>';
     return sheetWrap(pid, inner, s.fresh, 'Level path');
   }
@@ -1985,7 +2036,7 @@ export function startEngine() {
       if (d.who === 'partner') inner += '<span class="lbl">Grace period · how long only ' + esc(nameOf(o)) + ' can do it</span><div class="seg">' + GRACE.map(function (g) { return '<button class="' + (d.grace === g[0] ? 'on' : '') + '" data-act="sum-grace" data-g="' + g[0] + '">' + g[1] + '</button>'; }).join('') + '</div><span class="lbl">Note to ' + esc(nameOf(o)) + ' (optional)</span>' + composerHTML(pid, 'sheet', 'assign', 'select') + '<button class="btn gold" data-act="add-who-next">NEXT</button>';
       inner += skip;
     } else if (s.step === 'repeat') {
-      inner += '<h3>Does it repeat?</h3><div class="bigopts">' + [['none', 'No', 'One-off task'], ['daily', 'Daily', 'Every day'], ['alternate', 'Every other day', 'Today, then every second day'], ['weekly', 'Weekly', 'On one weekday'], ['biweekly', 'Every 2 weeks', 'On one weekday, every other week'], ['monthly', 'Monthly', 'On one day of the month']].map(function (r) { return '<button class="bigopt' + (d.repeat === r[0] ? ' on' : '') + '" data-act="add-repeat" data-r="' + r[0] + '"><span class="bt"><b>' + r[1] + '</b><span>' + r[2] + '</span></span></button>'; }).join('') + '</div>';
+      inner += '<h3>Does it repeat?</h3><div class="bigopts">' + [['none', 'No', 'One-off task'], ['twice', 'Twice a day', 'Done before 12:00? It comes back at 12:00'], ['daily', 'Daily', 'Every day'], ['alternate', 'Every other day', 'Today, then every second day'], ['weekly', 'Weekly', 'On one weekday'], ['biweekly', 'Every 2 weeks', 'On one weekday, every other week'], ['monthly', 'Monthly', 'On one day of the month']].map(function (r) { return '<button class="bigopt' + (d.repeat === r[0] ? ' on' : '') + '" data-act="add-repeat" data-r="' + r[0] + '"><span class="bt"><b>' + r[1] + '</b><span>' + r[2] + '</span></span></button>'; }).join('') + '</div>';
       if (d.repeat === 'weekly' || d.repeat === 'biweekly' || d.repeat === 'monthly') inner += dayPicker(d) + '<button class="btn gold" data-act="add-repeat-next">NEXT</button>';
       inner += skip;
     } else {
@@ -2005,9 +2056,11 @@ export function startEngine() {
       '<div class="sum-block"><label class="lbl" for="' + pid + '-sum-title">Task</label><input class="field" id="' + pid + '-sum-title" data-bind="draft.title" data-rerender="1" maxlength="60" value="' + esc(d.title) + '"></div>' +
       '<div class="sum-block"><span class="lbl">How bad is it?</span>' + seg('sum-size', 'n', SIZE_KEYS.map(function (n) { return [n, SIZES[n].label + ' (' + SIZES[n].xp + ' pts)']; }), d.size) + '</div>' +
       '<div class="sum-block"><span class="lbl">Who</span>' + seg('sum-who', 'w', [['me', 'Me'], ['partner', hasP ? esc(nameOf(o)) : 'Partner', !hasP], ['any', 'Anyone'], ['both', 'Both', !hasP]], d.who) + '</div>';
+    h += '<div class="sum-block"><span class="lbl">Reminder · a push notification until it\'s done</span>' + seg('sum-remind', 'm', REMIND_OPTS, d.remind || 'off') + '</div>';
+    if (d.who !== 'both') h += '<div class="sum-block"><span class="lbl">Bounty · extra points that grow while the task waits</span>' + seg('sum-bounty', 'b', [['on', 'On'], ['off', 'Off']], d.bounty === false ? 'off' : 'on') + '</div>';
     if (d.who === 'me' || d.who === 'partner') h += '<div class="sum-block"><span class="lbl">Grace period · how long only ' + (d.who === 'me' ? 'you' : esc(nameOf(o))) + ' can do it before it can be stolen. Never = it can\'t be stolen.</span>' + seg('sum-grace', 'g', GRACE, d.grace) + '</div>';
     if (d.who === 'partner') h += '<div class="sum-block"><span class="lbl">Note to ' + esc(nameOf(o)) + ' (optional)</span>' + composerHTML(pid, 'sheet', 'assign', 'select') + '</div>';
-    h += '<div class="sum-block"><span class="lbl">Repeats</span>' + seg('sum-repeat', 'r', [['none', 'No'], ['daily', 'Daily'], ['alternate', 'Every other day'], ['weekly', 'Weekly'], ['biweekly', 'Every 2 weeks'], ['monthly', 'Monthly']], d.repeat) + (d.repeat === 'weekly' || d.repeat === 'biweekly' || d.repeat === 'monthly' ? dayPicker(d) : '') + '</div>';
+    h += '<div class="sum-block"><span class="lbl">Repeats</span>' + seg('sum-repeat', 'r', [['none', 'No'], ['twice', 'Twice a day'], ['daily', 'Daily'], ['alternate', 'Every other day'], ['weekly', 'Weekly'], ['biweekly', 'Every 2 weeks'], ['monthly', 'Monthly']], d.repeat) + (d.repeat === 'weekly' || d.repeat === 'biweekly' || d.repeat === 'monthly' ? dayPicker(d) : '') + '</div>';
     h += '<span class="xp-preview">Worth <b>' + xp + ' pts</b>' + (d.repeat !== 'none' ? ' each time' : '') + '</span>';
     var ok = !!d.title.trim();
     if (s.editId) h += '<button class="btn gold" data-act="add-save"' + (ok ? '' : ' disabled') + '>SAVE</button>';
@@ -2427,13 +2480,13 @@ export function startEngine() {
   /* ================= Actions ================= */
   function openSheet(pid, sheet) { sheet.fresh = true; UI[pid].sheet = sheet; }
   function infoToast(pid, text) { UI[pid].toast = { kind: 'info', text: text, expires: Date.now() + 2200, fresh: true }; }
-  function newDraft() { var T = now(); return { title: '', size: null, who: null, repeat: null, weekday: wdIdx(T), monthDay: new Date(T).getDate(), grace: 1 }; }
+  function newDraft() { var T = now(); return { title: '', size: null, who: null, repeat: null, weekday: wdIdx(T), monthDay: new Date(T).getDate(), grace: 1, bounty: true, remind: 'off' }; }
   function draftDefaults(d) { if (d.size == null) d.size = 2; if (d.who == null) d.who = 'me'; if (d.repeat == null) d.repeat = 'none'; return d; }
 
   // Duplicate a task (open or done): opens the add drawer filled in, ready to tweak and add.
   function dupDraft(pid, t, c) {
     var T = now(), src = t || {};
-    return { title: (t ? t.title : c.title), size: (t ? t.size : c.size) || 2, grace: src.grace != null ? src.grace : 1,
+    return { title: (t ? t.title : c.title), size: (t ? t.size : c.size) || 2, grace: src.grace != null ? src.grace : 1, bounty: !src.noBounty, remind: src.remind || 'off',
       who: t ? whoFromAssignee(pid, t.assignee) : 'me', repeat: src.repeat ? src.repeat.kind : 'none',
       weekday: src.repeat && src.repeat.weekday != null ? src.repeat.weekday : wdIdx(T), monthDay: src.repeat && src.repeat.day ? src.repeat.day : new Date(T).getDate() };
   }
@@ -2572,7 +2625,7 @@ export function startEngine() {
       case 'detail-done': doComplete(pid, s.id); break;
       case 'detail-edit':
         t = getTask(s.id); if (!t) break;
-        var d = { title: t.title, size: t.size, grace: t.grace != null ? t.grace : 1, who: whoFromAssignee(pid, t.assignee), repeat: t.repeat ? t.repeat.kind : 'none', weekday: t.repeat && t.repeat.weekday != null ? t.repeat.weekday : wdIdx(T), monthDay: t.repeat && t.repeat.day ? t.repeat.day : new Date(T).getDate() };
+        var d = { title: t.title, size: t.size, grace: t.grace != null ? t.grace : 1, bounty: !t.noBounty, remind: t.remind || 'off', who: whoFromAssignee(pid, t.assignee), repeat: t.repeat ? t.repeat.kind : 'none', weekday: t.repeat && t.repeat.weekday != null ? t.repeat.weekday : wdIdx(T), monthDay: t.repeat && t.repeat.day ? t.repeat.day : new Date(T).getDate() };
         ui.sheet = { kind: 'add', step: 'summary', draft: d, editId: t.id, c: newComposer(), fresh: false, orig: JSON.stringify(d) };
         break;
       case 'detail-handback': ui.sheet = { kind: 'handback', id: s.id, c: newComposer(), fresh: false }; break;
@@ -2606,7 +2659,7 @@ export function startEngine() {
       case 'add-size': s.draft.size = parseInt(ds.n, 10); s.step = 'who'; break;
       case 'add-who': s.draft.who = ds.w; if (ds.w !== 'partner') s.step = 'repeat'; break;
       case 'add-who-next': s.step = 'repeat'; break;
-      case 'add-repeat': s.draft.repeat = ds.r; if (ds.r === 'none' || ds.r === 'daily' || ds.r === 'alternate') { draftDefaults(s.draft); s.step = 'summary'; } break;
+      case 'add-repeat': s.draft.repeat = ds.r; if (ds.r === 'none' || ds.r === 'twice' || ds.r === 'daily' || ds.r === 'alternate') { draftDefaults(s.draft); s.step = 'summary'; } break;
       case 'add-repeat-next': draftDefaults(s.draft); s.step = 'summary'; break;
       case 'add-weekday': s.draft.weekday = parseInt(ds.n, 10); break;
       case 'add-monthday': s.draft.monthDay = Math.max(1, Math.min(31, s.draft.monthDay + parseInt(ds.d, 10))); break;
@@ -2621,6 +2674,8 @@ export function startEngine() {
       case 'sum-who': s.draft.who = ds.w; break;
       case 'sum-repeat': s.draft.repeat = ds.r; break;
       case 'sum-grace': s.draft.grace = parseInt(ds.g, 10); break;
+      case 'sum-bounty': s.draft.bounty = ds.b === 'on'; break;
+      case 'sum-remind': s.draft.remind = ds.m; break;
       /* challenges */
       case 'gift-open': ui.sheet = { kind: 'gift', id: s.id, text: '', day: 0, c: newComposer(), fresh: false }; ui.focusNext = pid + '-gift-text'; break;
       case 'gift-idea': s.text = s.text === ds.text ? '' : ds.text; break;
@@ -2959,6 +3014,8 @@ export function startEngine() {
     if (newTitle !== t.title) { changes.push('renamed from "' + t.title + '"'); t.title = newTitle; }
     if (d.size !== t.size) { changes.push('now ' + SIZES[d.size].label + ' · ' + SIZES[d.size].xp + ' pts (was ' + SIZES[t.size].xp + ')'); t.size = d.size; }
     if (d.grace != null && d.grace !== (t.grace || 0)) { changes.push('grace period ' + graceLabel(d.grace).toLowerCase()); t.grace = d.grace; }
+    if ((d.remind || 'off') !== (t.remind || 'off')) { changes.push('reminder ' + remindLabel(d.remind).toLowerCase()); t.remind = d.remind && d.remind !== 'off' ? d.remind : null; t.remindAt = {}; }
+    if (d.bounty != null && (d.bounty === false) !== !!t.noBounty) { changes.push(d.bounty === false ? 'no bounty' : 'bounty on'); t.noBounty = d.bounty === false; }
     var newRep = repFromDraft(d, T), oldLbl = repLabel(t.repeat), newLbl = repLabel(newRep);
     if (oldLbl !== newLbl) {
       changes.push(newRep ? 'repeats ' + newLbl.toLowerCase() : 'no longer repeats');

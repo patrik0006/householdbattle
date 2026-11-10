@@ -879,8 +879,8 @@ body { background: var(--bg); overscroll-behavior: none; -webkit-tap-highlight-c
 <div id="phone" class="phone" role="application" aria-label="HouseholdBattle"></div>
 <noscript>HouseholdBattle needs JavaScript.</noscript>
 <script type="module">
-import { createSync } from './sync.js?v=0.9.10';
-import { startGame } from './app.js?v=0.9.10';
+import { createSync } from './sync.js?v=0.9.13';
+import { startGame } from './app.js?v=0.9.13';
 createSync().then(startGame).catch(function (e) {
   document.getElementById('phone').innerHTML = '<div class="app"><div class="ob"><div class="logo">HOUSEHOLD<br>BATTLE</div><p>Couldn\'t start. Check your connection and try again.</p><button class="btn gold" onclick="location.reload()">TRY AGAIN</button></div></div>';
   console.error(e);
