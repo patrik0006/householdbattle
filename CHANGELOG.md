@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.11.0 · Balto · 11 Nov 2026 · commit __COMMIT__
+## v0.11.0 · Balto · 11 Nov 2026 · commit 26961f5
 - Plan your day: your lists now have a To do section on top. Long-press a task and drag it above the line to plan it, or use ⋯ → Move to To do.
 - Notes on tasks: add details when you create or edit a task. Tasks with notes get a small note icon.
 - New badge art: Smash! and Snatch!.
