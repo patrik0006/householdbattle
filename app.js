@@ -1,4 +1,5 @@
-import { APP_VERSION } from './version.js';
+// The version is built into this file so a stale cached version.js can never make the app think it's older than it is.
+const APP_VERSION = '0.11.1';
 export function startGame(SYNCAPI) {
   'use strict';
 
@@ -3711,7 +3712,11 @@ export function startGame(SYNCAPI) {
       if (m && cmpVer(m[1], APP_VERSION) > 0 && !UI[ME].updateDismissed) { UI[ME].updateReady = true; renderPhone(ME); }
     }).catch(function () { });
   }
-  window.__hbReload = function () { location.reload(); };
+  // Reload to a fresh address so no cache can hand back the old page.
+  window.__hbReload = function () {
+    var go = function () { location.replace(location.pathname + '?u=' + Date.now()); };
+    if (navigator.serviceWorker && navigator.serviceWorker.getRegistration) navigator.serviceWorker.getRegistration().then(function (r) { return r && r.update(); }).then(go, go); else go();
+  };
   setInterval(checkForUpdate, 10 * 60 * 1000);
   document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') checkForUpdate(); });
 
