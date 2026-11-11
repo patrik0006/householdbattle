@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.11.1 · Balto · 11 Nov 2026 · commit __COMMIT__
+## v0.11.1 · Balto · 11 Nov 2026 · commit 691ba34
 - Fixed: after an update the app could think it was still the old version, so the reload bar kept coming back and What's new never showed.
 
 ## v0.11.0 · Balto · 11 Nov 2026 · commit 26961f5
