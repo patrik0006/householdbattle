@@ -117,6 +117,7 @@ export function startEngine() {
     sort: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4v16M3 16l4 4 4-4M17 20V4M13 8l4-4 4 4"/></svg>',
     copy: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2.5"/><path d="M5 15H4.5A1.5 1.5 0 0 1 3 13.5v-9A1.5 1.5 0 0 1 4.5 3h9A1.5 1.5 0 0 1 15 4.5V5"/></svg>',
     pen: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/></svg>',
+    note: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h14v16H5z"/><path d="M9 9h6M9 13h6M9 17h4"/></svg>',
     boltSm: '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"/></svg>',
     boltBig: '<svg width="56" height="56" viewBox="0 0 24 24" aria-hidden="true"><path fill="#4FB4FF" d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"/></svg>',
     crown: '<svg width="38" height="30" viewBox="0 0 38 30" aria-hidden="true"><path d="M3 26 L1 6 L11 14 L19 2 L27 14 L37 6 L35 26 Z" fill="#FFC93C" stroke="#7A4A08" stroke-width="2" stroke-linejoin="round"/><circle cx="19" cy="18" r="3" fill="#FF7A59"/></svg>',
@@ -427,6 +428,7 @@ export function startEngine() {
       breakdown.push(nameOf(o) + ' also gets +' + base);
       S.adjust = S.adjust || []; S.adjust.push({ id: uid(), pid: o, by: 'shared', delta: base, at: T, compId: comp.id });
     }
+    ['A', 'B'].forEach(function (p) { if (S.members[p] && S.members[p].planned) delete S.members[p].planned[t.id]; }); // done = off the plan
     if (opts.markedBy) { comp.markedBy = opts.markedBy; breakdown.push('Marked done by ' + nameOf(opts.markedBy)); }
     if (helping) {
       comp.help = { owner: helpOwner, banked: banked };
@@ -652,7 +654,7 @@ export function startEngine() {
     var T = now(), o = other(pid);
     var assignee = assigneeFromWho(pid, d.who);
     var rep = repFromDraft(d, T);
-    var t = { id: uid(), title: d.title.trim(), size: d.size, assignee: assignee, assignedBy: assignee === o ? pid : null, assignedAt: assignee === o ? T : null, createdBy: pid, createdAt: T, ageStart: T, repeat: rep, dueAt: null, status: 'open', thread: [], handedBackBy: null, grace: d.grace != null ? d.grace : 1, noBounty: d.bounty === false, remind: d.remind && d.remind !== 'off' ? d.remind : null, challenge: null };
+    var t = { id: uid(), title: d.title.trim(), notes: (d.notes || '').trim() || null, size: d.size, assignee: assignee, assignedBy: assignee === o ? pid : null, assignedAt: assignee === o ? T : null, createdBy: pid, createdAt: T, ageStart: T, repeat: rep, dueAt: null, status: 'open', thread: [], handedBackBy: null, grace: d.grace != null ? d.grace : 1, noBounty: d.bounty === false, remind: d.remind && d.remind !== 'off' ? d.remind : null, challenge: null };
     if (rep) { t.dueAt = nextOcc(rep, T); t.ageStart = Math.max(t.dueAt, T); }
     if (opts.alreadyDone && rep) { t.dueAt = sod(T); t.ageStart = T; }
     var note = (d.note || '').trim();
@@ -944,7 +946,7 @@ export function startEngine() {
     var x = xpFor(t, pid), can = canComplete(t, pid), rs = rowStatus(pid, t);
     return '<div class="task' + (rs.hot ? ' old' : '') + (can ? '' : ' locked') + '" data-tid="' + t.id + '">' +
       '<button class="tick" data-act="complete" data-id="' + t.id + '" aria-label="Complete ' + esc(t.title) + '"' + (can ? '' : ' disabled') + '><i></i></button>' +
-      '<button class="row-body" data-act="open-task" data-id="' + t.id + '"><span class="row-title">' + esc(t.title) + '</span><span class="row-sub ' + rs.cls + '">' + rs.sub + '</span></button>' +
+      '<button class="row-body" data-act="open-task" data-id="' + t.id + '"><span class="row-title">' + esc(t.title) + (t.notes ? '<span class="has-notes" aria-label="Has notes">' + IC.note + '</span>' : '') + '</span><span class="row-sub ' + rs.cls + '">' + rs.sub + '</span></button>' +
       (helpingMe(t, pid) ? '<span class="xp bst">' + IC.boltSm + '+' + helpBank(t) + '</span></div>' : '<span class="xp' + (isUnderdog(pid) ? ' ud' : '') + '">' + (isUnderdog(pid) ? IC.fireSm : '') + '+' + x + '</span></div>');
   }
 
@@ -1112,7 +1114,16 @@ export function startEngine() {
         else if (ui.filter === 'both') body += '<div class="empty"><span class="disp">NOTHING SHARED</span><span>Add a task for Both. Either of you does it, you both get the points.</span></div>';
         else body += '<div class="empty"><span class="disp">' + (hasPartner(pid) ? esc(nameOf(o)).toUpperCase() + ' IS ALL CLEAR' : 'NO PARTNER YET') + '</span><span>' + (hasPartner(pid) ? 'Nothing to steal. Annoying.' : 'Share your invite code from Settings.') + '</span></div>';
       }
-      body += '<div class="tasklist">'; list.forEach(function (t) { body += taskRow(pid, t); }); body += '</div>';
+      if (ui.filter === 'mine' || ui.filter === 'any' || ui.filter === 'both') {
+        // To do (planned, in your order) above the divider, the rest below it
+        var todo = list.filter(function (t) { return isPlanned(pid, t); }), later = list.filter(function (t) { return !isPlanned(pid, t); });
+        body += '<div class="tasklist planned">' + '<div class="plan-head"><span>TO DO</span>' + (todo.length ? '<span class="plan-n">' + todo.length + '</span>' : '') + '</div>';
+        if (todo.length) todo.forEach(function (t) { body += taskRow(pid, t); });
+        else body += '<div class="plan-empty">Long-press a task and drag it up here to plan what to do first.</div>';
+        body += '<div class="plan-div" role="separator" aria-label="Later"><span>LATER</span></div>';
+        later.forEach(function (t) { body += taskRow(pid, t); });
+        body += '</div>';
+      } else { body += '<div class="tasklist">'; list.forEach(function (t) { body += taskRow(pid, t); }); body += '</div>'; }
       if (upcoming.length) body += '<button class="linkrow" data-act="upcoming-open">Coming up · ' + upcoming.length + IC.chev + '</button>';
     }
     return headerHTML(pid) + chips + '<div class="scroll" data-scroll="tasks-' + ui.filter + '"><div class="list">' + body + '</div></div>';
@@ -1301,7 +1312,9 @@ export function startEngine() {
     bluff: '',
     goodboy: '',
     howl: '',
-    early: ''
+    early: '',
+    boomerang: '',
+    thief: ''
   };
   // Your artwork wins over the placeholder medal. Multi-tier badges get a bronze/silver/gold coin in the corner.
   // Badges without finished art all share one placeholder.
@@ -1913,9 +1926,11 @@ export function startEngine() {
     var inner = '<div class="sheet-top"><span class="ttl">' + (t.assignee === o ? on.toUpperCase() + "'S TASK" : t.assignee === 'any' ? "ANYONE'S TASK" : t.assignee === 'both' ? 'SHARED TASK' : 'YOUR TASK') + '</span>' +
       (mnOk ? '<button class="iconbtn" data-act="more-menu" aria-label="More options" aria-expanded="' + !!s.menu + '">' + IC.dots + '</button>' : '') +
       '<button class="iconbtn" data-act="close-sheet" aria-label="Close">' + IC.close + '</button></div>' +
-      (mnOk && s.menu ? '<div class="more-menu" role="menu"><button role="menuitem" data-act="dup-task" data-id="' + t.id + '">' + IC.copy + '<span><b>Duplicate</b><small>Make a new task just like this one</small></span></button>' +
+      (mnOk && s.menu ? '<div class="more-menu" role="menu">' + (canPlan(t, pid) ? '<button role="menuitem" data-act="plan-toggle" data-id="' + t.id + '">' + IC.check + '<span><b>' + (isPlanned(pid, t) ? 'Move to Later' : 'Move to To do') + '</b><small>' + (isPlanned(pid, t) ? 'Take it off your plan' : 'Put it on your plan, at the bottom') + '</small></span></button>' : '') +
+        '<button role="menuitem" data-act="dup-task" data-id="' + t.id + '">' + IC.copy + '<span><b>Duplicate</b><small>Make a new task just like this one</small></span></button>' +
         (dfOk ? '<button role="menuitem" data-act="done-for" data-id="' + t.id + '">' + IC.check + '<span><b>Mark done for ' + on + '</b><small>' + on + ' did it, so ' + on + ' gets the points</small></span></button>' : '') + '</div>' : '') +
       '<h3>' + esc(t.title) + '</h3>' +
+      (t.notes ? '<div class="task-notes">' + IC.note + '<p>' + esc(t.notes).replace(/\n/g, '<br>') + '</p></div>' : '') +
       '<dl class="kv"><dt>Worth</dt><dd>' + worth + '</dd><dt>Size</dt><dd>' + SIZES[t.size].label + ' · ' + SIZES[t.size].xp + ' pts</dd><dt>For</dt><dd>' + forTxt + '</dd>' +
       (graceTxt ? '<dt>Grace period</dt><dd>' + graceTxt + '</dd>' : '') +
       '<dt>Added by</dt><dd>' + (t.createdBy === pid ? 'You' : esc(nameOf(t.createdBy))) + ' · ' + fmtDate(t.createdAt) + '</dd>' +
@@ -2075,6 +2090,7 @@ export function startEngine() {
     var xp = SIZES[d.size].xp;
     var h = '<h3>' + (s.editId ? 'Edit task' : 'Ready to add?') + '</h3>' +
       '<div class="sum-block"><label class="lbl" for="' + pid + '-sum-title">Task</label><input class="field" id="' + pid + '-sum-title" data-bind="draft.title" data-rerender="1" maxlength="60" value="' + esc(d.title) + '"></div>' +
+      '<div class="sum-block"><label class="lbl" for="' + pid + '-sum-notes">Notes (optional)</label><textarea class="field notes-field" id="' + pid + '-sum-notes" data-bind="draft.notes" rows="3" maxlength="500" placeholder="Details, steps, where things are…">' + esc(d.notes || '') + '</textarea></div>' +
       '<div class="sum-block"><span class="lbl">How bad is it?</span>' + seg('sum-size', 'n', SIZE_KEYS.map(function (n) { return [n, SIZES[n].label + ' (' + SIZES[n].xp + ' pts)']; }), d.size) + '</div>' +
       '<div class="sum-block"><span class="lbl">Who</span>' + seg('sum-who', 'w', [['me', 'Me'], ['partner', hasP ? esc(nameOf(o)) : 'Partner', !hasP], ['any', 'Anyone'], ['both', 'Both', !hasP]], d.who) + '</div>';
     h += '<div class="sum-block"><span class="lbl">Reminder · a push notification until it\'s done</span>' + seg('sum-remind', 'm', REMIND_OPTS, d.remind || 'off') + '</div>';
@@ -2507,7 +2523,7 @@ export function startEngine() {
   // Duplicate a task (open or done): opens the add drawer filled in, ready to tweak and add.
   function dupDraft(pid, t, c) {
     var T = now(), src = t || {};
-    return { title: (t ? t.title : c.title), size: (t ? t.size : c.size) || 2, grace: src.grace != null ? src.grace : 1, bounty: !src.noBounty, remind: src.remind || 'off',
+    return { title: (t ? t.title : c.title), notes: t && t.notes ? t.notes : '', size: (t ? t.size : c.size) || 2, grace: src.grace != null ? src.grace : 1, bounty: !src.noBounty, remind: src.remind || 'off',
       who: t ? whoFromAssignee(pid, t.assignee) : 'me', repeat: src.repeat ? src.repeat.kind : 'none',
       weekday: src.repeat && src.repeat.weekday != null ? src.repeat.weekday : wdIdx(T), monthDay: src.repeat && src.repeat.day ? src.repeat.day : new Date(T).getDate() };
   }
@@ -2535,6 +2551,8 @@ export function startEngine() {
     try { var all = JSON.parse(localStorage.getItem('hb-feedback') || '[]'); all.push(rec); localStorage.setItem('hb-feedback', JSON.stringify(all)); } catch (e) { }
     log('Feedback from <b>' + esc(nameOf(pid)) + '</b> on ' + esc(rec.screen) + ': ' + esc(rec.note));
   }
+  function isPlanned(pid, t) { var m = S.members[pid]; return !!(m && m.planned && m.planned[t.id]); }
+  function canPlan(t, pid) { return t.status === 'open' && (t.assignee === pid || t.assignee === 'any' || t.assignee === 'both'); }
   function canDoneFor(t, pid) { var o = other(pid); return hasPartner(pid) && !isPaused() && isActive(t) && t.assignee !== pid && canComplete(t, o) && !helpingMe(t, pid); }
   function doneFor(pid, id) {
     var o = other(pid), r = completeTask(o, id, { markedBy: pid });
@@ -2621,7 +2639,9 @@ export function startEngine() {
       case 'filter': ui.filter = ds.f; break;
       case 'reorder':
         if (!S.members[pid]) break;
-        var vis = String(ds.ids || '').split(',').filter(Boolean), keep = (S.members[pid].order || []).filter(function (id) { return vis.indexOf(id) < 0 && getTask(id) && getTask(id).status === 'open'; });
+        var allIds = String(ds.ids || '').split(',').filter(Boolean), cut = allIds.indexOf('__div');
+        if (cut >= 0) { var pl = S.members[pid].planned = S.members[pid].planned || {}; allIds.forEach(function (id, i) { if (id === '__div') return; if (i < cut) pl[id] = 1; else delete pl[id]; }); }
+        var vis = allIds.filter(function (id) { return id !== '__div'; }), keep = (S.members[pid].order || []).filter(function (id) { return vis.indexOf(id) < 0 && getTask(id) && getTask(id).status === 'open'; });
         S.members[pid].order = vis.concat(keep); break;
       case 'open-settings': ui.settings = true; ui.sheet = null; ui.nameDraft = null; ui.pauseCompose = null; break;
       case 'close-settings': ui.clearAsk = null; ui.scoreEdit = null; ui.settings = false; ui.pauseCompose = null; ui.nameDraft = null; break;
@@ -2643,13 +2663,19 @@ export function startEngine() {
         var fbr = { id: uid(), at: Date.now(), by: nameOf(pid), version: (typeof APP_VERSION !== 'undefined' ? APP_VERSION : 'proto 0.9.0'), screen: ui.fb.target.screen, spot: ui.fb.target.path, text: ui.fb.target.text, note: ui.fb.note.trim(), x: ui.fb.target.x, y: ui.fb.target.y };
         fbSave(pid, fbr); ui.fb = null; infoToast(pid, 'Feedback saved. Thanks!'); break;
       case 'done-for': doneFor(pid, ds.id); break;
+      case 'plan-toggle':
+        t = getTask(ds.id); if (!t || !S.members[pid]) break;
+        var pm = S.members[pid].planned = S.members[pid].planned || {};
+        if (pm[t.id]) { delete pm[t.id]; infoToast(pid, 'Moved to Later.'); }
+        else { pm[t.id] = 1; var od = S.members[pid].order = (S.members[pid].order || []).filter(function (id) { return id !== t.id; }); var lastP = -1; od.forEach(function (id, i) { if (pm[id]) lastP = i; }); od.splice(lastP + 1, 0, t.id); infoToast(pid, 'Added to To do.'); }
+        if (s) s.menu = false; break;
       case 'dup-task': t = getTask(ds.id); if (t && !isPaused()) openDup(pid, dupDraft(pid, t, null)); break;
       case 'dup-done': var cD = S.completions.filter(function (c) { return c.id === ds.id; })[0]; if (cD && !isPaused()) openDup(pid, dupDraft(pid, getTask(cD.taskId) || null, cD)); break;
       case 'open-task': openSheet(pid, { kind: 'detail', id: ds.id }); break;
       case 'detail-done': doComplete(pid, s.id); break;
       case 'detail-edit':
         t = getTask(s.id); if (!t) break;
-        var d = { title: t.title, size: t.size, grace: t.grace != null ? t.grace : 1, bounty: !t.noBounty, remind: t.remind || 'off', who: whoFromAssignee(pid, t.assignee), repeat: t.repeat ? t.repeat.kind : 'none', weekday: t.repeat && t.repeat.weekday != null ? t.repeat.weekday : wdIdx(T), monthDay: t.repeat && t.repeat.day ? t.repeat.day : new Date(T).getDate() };
+        var d = { title: t.title, notes: t.notes || '', size: t.size, grace: t.grace != null ? t.grace : 1, bounty: !t.noBounty, remind: t.remind || 'off', who: whoFromAssignee(pid, t.assignee), repeat: t.repeat ? t.repeat.kind : 'none', weekday: t.repeat && t.repeat.weekday != null ? t.repeat.weekday : wdIdx(T), monthDay: t.repeat && t.repeat.day ? t.repeat.day : new Date(T).getDate() };
         ui.sheet = { kind: 'add', step: 'summary', draft: d, editId: t.id, c: newComposer(), fresh: false, orig: JSON.stringify(d) };
         break;
       case 'detail-handback': ui.sheet = { kind: 'handback', id: s.id, c: newComposer(), fresh: false }; break;
@@ -3036,6 +3062,8 @@ export function startEngine() {
     var o = other(pid), T = now(), changes = [];
     var newTitle = d.title.trim();
     if (newTitle !== t.title) { changes.push('renamed from "' + t.title + '"'); t.title = newTitle; }
+    var newNotes = (d.notes || '').trim() || null;
+    if (newNotes !== (t.notes || null)) { changes.push(newNotes ? 'updated the notes' : 'removed the notes'); t.notes = newNotes; }
     if (d.size !== t.size) { changes.push('now ' + SIZES[d.size].label + ' · ' + SIZES[d.size].xp + ' pts (was ' + SIZES[t.size].xp + ')'); t.size = d.size; }
     if (d.grace != null && d.grace !== (t.grace || 0)) { changes.push('grace period ' + graceLabel(d.grace).toLowerCase()); t.grace = d.grace; }
     if ((d.remind || 'off') !== (t.remind || 'off')) { changes.push('reminder ' + remindLabel(d.remind).toLowerCase()); t.remind = d.remind && d.remind !== 'off' ? d.remind : null; t.remindAt = {}; }
@@ -3083,13 +3111,13 @@ export function startEngine() {
   // Long-press a task row, then drag it up or down.
   function bindDrag(pid, root) {
     var hold = null, d = null, HOLD_MS = 380;
-    function rows() { return Array.prototype.slice.call(root.querySelectorAll('.tasklist > .task[data-tid]')); }
+    function rows() { return Array.prototype.slice.call(root.querySelectorAll('.tasklist > .task[data-tid], .tasklist > .plan-div')); }
     function cancelHold() { if (hold) { clearTimeout(hold.timer); hold = null; } }
     root.addEventListener('pointerdown', function (e) {
       if (e.button > 0 || d) return;
       var row = e.target.closest && e.target.closest('.task[data-tid]');
       if (!row || !root.contains(row) || e.target.closest('[data-act="complete"]') || isPaused() || UI[pid].sheet) return;
-      if (rows().length < 2) return;
+      if (root.querySelectorAll('.tasklist > .task[data-tid]').length < 2 && !root.querySelector('.tasklist > .plan-div')) return;
       hold = { x: e.clientX, y: e.clientY, row: row, id: e.pointerId };
       hold.timer = setTimeout(function () { start(hold); }, HOLD_MS);
     });
@@ -3100,6 +3128,8 @@ export function startEngine() {
       if (!h.row) return;
       var sc = h.row.parentElement; while (sc && sc !== root && !(sc.scrollHeight > sc.clientHeight && /auto|scroll/.test(getComputedStyle(sc).overflowY))) sc = sc.parentElement;
       d = { row: h.row, y0: h.y, list: list, idx: list.indexOf(h.row), to: list.indexOf(h.row), h: h.row.getBoundingClientRect().height + 9, moved: false, sc: sc && sc !== root ? sc : null, top0: sc && sc !== root ? sc.scrollTop : 0, maxTop: sc && sc !== root ? sc.scrollHeight - sc.clientHeight : 0, lastY: h.y };
+      var st0 = d.sc ? d.sc.scrollTop : 0;
+      d.mids = list.map(function (r) { var b = r.getBoundingClientRect(); return b.top + st0 + b.height / 2; });
       autoScroll();
       ui.dragging = true; buzz('light');
       h.row.classList.add('dragging');
@@ -3124,7 +3154,8 @@ export function startEngine() {
     function place(y) {
       var dy = y - d.y0 + (d.sc ? d.sc.scrollTop - d.top0 : 0); d.moved = d.moved || Math.abs(dy) > 4;
       d.row.style.transform = 'translateY(' + dy + 'px) scale(1.02)';
-      var to = Math.max(0, Math.min(d.list.length - 1, d.idx + Math.round(dy / d.h)));
+      var me = d.mids[d.idx] + dy, to = 0;
+      d.mids.forEach(function (m, i) { if (i !== d.idx && m < me) to++; });
       if (to !== d.to) { d.to = to; buzz('light'); }
       d.list.forEach(function (r, i) {
         if (r === d.row) return;
@@ -3139,7 +3170,7 @@ export function startEngine() {
       cancelHold(); if (!d) return;
       var dd = d, ui = UI[pid]; d = null; ui.dragging = false;
       root.classList.remove('is-dragging');
-      var ids = dd.list.map(function (r) { return r.getAttribute('data-tid'); });
+      var ids = dd.list.map(function (r) { return r.getAttribute('data-tid') || '__div'; });
       var moved = ids.splice(dd.idx, 1)[0]; ids.splice(dd.to, 0, moved);
       root.dataset.justDragged = '1'; setTimeout(function () { delete root.dataset.justDragged; }, 50);
       if (dd.to !== dd.idx) act(pid, 'reorder', { ids: ids.join(',') });

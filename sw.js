@@ -1,5 +1,5 @@
 // HouseholdBattle service worker: the app opens offline and updates itself in the background.
-const VERSION = '0.10.0';
+const VERSION = '0.11.0';
 const CACHE = 'hb-' + VERSION;
 const SHELL = ['./', 'index.html', 'app.js?v=' + VERSION, 'sync.js?v=' + VERSION, 'sync.js', 'version.js', 'firebase-config.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png'];
 

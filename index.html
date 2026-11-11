@@ -868,6 +868,21 @@ button.pcard { width: 100%; border: 0; color: inherit; text-align: left; cursor:
 .upd-bar span { flex: 1; font-weight: 600; }
 @media (prefers-reduced-motion: reduce) { .wn-ov, .upd-bar { animation: none; } }
 
+/* ---------- 0.11: To do / Later ---------- */
+.plan-head { display: flex; align-items: center; gap: 8px; font-family: var(--display); letter-spacing: 1.5px; color: var(--gold); font-size: var(--fs-md); margin: 2px 2px -2px; }
+.plan-n { font-family: inherit; background: var(--gold); color: #1A1540; border-radius: 999px; min-width: 22px; height: 22px; padding: 0 6px; display: inline-flex; align-items: center; justify-content: center; font-size: var(--fs-xs); }
+.plan-empty { border: 1.5px dashed rgba(255,201,60,0.45); border-radius: 16px; padding: 16px 14px; color: var(--soft); text-align: center; line-height: 1.4; }
+.plan-div { display: flex; align-items: center; gap: 10px; color: var(--muted); font-family: var(--display); letter-spacing: 1.5px; font-size: var(--fs-md); padding: 10px 2px 2px; transition: transform 0.18s ease; }
+.plan-div::after { content: ''; flex: 1; height: 1px; background: rgba(255,255,255,0.15); }
+.is-dragging .plan-div::after { background: var(--gold); opacity: 0.6; }
+
+/* ---------- 0.11: task notes ---------- */
+.notes-field { resize: vertical; min-height: 64px; font: inherit; line-height: 1.4; }
+.task-notes { display: flex; gap: 10px; background: var(--bg); border-radius: 14px; padding: 12px 14px; color: var(--soft); line-height: 1.45; }
+.task-notes svg { flex: none; margin-top: 3px; color: var(--muted); }
+.task-notes p { margin: 0; white-space: normal; overflow-wrap: anywhere; }
+.has-notes { display: inline-flex; vertical-align: -2px; margin-left: 6px; color: var(--muted); }
+
 /* ---------- Real app: one full-screen phone instead of the test bench ---------- */
 html, body { height: 100%; }
 body { background: var(--bg); overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
@@ -890,8 +905,8 @@ body { background: var(--bg); overscroll-behavior: none; -webkit-tap-highlight-c
 <div id="phone" class="phone" role="application" aria-label="HouseholdBattle"></div>
 <noscript>HouseholdBattle needs JavaScript.</noscript>
 <script type="module">
-import { createSync } from './sync.js?v=0.10.0';
-import { startGame } from './app.js?v=0.10.0';
+import { createSync } from './sync.js?v=0.11.0';
+import { startGame } from './app.js?v=0.11.0';
 createSync().then(startGame).catch(function (e) {
   document.getElementById('phone').innerHTML = '<div class="app"><div class="ob"><div class="logo">HOUSEHOLD<br>BATTLE</div><p>Couldn\'t start. Check your connection and try again.</p><button class="btn gold" onclick="location.reload()">TRY AGAIN</button></div></div>';
   console.error(e);

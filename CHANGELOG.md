@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.11.0 · Balto · 11 Nov 2026 · commit __COMMIT__
+- Plan your day: your lists now have a To do section on top. Long-press a task and drag it above the line to plan it, or use ⋯ → Move to To do.
+- Notes on tasks: add details when you create or edit a task. Tasks with notes get a small note icon.
+- New badge art: Smash! and Snatch!.
+
 ## v0.10.0 · Laika · 10 Nov 2026 · commit a266ba6
 - Every release now gets a famous dog's name. This one is Laika, the first dog in orbit.
 - A What's new card like this one shows the first time you open a new version.
