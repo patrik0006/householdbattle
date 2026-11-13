@@ -1119,7 +1119,7 @@ export function startEngine() {
         var todo = list.filter(function (t) { return isPlanned(pid, t); }), later = list.filter(function (t) { return !isPlanned(pid, t); });
         body += '<div class="tasklist planned">' + '<div class="plan-head"><span>TO DO</span>' + (todo.length ? '<span class="plan-n">' + todo.length + '</span>' : '') + '</div>';
         if (todo.length) todo.forEach(function (t) { body += taskRow(pid, t); });
-        else body += '<div class="plan-empty">Long-press a task and drag it up here to plan what to do first.</div>';
+        else body += '<div class="plan-empty">Drag and drop tasks here</div>';
         body += '<div class="plan-div" role="separator" aria-label="Later"><span>LATER</span></div>';
         later.forEach(function (t) { body += taskRow(pid, t); });
         body += '</div>';

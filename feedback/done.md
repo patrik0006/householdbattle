@@ -43,3 +43,9 @@ Notes moved here from inbox.md once acted on. Newest at the bottom.
 - **Spot:** “+1 bounty · maxed out” · `.row-sub < .row-body [open-task] < .task < .tasklist` (at 45% across, 69% down)
 - **Note:** Repeating tasks shouldn't have bounty if it has 'reset', so if it's daily it will never get a bounty but every other day it will get plus one
 - **Status:** Done in v0.9.11 (test bench): repeating tasks' bounty is capped at their repeat gap minus one day (daily never, every other day max +1).
+
+## 2026-11-12 14:51 · Patrik · v0.11.1 <!-- xyil8d2fp -->
+- **Screen:** Tasks › Mine
+- **Spot:** “Long-press a task and drag it up here to plan what to do first.” · `.plan-empty < .tasklist < .list < .scroll` (at 37% across, 55% down)
+- **Note:** -> drag and drop tasks here
+- **Status:** Done in v0.11.3: the empty To do hint now reads "Drag and drop tasks here".
