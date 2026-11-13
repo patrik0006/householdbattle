@@ -2310,6 +2310,24 @@ export function startEngine() {
   }
 
   /* ================= Phone render ================= */
+  // Loading screen: both dogs, grumpy (suspicious), facing each other; the name below. Timed off the real clock so a redraw doesn't restart it.
+  var SPLASH_MS = 2600;
+  function splashOn() { return !!APP.splashAt && Date.now() - APP.splashAt < SPLASH_MS; }
+  function splashDog(pid, fallback) { var m = S.members && S.members[pid]; var st = styleById(m && m.dogStyle ? m.dogStyle : fallback); var img = st.set.suspicious || STICKERS.suspicious; return img.src; }
+  function splashHTML(pid) {
+    var el = Date.now() - APP.splashAt, o = other(pid);
+    var left = splashDog(pid, 'frenchie'), right = splashDog(o, S.members && S.members[o] ? 'frenchie' : 'spaniel');
+    try { if (S.members && S.members[pid]) localStorage.setItem('hb-splash', JSON.stringify([styleOf(pid), S.members[o] ? styleOf(o) : 'spaniel'])); } catch (e) { } // so the next start shows the right dogs at once
+    return '<div class="splash" style="--el:' + el + 'ms" role="status" aria-label="HouseholdBattle is loading">' +
+      '<div class="sp-glow"></div><div class="sp-rays" aria-hidden="true"></div>' +
+      '<div class="sp-arena"><img class="sp-dog l" src="' + left + '" alt=""><span class="sp-spark" aria-hidden="true"></span><img class="sp-dog r" src="' + right + '" alt=""></div>' +
+      '<div class="sp-logo">HOUSEHOLD<br>BATTLE</div>' +
+      '<div class="sp-dots" aria-hidden="true"><i></i><i></i><i></i></div></div>';
+  }
+  function showSplash(pid) {
+    UI[pid].splashAt = Date.now(); renderPhone(pid);
+    clearTimeout(UI[pid].splashTimer); UI[pid].splashTimer = setTimeout(function () { renderPhone(pid); }, SPLASH_MS + 30);
+  }
   function phoneHTML(pid) {
     if (APP.screen) return '<div class="app">' + appScreenHTML() + '</div>';
     var ui = UI[pid];
@@ -2469,13 +2487,17 @@ export function startEngine() {
   function renderPhone(pid) {
     if (REPLAYING || !phoneEl[pid]) return;
     var root = phoneEl[pid], ui = UI[pid];
+    if (!APP.splashAt) { // first render: carry on the loading screen index.html started; if loading was slow, just fade it out now
+      var t0 = window.__splashT0 || Date.now(); APP.splashAt = Date.now() - t0 < 2250 ? t0 : Date.now() - 2250;
+      setTimeout(function () { renderPhone(ME); }, Math.max(0, SPLASH_MS - (Date.now() - APP.splashAt)) + 30);
+    }
     if (ui.animLock) return; // catch-up animation running; it re-renders when done
     if (ui.dragging) { ui.renderLater = true; return; } // a task is being dragged; render when it's dropped
     var ae = document.activeElement, focus = null;
     if (ae && root.contains(ae) && ae.id) { focus = { id: ae.id, s: null, e: null }; try { focus.s = ae.selectionStart; focus.e = ae.selectionEnd; } catch (e) { } }
     var scrolls = {};
     Array.prototype.forEach.call(root.querySelectorAll('[data-scroll]'), function (el) { scrolls[el.getAttribute('data-scroll')] = [el.scrollTop, el.scrollLeft]; });
-    root.innerHTML = phoneHTML(pid);
+    root.innerHTML = phoneHTML(pid) + (splashOn(ui) ? splashHTML(pid) : '');
     Array.prototype.forEach.call(root.querySelectorAll('[data-scroll]'), function (el) { var k = el.getAttribute('data-scroll'); if (scrolls[k] != null) { el.scrollTop = scrolls[k][0]; el.scrollLeft = scrolls[k][1]; } });
     var ch = root.querySelector('.chips'); if (ch) wireChips(ch);
     wireSheets(root, pid);
@@ -2502,7 +2524,7 @@ export function startEngine() {
       if (bar) { var to = bar.getAttribute('data-wto'); if (reduceMotion) bar.style.width = to + '%'; else requestAnimationFrame(function () { requestAnimationFrame(function () { bar.style.width = to + '%'; }); }); }
     }
     if (ui.toast && ui.toast.fresh) ui.toast.fresh = false;
-    if (ui.catchup && !ui.catchup.started && !ui.closed) { ui.catchup.started = true; var wait = ui.introAt && Date.now() - ui.introAt < 1000 ? 950 : 0; setTimeout(function () { requestAnimationFrame(function () { runCatchup(pid); }); }, wait); }
+    if (ui.catchup && !ui.catchup.started && !ui.closed && !splashOn(ui)) { ui.catchup.started = true; var wait = ui.introAt && Date.now() - ui.introAt < 1000 ? 950 : 0; setTimeout(function () { requestAnimationFrame(function () { runCatchup(pid); }); }, wait); }
   }
   function animateCount(el, to) {
     if (reduceMotion || to <= 1) { el.textContent = to; return; }
