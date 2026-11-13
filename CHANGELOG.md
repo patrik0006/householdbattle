@@ -1,5 +1,8 @@
 # Changelog
 
+## v0.11.3 · Balto · 13 Nov 2026 · commit __COMMIT__
+- Shorter hint in the empty To do section: "Drag and drop tasks here".
+
 ## v0.11.2 · Balto · 13 Nov 2026 · commit 887a3e1
 - New badge art: Bone Finder and Bounty Hunter. If you've already earned them, their chests open again.
 - Task notes now show in the task summary, next to Worth and Size.
