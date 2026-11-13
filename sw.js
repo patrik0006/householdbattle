@@ -1,7 +1,7 @@
 // HouseholdBattle service worker: the app opens offline and updates itself in the background.
-const VERSION = '0.11.3';
+const VERSION = '0.12.0';
 const CACHE = 'hb-' + VERSION;
-const SHELL = ['./', 'index.html', 'app.js?v=' + VERSION, 'sync.js?v=' + VERSION, 'sync.js', 'version.js', 'firebase-config.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png'];
+const SHELL = ['./', 'index.html', 'app.js?v=' + VERSION, 'sync.js?v=' + VERSION, 'sync.js', 'version.js', 'firebase-config.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'splash/frenchie.webp', 'splash/spaniel.webp'];
 
 self.addEventListener('install', (e) => {
   // cache: 'reload' skips the browser's own HTTP cache, so a new version never stores stale files.

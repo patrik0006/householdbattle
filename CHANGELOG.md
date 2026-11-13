@@ -1,5 +1,8 @@
 # Changelog
 
+## v0.12.0 · Hachiko · 13 Nov 2026 · commit __COMMIT__
+- New loading screen: your two dogs give each other the stink eye, with HOUSEHOLD BATTLE below. It shows the moment you open the app.
+
 ## v0.11.3 · Balto · 13 Nov 2026 · commit c63ed11
 - Shorter hint in the empty To do section: "Drag and drop tasks here".
 
