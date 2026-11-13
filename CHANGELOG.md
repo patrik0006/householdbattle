@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.11.3 · Balto · 13 Nov 2026 · commit __COMMIT__
+## v0.11.3 · Balto · 13 Nov 2026 · commit c63ed11
 - Shorter hint in the empty To do section: "Drag and drop tasks here".
 
 ## v0.11.2 · Balto · 13 Nov 2026 · commit 887a3e1
