@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.11.2 · Balto · 13 Nov 2026 · commit __COMMIT__
+- New badge art: Bone Finder and Bounty Hunter. If you've already earned them, their chests open again.
+- Task notes now show in the task summary, next to Worth and Size.
+
 ## v0.11.1 · Balto · 11 Nov 2026 · commit 691ba34
 - Fixed: after an update the app could think it was still the old version, so the reload bar kept coming back and What's new never showed.
 

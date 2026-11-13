@@ -335,11 +335,11 @@ export function startEngine() {
     return xp;
   }
   // Replay: hide every earned badge again and take back its XP, so the chests open one by one and pay out again.
-  function replayBadges() {
+  function replayBadges(only) {
     ['A', 'B'].forEach(function (p) {
       if (!S.badges || !S.badges[p]) return;
       var ids = {};
-      S.badges[p].forEach(function (e) { if (badgeDef(e.id) && e.revealed) { e.revealed = false; ids[e.id] = 1; } });
+      S.badges[p].forEach(function (e) { if (badgeDef(e.id) && e.revealed && (!only || only.indexOf(e.id) >= 0)) { e.revealed = false; ids[e.id] = 1; } });
       S.adjust = (S.adjust || []).filter(function (a) { return !(a.pid === p && a.by === 'badge' && ids[a.badge]); });
     });
   }
@@ -1314,7 +1314,9 @@ export function startEngine() {
     howl: '',
     early: '',
     boomerang: '',
-    thief: ''
+    thief: '',
+    archaeo: '',
+    bounty: ''
   };
   // Your artwork wins over the placeholder medal. Multi-tier badges get a bronze/silver/gold coin in the corner.
   // Badges without finished art all share one placeholder.
@@ -1930,8 +1932,7 @@ export function startEngine() {
         '<button role="menuitem" data-act="dup-task" data-id="' + t.id + '">' + IC.copy + '<span><b>Duplicate</b><small>Make a new task just like this one</small></span></button>' +
         (dfOk ? '<button role="menuitem" data-act="done-for" data-id="' + t.id + '">' + IC.check + '<span><b>Mark done for ' + on + '</b><small>' + on + ' did it, so ' + on + ' gets the points</small></span></button>' : '') + '</div>' : '') +
       '<h3>' + esc(t.title) + '</h3>' +
-      (t.notes ? '<div class="task-notes">' + IC.note + '<p>' + esc(t.notes).replace(/\n/g, '<br>') + '</p></div>' : '') +
-      '<dl class="kv"><dt>Worth</dt><dd>' + worth + '</dd><dt>Size</dt><dd>' + SIZES[t.size].label + ' · ' + SIZES[t.size].xp + ' pts</dd><dt>For</dt><dd>' + forTxt + '</dd>' +
+      '<dl class="kv">' + (t.notes ? '<dt>Notes</dt><dd class="kv-notes">' + esc(t.notes).replace(/\n/g, '<br>') + '</dd>' : '') + '<dt>Worth</dt><dd>' + worth + '</dd><dt>Size</dt><dd>' + SIZES[t.size].label + ' · ' + SIZES[t.size].xp + ' pts</dd><dt>For</dt><dd>' + forTxt + '</dd>' +
       (graceTxt ? '<dt>Grace period</dt><dd>' + graceTxt + '</dd>' : '') +
       '<dt>Added by</dt><dd>' + (t.createdBy === pid ? 'You' : esc(nameOf(t.createdBy))) + ' · ' + fmtDate(t.createdAt) + '</dd>' +
       (t.repeat ? '<dt>Repeats</dt><dd>' + repLabel(t.repeat) + (isUpcoming(t) ? ' · next ' + fmtDate(t.dueAt) : '') + '</dd>' : '') +

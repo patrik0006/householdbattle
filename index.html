@@ -877,6 +877,7 @@ button.pcard { width: 100%; border: 0; color: inherit; text-align: left; cursor:
 .is-dragging .plan-div::after { background: var(--gold); opacity: 0.6; }
 
 /* ---------- 0.11: task notes ---------- */
+.kv-notes { overflow-wrap: anywhere; line-height: 1.45; }
 .notes-field { resize: vertical; min-height: 64px; font: inherit; line-height: 1.4; }
 .task-notes { display: flex; gap: 10px; background: var(--bg); border-radius: 14px; padding: 12px 14px; color: var(--soft); line-height: 1.45; }
 .task-notes svg { flex: none; margin-top: 3px; color: var(--muted); }
@@ -905,8 +906,8 @@ body { background: var(--bg); overscroll-behavior: none; -webkit-tap-highlight-c
 <div id="phone" class="phone" role="application" aria-label="HouseholdBattle"></div>
 <noscript>HouseholdBattle needs JavaScript.</noscript>
 <script type="module">
-import { createSync } from './sync.js?v=0.11.1';
-import { startGame } from './app.js?v=0.11.1';
+import { createSync } from './sync.js?v=0.11.2';
+import { startGame } from './app.js?v=0.11.2';
 createSync().then(startGame).catch(function (e) {
   document.getElementById('phone').innerHTML = '<div class="app"><div class="ob"><div class="logo">HOUSEHOLD<br>BATTLE</div><p>Couldn\'t start. Check your connection and try again.</p><button class="btn gold" onclick="location.reload()">TRY AGAIN</button></div></div>';
   console.error(e);
