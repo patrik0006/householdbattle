@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.12.0 · Hachiko · 13 Nov 2026 · commit __COMMIT__
+## v0.12.0 · Hachiko · 13 Nov 2026 · commit 3b476b7
 - New loading screen: your two dogs give each other the stink eye, with HOUSEHOLD BATTLE below. It shows the moment you open the app.
 
 ## v0.11.3 · Balto · 13 Nov 2026 · commit c63ed11
