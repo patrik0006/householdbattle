@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.12.1 · Hachiko · 18 Nov 2026 · commit __COMMIT__
+- Typing works properly on Android now: holding backspace clears the whole field and spaces no longer go missing.
+- New size option "No points" for things you just want on the list. They give no points and never count toward badges.
+- Fix your own done tasks until the week ends: tap the pencil to change the name or the size. Your partner sees the change.
+- Plan each other's lists: drag your partner's tasks into their To do. Turn it off in Settings › Planning if you'd rather they didn't.
+- New app icon with both dogs, so the launch screen leads straight into the stand-off. Android can take a few days to update the home-screen icon.
+
 ## v0.12.0 · Hachiko · 13 Nov 2026 · commit 3b476b7
 - New loading screen: your two dogs give each other the stink eye, with HOUSEHOLD BATTLE below. It shows the moment you open the app.
 

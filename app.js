@@ -1,5 +1,5 @@
 // The version is built into this file so a stale cached version.js can never make the app think it's older than it is.
-const APP_VERSION = '0.12.0';
+const APP_VERSION = '0.12.1';
 export function startGame(SYNCAPI) {
   'use strict';
 
@@ -11,9 +11,11 @@ export function startGame(SYNCAPI) {
     2: { label: 'Easy', xp: 3, combo: 2, ex: ['Empty the dishwasher', 'Take out the trash', 'Clear out the fridge', 'Call your sister about that thing'] },
     3: { label: 'Annoying', xp: 5, combo: 3, ex: ['Clean the bathroom', 'Vacuum downstairs', 'Clean the humidifier'] },
     4: { label: 'Hard', xp: 10, combo: 5, ex: ['Clean the pipes', 'Weed the bushes'] },
-    5: { label: 'Epic', xp: 20, combo: 10, ex: ['Take down the hammock', 'Put up pictures on the wall', 'Book a flight'] }
+    5: { label: 'Epic', xp: 20, combo: 10, ex: ['Take down the hammock', 'Put up pictures on the wall', 'Book a flight'] },
+    0: { label: 'No points', xp: 0, combo: 0, ex: ['Buy batteries', 'Book the dentist', 'Bins go out Thursday'] } // a note: on the list, worth nothing
   };
-  var SIZE_KEYS = [1, 2, 3, 4, 5];
+  var SIZE_KEYS = [1, 2, 3, 4, 5, 0];
+  function sizeTxt(n) { return n === 0 ? 'No points' : SIZES[n].label + ' (' + SIZES[n].xp + ' pts)'; }
   var GRACE = [[0, 'None'], [1, 'Today'], [3, '3 days'], [7, '1 week'], [-1, 'Never']]; // -1 = can't be stolen
   function graceLabel(g) { for (var i = 0; i < GRACE.length; i++) if (GRACE[i][0] === g) return GRACE[i][1]; return g + ' days'; }
   var WD = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -316,7 +318,7 @@ export function startGame(SYNCAPI) {
 
   function awardBadges(pid, compId, at) {
     if (!S.members[pid]) return [];
-    var cs = compsBy(pid), got = [];
+    var cs = compsBy(pid).filter(function (c) { return c.size !== 0; }), got = []; // no-points notes never count toward badges
     BADGES.forEach(function (b) {
       if (b.shame) return;
       var v = b.value(cs, pid), cur = badgeTier(pid, b.id), tier = 0;
@@ -411,10 +413,11 @@ export function startGame(SYNCAPI) {
     var udXp = isUnderdog(pid, T) ? underdogExtra(xp) : 0;
     if (udXp) { xp += udXp; breakdown.push('Underdog +' + UNDERDOG_PCT + '% +' + udXp); parts.push('+' + udXp + ' (underdog)'); }
     var helping = helpingMe(t, pid), helpOwner = helping ? t.assignee : null, banked = helping ? helpBank(t) : 0;
-    var todayCount = S.completions.filter(function (c) { return c.by === pid && c.at >= sod(T) && !c.help; }).length;
+    var todayCount = S.completions.filter(function (c) { return c.by === pid && c.at >= sod(T) && !c.help && c.size !== 0; }).length;
     var combo = 0;
     if (todayCount === 0) { xp += 2; breakdown.push('First today +2'); parts.push('+2 (first today)'); }
     else { combo = size.combo; xp += combo; breakdown.push('Combo ×' + (todayCount + 1) + ' +' + combo); parts.push('+' + combo + ' (combo ×' + (todayCount + 1) + ')'); }
+    if (t.size === 0 && !helping) { xp = 0; combo = 0; bounty = 0; breakdown = ['No points'];  parts = ['0 (no points)']; }
     if (helping) { xp = 0; combo = 0; bounty = 0; breakdown = ['Helped ' + nameOf(helpOwner) + ' · +' + banked + ' boost banked']; parts = ['0 (helping, +' + banked + ' boost banked)']; }
     var stolen = hasP && t.assignee === o && !challengeCollect && !helping;
     var boomerang = t.assignee === pid && t.handedBackBy === o;
@@ -423,7 +426,7 @@ export function startGame(SYNCAPI) {
     var tookLead = hasP && myB <= pB && myB + xp > pB;
     var comp = { id: uid(), taskId: t.id, title: t.title, size: t.size, by: pid, at: T, xp: xp, breakdown: breakdown, stolen: stolen, waitedDays: waited, alreadyDone: !!opts.alreadyDone, boomerang: boomerang, hour: new Date(T).getHours(), comeback: tookLead && wdIdx(T) === 6 && myB < pB, bounty: bounty, combo: combo, comboN: todayCount + 1, challengeWon: challengeWon, challengeCollect: challengeCollect };
     comp.underdog = udXp;
-    if (t.assignee === 'both' && hasP && !helping) {
+    if (t.assignee === 'both' && hasP && !helping && base > 0) {
       comp.shared = { pid: o, xp: base };
       breakdown.push(nameOf(o) + ' also gets +' + base);
       S.adjust = S.adjust || []; S.adjust.push({ id: uid(), pid: o, by: 'shared', delta: base, at: T, compId: comp.id });
@@ -460,7 +463,7 @@ export function startGame(SYNCAPI) {
     }
     var lvlA = levelInfo(totalXP(pid)).lvl;
     if (lvlA > lvlB) actIds.push(addAct({ kind: 'level', actor: pid, level: lvlA }).id);
-    var nAct = S.activity.length, newB = awardBadges(pid, comp.id, T);
+    var nAct = S.activity.length, newB = t.size === 0 ? [] : awardBadges(pid, comp.id, T);
     S.activity.slice(nAct).forEach(function (a) { actIds.push(a.id); });
     log('<b>' + esc(nameOf(pid)) + '</b> ' + (helping ? 'helped ' + esc(nameOf(helpOwner)) + ' with' : stolen ? 'stole' : 'completed') + ' "' + esc(t.title) + '" · +' + xp + ' pts = ' + parts.join(' ') + (opts.alreadyDone ? ' · logged as already done (no bounty)' : ''));
     if (tookLead) log('<b>' + esc(nameOf(pid)) + '</b> takes the weekly lead: ' + (myB + xp) + ' vs ' + pB + (comp.comeback ? ' (Sunday comeback)' : ''));
@@ -949,7 +952,7 @@ export function startGame(SYNCAPI) {
     return '<div class="task' + (rs.hot ? ' old' : '') + (can ? '' : ' locked') + '" data-tid="' + t.id + '">' +
       '<button class="tick" data-act="complete" data-id="' + t.id + '" aria-label="Complete ' + esc(t.title) + '"' + (can ? '' : ' disabled') + '><i></i></button>' +
       '<button class="row-body" data-act="open-task" data-id="' + t.id + '"><span class="row-title">' + esc(t.title) + (t.notes ? '<span class="has-notes" aria-label="Has notes">' + IC.note + '</span>' : '') + '</span><span class="row-sub ' + rs.cls + '">' + rs.sub + '</span></button>' +
-      (helpingMe(t, pid) ? '<span class="xp bst">' + IC.boltSm + '+' + helpBank(t) + '</span></div>' : '<span class="xp' + (isUnderdog(pid) ? ' ud' : '') + '">' + (isUnderdog(pid) ? IC.fireSm : '') + '+' + x + '</span></div>');
+      (helpingMe(t, pid) ? '<span class="xp bst">' + IC.boltSm + '+' + helpBank(t) + '</span></div>' : (t.size === 0 ? '<span class="xp zero" aria-label="No points">0</span></div>' : '<span class="xp' + (isUnderdog(pid) ? ' ud' : '') + '">' + (isUnderdog(pid) ? IC.fireSm : '') + '+' + x + '</span></div>'));
   }
 
   /* ---------- 0.3.0: rotating tips ---------- */
@@ -960,7 +963,7 @@ export function startGame(SYNCAPI) {
     var steal = hasPartner(pid) ? S.tasks.filter(function (t) { return t.status === 'open' && t.assignee === o && canComplete(t, pid); }).length : 0;
     return { claimed: today.length > 0, n: today.length, combo: today.reduce(function (a, c) { return a + (c.combo || 0); }, 0), steal: steal, hasP: hasPartner(pid), o: o };
   }
-  function comboPills() { return '<span class="tip-pills">' + SIZE_KEYS.map(function (n) { return '<span>' + SIZES[n].label + ' <b>+' + SIZES[n].combo + '</b></span>'; }).join('') + '</span>'; }
+  function comboPills() { return '<span class="tip-pills">' + SIZE_KEYS.filter(function (n) { return n > 0; }).map(function (n) { return '<span>' + SIZES[n].label + ' <b>+' + SIZES[n].combo + '</b></span>'; }).join('') + '</span>'; }
   var TIPS = [
     { id: 'first', icon: 'clock', ok: function (p, c) { return !c.claimed; }, head: function () { return 'First task of the day: +2 pts'; }, body: function () { return 'Finish any task today to grab the bonus.'; } },
     { id: 'combo', icon: 'clock', ok: function (p, c) { return c.claimed; }, head: function (p, c) { return c.n === 1 ? 'Combo unlocked' : 'Combo ×' + c.n + ' · +' + c.combo + ' pts so far'; }, body: function (p, c) { return (c.n === 1 ? 'Every task you finish before midnight earns a bonus on top:' : 'Keep going until midnight. Each task adds:') + comboPills(); } },
@@ -1087,7 +1090,7 @@ export function startGame(SYNCAPI) {
       mine: sortTasks(active.filter(function (t) { return t.assignee === pid || helpingMe(t, pid); }), pid),
       any: sortTasks(active.filter(function (t) { return t.assignee === 'any'; }), pid),
       both: sortTasks(active.filter(function (t) { return t.assignee === 'both'; }), pid),
-      partner: sortTasks(active.filter(function (t) { return t.assignee === o && !helpingMe(t, pid); }), pid)
+      partner: sortTasks(active.filter(function (t) { return t.assignee === o && !helpingMe(t, pid); }), canPlanFor(pid) ? o : pid)
     };
     var doneToday = S.completions.filter(function (c) { return c.at >= sod(T) && c.at <= T; }).sort(function (a, b) { return b.at - a.at; });
     var upcoming = S.tasks.filter(isUpcoming).sort(function (a, b) { return a.dueAt - b.dueAt; });
@@ -1099,11 +1102,15 @@ export function startGame(SYNCAPI) {
       var mineToday = doneToday.filter(function (c) { return c.by === pid; });
       body += '<button class="btn ghost" data-act="showoff-open"' + (mineToday.length || compsBy(pid).some(function (c) { return c.at >= weekStart(T); }) ? '' : ' disabled') + '>Show off to ' + esc(hasPartner(pid) ? nameOf(o) : 'your partner') + '</button>';
       if (!doneToday.length) body += '<div class="empty"><span class="disp">NOTHING DONE TODAY</span><span>Yet. The day is young.</span></div>';
-      doneToday.forEach(function (c) {
+      function doneRow(c) {
         var ca = S.activity.find(function (x) { return x.compId === c.id && REPLYABLE.indexOf(x.kind) >= 0; });
         var rep1 = ca && (ca.replies || []).find(function (r) { return r.from === pid; });
-        body += '<div class="done-row">' + avatar(c.by, pid, 'sm') + '<div class="t"><span>' + esc(c.title) + '</span><span>' + (c.by === pid ? 'You' : esc(nameOf(c.by))) + (c.stolen ? ' stole it' : '') + ' · ' + fmtTime(c.at) + (rep1 ? ' · you replied' : '') + '</span></div>' + (ca && canReply(ca, pid) ? '<button class="rbtn" data-act="reply-open" data-id="' + ca.id + '">Reply</button>' : '') + (isPaused() ? '' : '<button class="iconbtn sm dupbtn" data-act="dup-done" data-id="' + c.id + '" aria-label="Duplicate ' + esc(c.title) + '">' + IC.copy + '</button>') + '<span class="xp">+' + c.xp + '</span></div>';
-      });
+        return '<div class="done-row' + (canEditDone(pid, c) ? ' editable' : '') + '">' + avatar(c.by, pid, 'sm') + '<div class="t"><span>' + esc(c.title) + '</span><span>' + (c.by === pid ? 'You' : esc(nameOf(c.by))) + (c.stolen ? ' stole it' : '') + ' · ' + fmtTime(c.at) + (rep1 ? ' · you replied' : '') + '</span></div>' + (ca && canReply(ca, pid) ? '<button class="rbtn" data-act="reply-open" data-id="' + ca.id + '">Reply</button>' : '') + (isPaused() ? '' : '<button class="iconbtn sm dupbtn" data-act="dup-done" data-id="' + c.id + '" aria-label="Duplicate ' + esc(c.title) + '">' + IC.copy + '</button>') + (canEditDone(pid, c) ? '<button class="iconbtn sm editbtn" data-act="done-edit" data-id="' + c.id + '" aria-label="Edit ' + esc(c.title) + '">' + IC.pencil + '</button>' : '') + '<span class="xp' + (c.size === 0 ? ' zero' : '') + '">' + (c.size === 0 ? '0' : '+' + c.xp) + '</span></div>';
+      }
+      doneToday.forEach(function (c) { body += doneRow(c); });
+      // Earlier this week: you can still fix your own (points, name) until the week ends
+      var earlier = S.completions.filter(function (c) { return c.at >= weekStart(T) && c.at < sod(T); }).sort(function (a, b) { return b.at - a.at; });
+      if (earlier.length) { body += '<div class="done-sub">EARLIER THIS WEEK</div>'; earlier.forEach(function (c) { body += doneRow(c); }); }
     } else {
       var list = lists[ui.filter];
       var todayList = S.completions.filter(function (c) { return c.by === pid && c.at >= sod(T); }), nToday = todayList.length;
@@ -1116,10 +1123,12 @@ export function startGame(SYNCAPI) {
         else if (ui.filter === 'both') body += '<div class="empty"><span class="disp">NOTHING SHARED</span><span>Add a task for Both. Either of you does it, you both get the points.</span></div>';
         else body += '<div class="empty"><span class="disp">' + (hasPartner(pid) ? esc(nameOf(o)).toUpperCase() + ' IS ALL CLEAR' : 'NO PARTNER YET') + '</span><span>' + (hasPartner(pid) ? 'Nothing to steal. Annoying.' : 'Share your invite code from Settings.') + '</span></div>';
       }
-      if (ui.filter === 'mine' || ui.filter === 'any' || ui.filter === 'both') {
-        // To do (planned, in your order) above the divider, the rest below it
-        var todo = list.filter(function (t) { return isPlanned(pid, t); }), later = list.filter(function (t) { return !isPlanned(pid, t); });
-        body += '<div class="tasklist planned">' + '<div class="plan-head"><span>TO DO</span>' + (todo.length ? '<span class="plan-n">' + todo.length + '</span>' : '') + '</div>';
+      var planP = ui.filter === 'partner' && canPlanFor(pid);
+      if (ui.filter === 'mine' || ui.filter === 'any' || ui.filter === 'both' || (planP && list.length)) {
+        // To do (planned, in your order) above the divider, the rest below it. On the partner's list: their plan, if they allow it.
+        var whoP = planP ? o : pid;
+        var todo = list.filter(function (t) { return isPlanned(whoP, t); }), later = list.filter(function (t) { return !isPlanned(whoP, t); });
+        body += '<div class="tasklist planned">' + '<div class="plan-head"><span>' + (planP ? esc(nameOf(o)).toUpperCase() + "'S TO DO" : 'TO DO') + '</span>' + (todo.length ? '<span class="plan-n">' + todo.length + '</span>' : '') + '</div>';
         if (todo.length) todo.forEach(function (t) { body += taskRow(pid, t); });
         else body += '<div class="plan-empty">Drag and drop tasks here</div>';
         body += '<div class="plan-div" role="separator" aria-label="Later"><span>LATER</span></div>';
@@ -1611,7 +1620,7 @@ export function startGame(SYNCAPI) {
     var t = '<b>' + esc(a.title || '') + '</b>';
     switch (a.kind) {
       case 'join': return who(a.actor) + ' joined the household';
-      case 'add': return who(a.actor) + ' added ' + t + ' · ' + SIZES[a.size].label + ' ' + SIZES[a.size].xp + ' pts' + (a.assignee === 'any' ? ' for anyone' : a.assignee === 'both' ? ' for both of you' : '');
+      case 'add': return who(a.actor) + ' added ' + t + ' · ' + (a.size === 0 ? 'no points' : SIZES[a.size].label + ' ' + SIZES[a.size].xp + ' pts') + (a.assignee === 'any' ? ' for anyone' : a.assignee === 'both' ? ' for both of you' : '');
       case 'assign': return who(a.actor) + ' assigned ' + (a.target === v ? 'you' : '<b>' + esc(nameOf(a.target)) + '</b>') + ' ' + t + ' · ' + SIZES[a.size].xp + ' pts';
       case 'handback': return who(a.actor) + ' handed back ' + t;
       case 'complete': return (a.markedBy ? who(a.markedBy) + ' marked ' + t + ' done for ' + (a.actor === v ? 'you' : '<b>' + esc(nameOf(a.actor)) + '</b>') + ' · +' + a.xp : who(a.actor) + ' completed ' + t + ' · +' + a.xp) + (a.shared ? ' · ' + (a.actor === v ? esc(nameOf(other(v))) : 'you') + ' also got +' + a.shared : '') + (a.already ? ' (already done, just logged)' : '') + (a.challenge === 'won' ? ' · challenge won' : a.challenge === 'collect' ? ' · collected the challenge bonus' : '');
@@ -1633,6 +1642,7 @@ export function startGame(SYNCAPI) {
       case 'level': return who(a.actor) + ' reached level ' + a.level + ' · ' + levelTitle(a.level);
       case 'badge': var b = badgeDef(a.badge); if (!b) return who(a.actor) + ' earned a badge'; return b.shame ? who(a.actor) + ' earned <b>' + esc(b.name) + '</b>. Less than 5 points all week.' : who(a.actor) + ' earned ' + (b.tiers.length > 1 ? TIER_NAME[a.tier || 1] + ' ' : '') + '<b>' + esc(b.name) + '</b>' + (b.rare ? ' · rare' : '');
       case 'edit': return who(a.actor) + ' changed ' + t + ': ' + esc(a.changes);
+      case 'done_edit': return who(a.actor) + ' edited done task ' + t + (a.from !== a.to ? ': ' + SIZES[a.from].label + ' → ' + SIZES[a.to].label + ' · ' + (a.delta >= 0 ? '+' : '') + a.delta + ' pts' : '') + (a.oldTitle ? ' (was \u201C' + esc(a.oldTitle) + '\u201D)' : '');
       case 'delete': return who(a.actor) + ' deleted ' + t;
       case 'pause_req': return who(a.actor) + ' proposed a pause';
       case 'pause_ok': return who(a.actor) + ' accepted the pause. Household paused.';
@@ -1759,6 +1769,7 @@ export function startGame(SYNCAPI) {
       '<section class="sect"><h4>HOUSEHOLD</h4>' + (hasP ? '<p>You and ' + esc(nameOf(o)) + '. Joined ' + fmtDate(S.members[o].joinedAt) + '.</p>' : '<p>Your partner hasn\'t joined yet. Share this code:</p>') + '<div class="own"><div class="code" id="' + pid + '-setcode" style="font-size:var(--fs-xl);letter-spacing:4px;flex:1;padding:10px">' + esc(h.code) + '</div><button class="btn ghost" data-act="copy-code" style="min-height:52px">' + (UI[pid].copiedAt && Date.now() - UI[pid].copiedAt < 1800 ? 'Copied ✓' : 'Copy') + '</button></div></section>' +
       weekScoreHTML(pid) +
       nudgeSettingsHTML(pid) +
+      (hasP ? '<section class="sect"><h4>PLANNING</h4><div class="swrow"><div><b>Let ' + esc(nameOf(o)) + ' plan your list</b><span>' + esc(nameOf(o)) + ' can drag your tasks into your To do and change their order.</span></div><button class="switch' + (S.members[pid].lockPlan ? '' : ' on') + '" role="switch" aria-checked="' + !S.members[pid].lockPlan + '" aria-label="Let ' + esc(nameOf(o)) + ' plan your list" data-act="set-lockplan"><i></i></button></div></section>' : '') +
       '<section class="sect"><h4>PAUSE</h4>' + pause + '</section>' +
       historyHTML(pid) +
       installSettingsHTML() +
@@ -1894,6 +1905,49 @@ export function startGame(SYNCAPI) {
   function sheetWrap(pid, inner, fresh, label) {
     return '<div class="overlay"><button class="overlay-hit" data-act="close-sheet" aria-label="Close" tabindex="-1"></button><div class="sheet' + (fresh ? ' enter' : '') + '" role="dialog" aria-label="' + esc(label) + '" data-scroll="sheet-' + esc(label) + '"><div class="grab"></div>' + inner + '</div></div>';
   }
+  function canEditDone(pid, c) { return !!c && c.by === pid && !c.help && !isPaused() && c.at >= weekStart(effNow()); }
+  function doneEditSheet(pid, s) {
+    var c = S.completions.find(function (x) { return x.id === s.id; }), d = s.draft;
+    if (!c) return '';
+    var nx = doneEditXP(c, d.size);
+    function seg(items, cur) { return '<div class="seg">' + items.map(function (it) { return '<button class="' + (cur === it[0] ? 'on' : '') + '" data-act="de-size" data-n="' + it[0] + '">' + it[1] + '</button>'; }).join('') + '</div>'; }
+    var inner = '<div class="sheet-top"><span class="ttl">EDIT DONE TASK</span><button class="iconbtn" data-act="close-sheet" aria-label="Close">' + IC.close + '</button></div>' +
+      '<p class="muted" style="margin:0">Done ' + fmtDate(c.at) + ' ' + fmtTime(c.at) + '. You can fix your own done tasks until the week ends.' + (hasPartner(pid) ? ' ' + esc(nameOf(other(pid))) + ' sees the change.' : '') + '</p>' +
+      '<div class="sum-block"><label class="lbl" for="' + pid + '-de-title">Task</label><input class="field" id="' + pid + '-de-title" data-bind="draft.title" data-rerender="1" maxlength="60" value="' + esc(d.title) + '"></div>' +
+      '<div class="sum-block"><span class="lbl">How bad was it?</span>' + seg(SIZE_KEYS.map(function (n) { return [n, sizeTxt(n)]; }), d.size) + '</div>' +
+      '<div class="de-pts"><span>Points</span><b>' + c.xp + (nx !== c.xp ? ' → ' + nx : '') + '</b></div>' +
+      '<button class="btn gold" data-act="de-save"' + (d.title.trim() && (d.title.trim() !== c.title || d.size !== c.size) ? '' : ' disabled') + '>SAVE</button>';
+    return sheetWrap(pid, inner, s.fresh, 'Edit done task');
+  }
+  // New points after a size change: the base and combo follow the size, bounty and other bonuses stay. No points = 0.
+  function doneEditXP(c, size) {
+    if (size === c.size) return c.xp;
+    if (size === 0) return 0;
+    if (c.size === 0) return SIZES[size].xp;
+    return Math.max(0, c.xp + SIZES[size].xp - SIZES[c.size].xp + (c.combo ? SIZES[size].combo - c.combo : 0));
+  }
+  function editDone(pid, id, d) {
+    var c = S.completions.find(function (x) { return x.id === id; });
+    if (!canEditDone(pid, c)) return false;
+    var title = (d.title || '').trim(); if (!title) return false;
+    var oldSize = c.size, oldXp = c.xp, oldTitle = c.title, nx = doneEditXP(c, d.size);
+    if (title === oldTitle && d.size === oldSize) return false;
+    if (d.size !== oldSize) {
+      if (c.combo) c.combo = d.size === 0 ? 0 : SIZES[d.size].combo;
+      if (d.size === 0) { c.bounty = 0; c.combo = 0; }
+      c.xp = nx; c.size = d.size;
+      (c.breakdown = c.breakdown || []).push('Changed to ' + SIZES[d.size].label + ' after');
+      var sh = (S.adjust || []).find(function (a) { return a.compId === c.id && a.by === 'shared'; }); // Both: the partner's share follows the size
+      if (sh) { sh.delta = SIZES[d.size].xp; if (c.shared) c.shared.xp = sh.delta; }
+    }
+    c.title = title; c.edited = true;
+    S.activity.forEach(function (a) { if (a.compId === c.id && (a.kind === 'complete' || a.kind === 'steal' || a.kind === 'helped')) { a.xp = c.xp; a.title = title; } });
+    var t = getTask(c.taskId); if (t && t.status === 'done' && t.doneAt === c.at) { t.title = title; t.size = c.size; }
+    addAct({ kind: 'done_edit', actor: pid, compId: c.id, title: title, oldTitle: oldTitle !== title ? oldTitle : null, from: oldSize, to: c.size, delta: c.xp - oldXp });
+    if (c.size !== 0) awardBadges(pid, c.id, now());
+    log('<b>' + esc(nameOf(pid)) + '</b> edited done task "' + esc(title) + '"' + (oldSize !== c.size ? ': ' + SIZES[oldSize].label + ' → ' + SIZES[c.size].label + ' (' + oldXp + ' → ' + c.xp + ' pts)' : '') + (oldTitle !== title ? ' (was "' + esc(oldTitle) + '")' : ''));
+    return true;
+  }
   function sheetHTML(pid) {
     var s = UI[pid].sheet; if (!s) return '';
     switch (s.kind) {
@@ -1901,6 +1955,7 @@ export function startGame(SYNCAPI) {
       case 'add': return addSheet(pid, s);
       case 'reward': return rewardSheet(pid, s);
       case 'handback': return handbackSheet(pid, s);
+      case 'done-edit': return doneEditSheet(pid, s);
       case 'upcoming': return upcomingSheet(pid, s);
       case 'showoff': return showoffSheet(pid, s);
       case 'challenge': return challengeSheet(pid, s);
@@ -2065,7 +2120,7 @@ export function startGame(SYNCAPI) {
         '<label class="lbl" for="' + pid + '-add-title">Or type something else</label><input class="field" id="' + pid + '-add-title" data-bind="draft.title" data-rerender="1" data-enter="add-next" maxlength="60" placeholder="e.g. Fix the wobbly chair" value="' + esc(d.title) + '">' +
         '<button class="btn gold" data-act="add-next"' + (d.title.trim() ? '' : ' disabled') + '>NEXT</button>';
     } else if (s.step === 'size') {
-      inner += '<h3>How bad is it?</h3><div class="bigopts">' + SIZE_KEYS.map(function (n) { var ex = SIZES[n].ex[(s.exSeed + n) % SIZES[n].ex.length]; return '<button class="bigopt' + (d.size === n ? ' on' : '') + '" data-act="add-size" data-n="' + n + '"><span class="bt"><b>' + SIZES[n].label + ' (' + SIZES[n].xp + ' pts)</b><span>Like ' + esc(ex.charAt(0).toLowerCase() + ex.slice(1)) + '</span></span></button>'; }).join('') + '</div>' + skip;
+      inner += '<h3>How bad is it?</h3><div class="bigopts">' + SIZE_KEYS.map(function (n) { var ex = SIZES[n].ex[(s.exSeed + n) % SIZES[n].ex.length]; return '<button class="bigopt' + (d.size === n ? ' on' : '') + (n === 0 ? ' note-opt' : '') + '" data-act="add-size" data-n="' + n + '"><span class="bt"><b>' + sizeTxt(n) + '</b><span>' + (n === 0 ? 'Just a note on the list. Like ' : 'Like ') + esc(ex.charAt(0).toLowerCase() + ex.slice(1)) + '</span></span></button>'; }).join('') + '</div>' + skip;
     } else if (s.step === 'who') {
       inner += '<h3>Who\'s doing it?</h3><div class="bigopts">' +
         '<button class="bigopt' + (d.who === 'me' ? ' on' : '') + '" data-act="add-who" data-w="me"><span class="bt"><b>Me</b><span>It goes on your list</span></span></button>' +
@@ -2094,7 +2149,7 @@ export function startGame(SYNCAPI) {
     var h = '<h3>' + (s.editId ? 'Edit task' : 'Ready to add?') + '</h3>' +
       '<div class="sum-block"><label class="lbl" for="' + pid + '-sum-title">Task</label><input class="field" id="' + pid + '-sum-title" data-bind="draft.title" data-rerender="1" maxlength="60" value="' + esc(d.title) + '"></div>' +
       '<div class="sum-block"><label class="lbl" for="' + pid + '-sum-notes">Notes (optional)</label><textarea class="field notes-field" id="' + pid + '-sum-notes" data-bind="draft.notes" rows="3" maxlength="500" placeholder="Details, steps, where things are…">' + esc(d.notes || '') + '</textarea></div>' +
-      '<div class="sum-block"><span class="lbl">How bad is it?</span>' + seg('sum-size', 'n', SIZE_KEYS.map(function (n) { return [n, SIZES[n].label + ' (' + SIZES[n].xp + ' pts)']; }), d.size) + '</div>' +
+      '<div class="sum-block"><span class="lbl">How bad is it?</span>' + seg('sum-size', 'n', SIZE_KEYS.map(function (n) { return [n, sizeTxt(n)]; }), d.size) + '</div>' +
       '<div class="sum-block"><span class="lbl">Who</span>' + seg('sum-who', 'w', [['me', 'Me'], ['partner', hasP ? esc(nameOf(o)) : 'Partner', !hasP], ['any', 'Anyone'], ['both', 'Both', !hasP]], d.who) + '</div>';
     h += '<div class="sum-block"><span class="lbl">Reminder · a push notification until it\'s done</span>' + seg('sum-remind', 'm', REMIND_OPTS, d.remind || 'off') + '</div>';
     if (d.who !== 'both') h += '<div class="sum-block"><span class="lbl">Bounty · extra points that grow while the task waits</span>' + seg('sum-bounty', 'b', [['on', 'On'], ['off', 'Off']], d.bounty === false ? 'off' : 'on') + '</div>';
@@ -2499,7 +2554,13 @@ export function startGame(SYNCAPI) {
     if (ae && root.contains(ae) && ae.id) { focus = { id: ae.id, s: null, e: null }; try { focus.s = ae.selectionStart; focus.e = ae.selectionEnd; } catch (e) { } }
     var scrolls = {};
     Array.prototype.forEach.call(root.querySelectorAll('[data-scroll]'), function (el) { scrolls[el.getAttribute('data-scroll')] = [el.scrollTop, el.scrollLeft]; });
-    root.innerHTML = phoneHTML(pid) + (splashOn(ui) ? splashHTML(pid) : '');
+    var html = phoneHTML(pid) + (splashOn(ui) ? splashHTML(pid) : '');
+    var typing = ae && root.contains(ae) && (ae.tagName === 'TEXTAREA' || (ae.tagName === 'INPUT' && !/^(button|checkbox|radio|range|submit|file)$/.test(ae.type)));
+    if (typing) { // keep the field you're typing in: patch the screen in place when only text and attributes changed
+      var tpl = document.createElement('div'); tpl.innerHTML = html;
+      if (ae.id && tpl.querySelector('#' + ae.id)) { morphKids(root, tpl, ae); if (ui.toast && ui.toast.fresh) ui.toast.fresh = false; return; }
+    }
+    root.innerHTML = html;
     Array.prototype.forEach.call(root.querySelectorAll('[data-scroll]'), function (el) { var k = el.getAttribute('data-scroll'); if (scrolls[k] != null) { el.scrollTop = scrolls[k][0]; el.scrollLeft = scrolls[k][1]; } });
     var ch = root.querySelector('.chips'); if (ch) wireChips(ch);
     wireSheets(root, pid);
@@ -2528,6 +2589,34 @@ export function startGame(SYNCAPI) {
     if (ui.toast && ui.toast.fresh) ui.toast.fresh = false;
     if (ui.catchup && !ui.catchup.started && !ui.closed && !splashOn(ui)) { ui.catchup.started = true; var wait = ui.introAt && Date.now() - ui.introAt < 1000 ? 950 : 0; setTimeout(function () { requestAnimationFrame(function () { runCatchup(pid); }); }, wait); }
   }
+  // Patch the live screen to match freshly rendered HTML, node by node, without ever replacing the field being typed in.
+  function morphKids(a, b, keep) {
+    var ak = Array.prototype.slice.call(a.childNodes), bk = Array.prototype.slice.call(b.childNodes);
+    var ka = -1, kb = -1, kid = keep.id;
+    ak.forEach(function (n, i) { if (n === keep || (n.nodeType === 1 && n.contains(keep))) ka = i; });
+    if (ka >= 0) bk.forEach(function (n, i) { if (n.nodeType === 1 && (n.id === kid || n.querySelector('#' + kid))) kb = i; });
+    if (ka < 0 || kb < 0) { morphRange(a, ak, bk, null); return; }
+    morphRange(a, ak.slice(0, ka), bk.slice(0, kb), ak[ka]); // the siblings before the field (or the box holding it)
+    morphNode(ak[ka], bk[kb], keep);
+    morphRange(a, ak.slice(ka + 1), bk.slice(kb + 1), null); // and after it
+  }
+  // Same count: patch pair by pair. Different count: swap that stretch for the new nodes.
+  function morphRange(parent, olds, news, before) {
+    if (olds.length === news.length) { olds.forEach(function (n, i) { if (n.nodeType !== news[i].nodeType || n.nodeName !== news[i].nodeName) parent.replaceChild(news[i].cloneNode(true), n); else morphNode(n, news[i], null); }); return; }
+    olds.forEach(function (n) { parent.removeChild(n); });
+    news.forEach(function (n) { parent.insertBefore(n.cloneNode(true), before); });
+  }
+  function morphNode(a, b, keep) {
+    if (a.nodeType === 3 || a.nodeType === 8) { if (a.nodeValue !== b.nodeValue) a.nodeValue = b.nodeValue; return; }
+    if (a.nodeType !== 1) return;
+    if (a !== keep) {
+      var i, at;
+      for (i = a.attributes.length - 1; i >= 0; i--) { at = a.attributes[i].name; if (!b.hasAttribute(at) && at !== 'style') a.removeAttribute(at); }
+      for (i = 0; i < b.attributes.length; i++) { at = b.attributes[i]; if (a.getAttribute(at.name) !== at.value) a.setAttribute(at.name, at.value); }
+      if ((a.tagName === 'INPUT' || a.tagName === 'TEXTAREA') && a.value !== b.value) a.value = b.value;
+      if (keep && a.contains(keep)) morphKids(a, b, keep); else morphRange(a, Array.prototype.slice.call(a.childNodes), Array.prototype.slice.call(b.childNodes), null);
+    }
+  }
   function animateCount(el, to) {
     if (reduceMotion || to <= 1) { el.textContent = to; return; }
     var start = null, dur = 600;
@@ -2548,7 +2637,7 @@ export function startGame(SYNCAPI) {
   // Duplicate a task (open or done): opens the add drawer filled in, ready to tweak and add.
   function dupDraft(pid, t, c) {
     var T = now(), src = t || {};
-    return { title: (t ? t.title : c.title), notes: t && t.notes ? t.notes : '', size: (t ? t.size : c.size) || 2, grace: src.grace != null ? src.grace : 1, bounty: !src.noBounty, remind: src.remind || 'off',
+    return { title: (t ? t.title : c.title), notes: t && t.notes ? t.notes : '', size: (t ? t.size : c.size) == null ? 2 : (t ? t.size : c.size), grace: src.grace != null ? src.grace : 1, bounty: !src.noBounty, remind: src.remind || 'off',
       who: t ? whoFromAssignee(pid, t.assignee) : 'me', repeat: src.repeat ? src.repeat.kind : 'none',
       weekday: src.repeat && src.repeat.weekday != null ? src.repeat.weekday : wdIdx(T), monthDay: src.repeat && src.repeat.day ? src.repeat.day : new Date(T).getDate() };
   }
@@ -2576,6 +2665,7 @@ export function startGame(SYNCAPI) {
     if (!REPLAYING) sendFeedback(rec);
     log('Feedback from <b>' + esc(nameOf(pid)) + '</b> on ' + esc(rec.screen) + ': ' + esc(rec.note));
   }
+  function canPlanFor(pid) { var o = other(pid); return hasPartner(pid) && !S.members[o].lockPlan; } // on unless the partner turned it off
   function isPlanned(pid, t) { var m = S.members[pid]; return !!(m && m.planned && m.planned[t.id]); }
   function canPlan(t, pid) { return t.status === 'open' && (t.assignee === pid || t.assignee === 'any' || t.assignee === 'both'); }
   function canDoneFor(t, pid) { var o = other(pid); return hasPartner(pid) && !isPaused() && isActive(t) && t.assignee !== pid && canComplete(t, o) && !helpingMe(t, pid); }
@@ -2662,12 +2752,14 @@ export function startGame(SYNCAPI) {
       case 'levels-open': openSheet(pid, { kind: 'levels', who: ds.who === other(pid) ? other(pid) : pid }); break;
       case 'score-who': ui.badgeOwner = ds.who === 'partner' && hasPartner(pid) ? 'partner' : 'me'; ui.badgeOpen = null; break;
       case 'filter': ui.filter = ds.f; break;
+      case 'set-lockplan': if (S.members[pid]) { S.members[pid].lockPlan = !S.members[pid].lockPlan; infoToast(pid, S.members[pid].lockPlan ? nameOf(other(pid)) + ' can no longer plan your list.' : nameOf(other(pid)) + ' can plan your list.'); } break;
       case 'reorder':
         if (!S.members[pid]) break;
+        var planWho = ui.filter === 'partner' && canPlanFor(pid) ? other(pid) : pid; // planning the partner's list (if they allow it)
         var allIds = String(ds.ids || '').split(',').filter(Boolean), cut = allIds.indexOf('__div');
-        if (cut >= 0) { var pl = S.members[pid].planned = S.members[pid].planned || {}; allIds.forEach(function (id, i) { if (id === '__div') return; if (i < cut) pl[id] = 1; else delete pl[id]; }); }
-        var vis = allIds.filter(function (id) { return id !== '__div'; }), keep = (S.members[pid].order || []).filter(function (id) { return vis.indexOf(id) < 0 && getTask(id) && getTask(id).status === 'open'; });
-        S.members[pid].order = vis.concat(keep); break;
+        if (cut >= 0) { var pl = S.members[planWho].planned = S.members[planWho].planned || {}; allIds.forEach(function (id, i) { if (id === '__div') return; if (i < cut) pl[id] = 1; else delete pl[id]; }); }
+        var vis = allIds.filter(function (id) { return id !== '__div'; }), keep = (S.members[planWho].order || []).filter(function (id) { return vis.indexOf(id) < 0 && getTask(id) && getTask(id).status === 'open'; });
+        S.members[planWho].order = vis.concat(keep); break;
       case 'open-settings': ui.settings = true; ui.sheet = null; ui.nameDraft = null; ui.pauseCompose = null; break;
       case 'close-settings': ui.clearAsk = null; ui.scoreEdit = null; ui.settings = false; ui.pauseCompose = null; ui.nameDraft = null; break;
       case 'close-sheet': ui.dogPicker = null;
@@ -2746,6 +2838,9 @@ export function startGame(SYNCAPI) {
         else if (s.step === 'summary') s.step = s.from === 'suggestion' ? 'what' : 'repeat';
         break;
       case 'sum-size': s.draft.size = parseInt(ds.n, 10); break;
+      case 'done-edit': var cE = S.completions.find(function (x) { return x.id === ds.id; }); if (canEditDone(pid, cE)) openSheet(pid, { kind: 'done-edit', id: cE.id, draft: { title: cE.title, size: cE.size } }); break;
+      case 'de-size': if (s && s.kind === 'done-edit') s.draft.size = parseInt(ds.n, 10); break;
+      case 'de-save': if (s && s.kind === 'done-edit' && editDone(pid, s.id, s.draft)) { ui.sheet = null; infoToast(pid, 'Done task updated.'); } break;
       case 'sum-who': s.draft.who = ds.w; break;
       case 'sum-repeat': s.draft.repeat = ds.r; break;
       case 'sum-grace': s.draft.grace = parseInt(ds.g, 10); break;

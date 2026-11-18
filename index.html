@@ -7,8 +7,8 @@
 <meta name="description" content="Chores, but you're winning.">
 <meta name="theme-color" content="#241E4E">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
-<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-vs-192.png">
+<link rel="apple-touch-icon" href="icons/icon-vs-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Rubik:wght@400;500;700&display=swap">
@@ -937,6 +937,21 @@ button.pcard { width: 100%; border: 0; color: inherit; text-align: left; cursor:
 @keyframes sp-out { to { opacity: 0; visibility: hidden; } }
 @media (prefers-reduced-motion: reduce) { .splash *, .splash { animation-duration: 0.01s !important; } .sp-dots i { animation: none; } .splash { animation: sp-out 0.3s linear calc(2.25s - var(--el, 0ms)) both !important; } }
 
+/* ---------- 0.12.1 ---------- */
+.xp.zero { color: var(--muted); background: transparent; }
+.bigopt.note-opt { border-style: dashed; }
+.done-sub { margin: 14px 2px 2px; font-family: var(--display); font-size: var(--fs-xs); letter-spacing: 1px; color: var(--muted); }
+.done-row .editbtn { color: var(--muted); }
+.de-pts { display: flex; justify-content: space-between; align-items: center; background: var(--card); border-radius: 12px; padding: 12px 14px; }
+.de-pts b { font-family: var(--display); color: var(--gold); }
+.swrow { display: flex; align-items: center; gap: 14px; }
+.swrow > div { flex: 1; display: flex; flex-direction: column; gap: 3px; }
+.swrow span { font-size: var(--fs-sm); color: var(--muted); }
+.switch { flex: none; width: 52px; height: 32px; border-radius: 16px; border: 0; background: rgba(244,241,255,0.18); position: relative; cursor: pointer; transition: background 0.2s; }
+.switch i { position: absolute; top: 4px; left: 4px; width: 24px; height: 24px; border-radius: 50%; background: #fff; transition: transform 0.2s; }
+.switch.on { background: var(--gold); }
+.switch.on i { transform: translateX(20px); }
+
 /* ---------- Real app: one full-screen phone instead of the test bench ---------- */
 html, body { height: 100%; }
 body { background: var(--bg); overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
@@ -966,8 +981,8 @@ window.__splashT0 = Date.now();
 </script>
 <noscript>HouseholdBattle needs JavaScript.</noscript>
 <script type="module">
-import { createSync } from './sync.js?v=0.12.0';
-import { startGame } from './app.js?v=0.12.0';
+import { createSync } from './sync.js?v=0.12.1';
+import { startGame } from './app.js?v=0.12.1';
 createSync().then(startGame).catch(function (e) {
   document.getElementById('phone').innerHTML = '<div class="app"><div class="ob"><div class="logo">HOUSEHOLD<br>BATTLE</div><p>Couldn\'t start. Check your connection and try again.</p><button class="btn gold" onclick="location.reload()">TRY AGAIN</button></div></div>';
   console.error(e);
