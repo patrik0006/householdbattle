@@ -1,7 +1,7 @@
 // HouseholdBattle service worker: the app opens offline and updates itself in the background.
-const VERSION = '0.12.0';
+const VERSION = '0.12.1';
 const CACHE = 'hb-' + VERSION;
-const SHELL = ['./', 'index.html', 'app.js?v=' + VERSION, 'sync.js?v=' + VERSION, 'sync.js', 'version.js', 'firebase-config.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'splash/frenchie.webp', 'splash/spaniel.webp'];
+const SHELL = ['./', 'index.html', 'app.js?v=' + VERSION, 'sync.js?v=' + VERSION, 'sync.js', 'version.js', 'firebase-config.js', 'manifest.webmanifest', 'icons/icon-vs-192.png', 'icons/icon-vs-512.png', 'splash/frenchie.webp', 'splash/spaniel.webp'];
 
 self.addEventListener('install', (e) => {
   // cache: 'reload' skips the browser's own HTTP cache, so a new version never stores stale files.
@@ -39,8 +39,8 @@ self.addEventListener('push', (e) => {
   const title = d.title || 'HouseholdBattle';
   e.waitUntil(self.registration.showNotification(title, {
     body: d.body || '',
-    icon: 'icons/icon-192.png',
-    badge: 'icons/icon-192.png',
+    icon: 'icons/icon-vs-192.png',
+    badge: 'icons/icon-vs-192.png',
     tag: d.tag || 'nudge',
     data: { nudge: d.nudge || '' }
   }));
