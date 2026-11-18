@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.12.2 · Hachiko · 18 Nov 2026 · commit __COMMIT__
+## v0.12.2 · Hachiko · 18 Nov 2026 · commit 3aaf0e2
 - New badge art: Fetch. If you've already earned it, its chest opens again.
 
 ## v0.12.1 · Hachiko · 18 Nov 2026 · commit ed30599
