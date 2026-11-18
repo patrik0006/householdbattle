@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.12.1 · Hachiko · 18 Nov 2026 · commit __COMMIT__
+## v0.12.1 · Hachiko · 18 Nov 2026 · commit ed30599
 - Typing works properly on Android now: holding backspace clears the whole field and spaces no longer go missing.
 - New size option "No points" for things you just want on the list. They give no points and never count toward badges.
 - Fix your own done tasks until the week ends: tap the pencil to change the name or the size. Your partner sees the change.
