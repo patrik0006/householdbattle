@@ -1,5 +1,8 @@
 # Changelog
 
+## v0.12.2 · Hachiko · 18 Nov 2026 · commit __COMMIT__
+- New badge art: Fetch. If you've already earned it, its chest opens again.
+
 ## v0.12.1 · Hachiko · 18 Nov 2026 · commit ed30599
 - Typing works properly on Android now: holding backspace clears the whole field and spaces no longer go missing.
 - New size option "No points" for things you just want on the list. They give no points and never count toward badges.

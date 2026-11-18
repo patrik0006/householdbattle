@@ -1325,7 +1325,8 @@ export function startEngine() {
     boomerang: '',
     thief: '',
     archaeo: '',
-    bounty: ''
+    bounty: '',
+    fetch: ''
   };
   // Your artwork wins over the placeholder medal. Multi-tier badges get a bronze/silver/gold coin in the corner.
   // Badges without finished art all share one placeholder.
