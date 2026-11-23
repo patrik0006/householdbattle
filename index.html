@@ -952,6 +952,11 @@ button.pcard { width: 100%; border: 0; color: inherit; text-align: left; cursor:
 .switch.on { background: var(--gold); }
 .switch.on i { transform: translateX(20px); }
 
+/* 0.12.6: Today / This week / Later */
+.plan-div .plan-n { order: 2; }
+.plan-div::after { order: 3; }
+.plan-empty.sm { padding: 10px; }
+
 /* ---------- Real app: one full-screen phone instead of the test bench ---------- */
 html, body { height: 100%; }
 body { background: var(--bg); overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
@@ -981,8 +986,8 @@ window.__splashT0 = Date.now();
 </script>
 <noscript>HouseholdBattle needs JavaScript.</noscript>
 <script type="module">
-import { createSync } from './sync.js?v=0.12.5';
-import { startGame } from './app.js?v=0.12.5';
+import { createSync } from './sync.js?v=0.12.6';
+import { startGame } from './app.js?v=0.12.6';
 createSync().then(startGame).catch(function (e) {
   document.getElementById('phone').innerHTML = '<div class="app"><div class="ob"><div class="logo">HOUSEHOLD<br>BATTLE</div><p>Couldn\'t start. Check your connection and try again.</p><button class="btn gold" onclick="location.reload()">TRY AGAIN</button></div></div>';
   console.error(e);

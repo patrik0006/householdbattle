@@ -1,5 +1,5 @@
 // The version is built into this file so a stale cached version.js can never make the app think it's older than it is.
-const APP_VERSION = '0.12.5';
+const APP_VERSION = '0.12.6';
 export function startGame(SYNCAPI) {
   'use strict';
 
@@ -1128,11 +1128,16 @@ export function startGame(SYNCAPI) {
       if (ui.filter === 'mine' || ui.filter === 'any' || ui.filter === 'both' || (planP && list.length)) {
         // To do (planned, in your order) above the divider, the rest below it. On the partner's list: their plan, if they allow it.
         var whoP = planP ? o : pid;
-        var todo = list.filter(function (t) { return isPlanned(whoP, t); }), later = list.filter(function (t) { return !isPlanned(whoP, t); });
-        body += '<div class="tasklist planned">' + '<div class="plan-head"><span>' + (planP ? esc(nameOf(o)).toUpperCase() + "'S TO DO" : 'TO DO') + '</span>' + (todo.length ? '<span class="plan-n">' + todo.length + '</span>' : '') + '</div>';
-        if (todo.length) todo.forEach(function (t) { body += taskRow(pid, t); });
+        var today = list.filter(function (t) { return planBucket(whoP, t) === 'today'; }), week = list.filter(function (t) { return planBucket(whoP, t) === 'week'; }), later = list.filter(function (t) { return !planBucket(whoP, t); });
+        var pfx = planP ? esc(nameOf(o)).toUpperCase() + "'S " : '';
+        function n(a) { return a.length ? '<span class="plan-n">' + a.length + '</span>' : ''; }
+        body += '<div class="tasklist planned">' + '<div class="plan-head"><span>' + pfx + 'TODAY</span>' + n(today) + '</div>';
+        if (today.length) today.forEach(function (t) { body += taskRow(pid, t); });
         else body += '<div class="plan-empty">Drag and drop tasks here</div>';
-        body += '<div class="plan-div" role="separator" aria-label="Later"><span>LATER</span></div>';
+        body += '<div class="plan-div" data-div="week" role="separator" aria-label="This week"><span>' + pfx + 'THIS WEEK</span>' + n(week) + '</div>';
+        if (week.length) week.forEach(function (t) { body += taskRow(pid, t); });
+        else body += '<div class="plan-empty sm">Drag and drop tasks here</div>';
+        body += '<div class="plan-div" data-div="later" role="separator" aria-label="Later"><span>LATER</span></div>';
         later.forEach(function (t) { body += taskRow(pid, t); });
         body += '</div>';
       } else { body += '<div class="tasklist">'; list.forEach(function (t) { body += taskRow(pid, t); }); body += '</div>'; }
@@ -1987,7 +1992,7 @@ export function startGame(SYNCAPI) {
     var inner = '<div class="sheet-top"><span class="ttl">' + (t.assignee === o ? on.toUpperCase() + "'S TASK" : t.assignee === 'any' ? "ANYONE'S TASK" : t.assignee === 'both' ? 'SHARED TASK' : 'YOUR TASK') + '</span>' +
       (mnOk ? '<button class="iconbtn" data-act="more-menu" aria-label="More options" aria-expanded="' + !!s.menu + '">' + IC.dots + '</button>' : '') +
       '<button class="iconbtn" data-act="close-sheet" aria-label="Close">' + IC.close + '</button></div>' +
-      (mnOk && s.menu ? '<div class="more-menu" role="menu">' + (canPlan(t, pid) ? '<button role="menuitem" data-act="plan-toggle" data-id="' + t.id + '">' + IC.check + '<span><b>' + (isPlanned(pid, t) ? 'Move to Later' : 'Move to To do') + '</b><small>' + (isPlanned(pid, t) ? 'Take it off your plan' : 'Put it on your plan, at the bottom') + '</small></span></button>' : '') +
+      (mnOk && s.menu ? '<div class="more-menu" role="menu">' + (canPlan(t, pid) ? ['today', 'week', 'later'].filter(function (b) { return b !== (planBucket(pid, t) || 'later'); }).map(function (b) { return '<button role="menuitem" data-act="plan-set" data-b="' + b + '" data-id="' + t.id + '">' + IC.check + '<span><b>Move to ' + PLAN_NAMES[b] + '</b><small>' + (b === 'later' ? 'Take it off your plan' : 'At the bottom of ' + PLAN_NAMES[b]) + '</small></span></button>'; }).join('') : '') +
         '<button role="menuitem" data-act="dup-task" data-id="' + t.id + '">' + IC.copy + '<span><b>Duplicate</b><small>Make a new task just like this one</small></span></button>' +
         (dfOk ? '<button role="menuitem" data-act="done-for" data-id="' + t.id + '">' + IC.check + '<span><b>Mark done for ' + on + '</b><small>' + on + ' did it, so ' + on + ' gets the points</small></span></button>' : '') + '</div>' : '') +
       '<h3>' + esc(t.title) + '</h3>' +
@@ -2669,6 +2674,10 @@ export function startGame(SYNCAPI) {
   }
   function canPlanFor(pid) { var o = other(pid); return hasPartner(pid) && !S.members[o].lockPlan; } // on unless the partner turned it off
   function isPlanned(pid, t) { var m = S.members[pid]; return !!(m && m.planned && m.planned[t.id]); }
+  // planned[id]: a day (start-of-day time) = Today; anything else ('w', or 1 from older versions) = This week.
+  // A Today task that wasn't done slides into This week the next day, so nothing falls off the plan.
+  function planBucket(pid, t) { var m = S.members[pid], v = m && m.planned && m.planned[t.id]; if (!v) return null; return typeof v === 'number' && v > 1 && v === sod(effNow()) ? 'today' : 'week'; }
+  var PLAN_NAMES = { today: 'Today', week: 'This week', later: 'Later' };
   function canPlan(t, pid) { return t.status === 'open' && (t.assignee === pid || t.assignee === 'any' || t.assignee === 'both'); }
   function canDoneFor(t, pid) { var o = other(pid); return hasPartner(pid) && !isPaused() && isActive(t) && t.assignee !== pid && canComplete(t, o) && !helpingMe(t, pid); }
   function doneFor(pid, id) {
@@ -2758,9 +2767,12 @@ export function startGame(SYNCAPI) {
       case 'reorder':
         if (!S.members[pid]) break;
         var planWho = ui.filter === 'partner' && canPlanFor(pid) ? other(pid) : pid; // planning the partner's list (if they allow it)
-        var allIds = String(ds.ids || '').split(',').filter(Boolean), cut = allIds.indexOf('__div');
-        if (cut >= 0) { var pl = S.members[planWho].planned = S.members[planWho].planned || {}; allIds.forEach(function (id, i) { if (id === '__div') return; if (i < cut) pl[id] = 1; else delete pl[id]; }); }
-        var vis = allIds.filter(function (id) { return id !== '__div'; }), keep = (S.members[planWho].order || []).filter(function (id) { return vis.indexOf(id) < 0 && getTask(id) && getTask(id).status === 'open'; });
+        var allIds = String(ds.ids || '').split(',').filter(Boolean), cut = allIds.indexOf('__div'), cutW = allIds.indexOf('__week');
+        if (cut >= 0) { // above THIS WEEK = Today, between the two = This week, below LATER = off the plan
+          var pl = S.members[planWho].planned = S.members[planWho].planned || {}, dayV = sod(effNow());
+          allIds.forEach(function (id, i) { if (id === '__div' || id === '__week') return; if (i > cut) delete pl[id]; else if (cutW >= 0 && i < cutW) pl[id] = dayV; else if (cutW < 0 && pl[id]) { } else pl[id] = 'w'; });
+        }
+        var vis = allIds.filter(function (id) { return id !== '__div' && id !== '__week'; }), keep = (S.members[planWho].order || []).filter(function (id) { return vis.indexOf(id) < 0 && getTask(id) && getTask(id).status === 'open'; });
         S.members[planWho].order = vis.concat(keep); break;
       case 'open-settings': ui.settings = true; ui.sheet = null; ui.nameDraft = null; ui.pauseCompose = null; break;
       case 'close-settings': ui.clearAsk = null; ui.scoreEdit = null; ui.settings = false; ui.pauseCompose = null; ui.nameDraft = null; break;
@@ -2782,11 +2794,18 @@ export function startGame(SYNCAPI) {
         var fbr = { id: uid(), at: Date.now(), by: nameOf(pid), version: (typeof APP_VERSION !== 'undefined' ? APP_VERSION : 'proto 0.9.0'), screen: ui.fb.target.screen, spot: ui.fb.target.path, text: ui.fb.target.text, note: ui.fb.note.trim(), x: ui.fb.target.x, y: ui.fb.target.y };
         fbSave(pid, fbr); ui.fb = null; infoToast(pid, 'Feedback saved. Thanks!'); break;
       case 'done-for': doneFor(pid, ds.id); break;
-      case 'plan-toggle':
+      case 'plan-toggle': // legacy name: now moves to the bucket in ds.b (today / week / later)
+      case 'plan-set':
         t = getTask(ds.id); if (!t || !S.members[pid]) break;
-        var pm = S.members[pid].planned = S.members[pid].planned || {};
-        if (pm[t.id]) { delete pm[t.id]; infoToast(pid, 'Moved to Later.'); }
-        else { pm[t.id] = 1; var od = S.members[pid].order = (S.members[pid].order || []).filter(function (id) { return id !== t.id; }); var lastP = -1; od.forEach(function (id, i) { if (pm[id]) lastP = i; }); od.splice(lastP + 1, 0, t.id); infoToast(pid, 'Added to To do.'); }
+        var pm = S.members[pid].planned = S.members[pid].planned || {}, b = ds.b || (pm[t.id] ? 'later' : 'week');
+        if (b === 'later') { delete pm[t.id]; infoToast(pid, 'Moved to Later.'); }
+        else {
+          pm[t.id] = b === 'today' ? sod(effNow()) : 'w';
+          var od = S.members[pid].order = (S.members[pid].order || []).filter(function (id) { return id !== t.id; }), lastP = -1;
+          od.forEach(function (id, i) { var tt = getTask(id); if (tt && planBucket(pid, tt) === b) lastP = i; }); // bottom of that part
+          if (lastP < 0 && b === 'week') od.forEach(function (id, i) { var tt = getTask(id); if (tt && planBucket(pid, tt) === 'today') lastP = i; });
+          od.splice(lastP + 1, 0, t.id); infoToast(pid, 'Moved to ' + PLAN_NAMES[b] + '.');
+        }
         if (s) s.menu = false; break;
       case 'dup-task': t = getTask(ds.id); if (t && !isPaused()) openDup(pid, dupDraft(pid, t, null)); break;
       case 'dup-done': var cD = S.completions.filter(function (c) { return c.id === ds.id; })[0]; if (cD && !isPaused()) openDup(pid, dupDraft(pid, getTask(cD.taskId) || null, cD)); break;
@@ -3295,7 +3314,7 @@ export function startGame(SYNCAPI) {
       cancelHold(); if (!d) return;
       var dd = d, ui = UI[pid]; d = null; ui.dragging = false;
       root.classList.remove('is-dragging');
-      var ids = dd.list.map(function (r) { return r.getAttribute('data-tid') || '__div'; });
+      var ids = dd.list.map(function (r) { return r.getAttribute('data-tid') || (r.getAttribute('data-div') === 'week' ? '__week' : '__div'); });
       var moved = ids.splice(dd.idx, 1)[0]; ids.splice(dd.to, 0, moved);
       root.dataset.justDragged = '1'; setTimeout(function () { delete root.dataset.justDragged; }, 50);
       if (dd.to !== dd.idx) doAct(pid, 'reorder', { ids: ids.join(',') });

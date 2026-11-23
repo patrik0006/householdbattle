@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.12.6 · Hachiko · 23 Nov 2026 · commit __COMMIT__
+- Your list is now split into Today, This week and Later. Drag tasks between them, or use ⋯ › Move to.
+- Anything in Today that isn't done slides into This week the next day, so nothing falls off your plan.
+- Tasks you'd put in To do are now under This week.
+
 ## v0.12.5 · Hachiko · 23 Nov 2026 · commit b3a171c
 - Push notifications work again. If you'd allowed notifications on your phone, the app sometimes didn't save that, so nudges and reminders were never sent. It's saved now whenever you open the app.
 
