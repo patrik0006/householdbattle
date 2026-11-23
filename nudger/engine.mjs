@@ -3333,6 +3333,7 @@ export function startEngine() {
       if (b === 'ob.name') ui.ob.name = v;
       else if (b === 'ob.code') { ui.ob.code = v.toUpperCase(); if (ui.ob.error) { ui.ob.error = ''; } }
       else if (b === 'draft.title' && ui.sheet && ui.sheet.draft) ui.sheet.draft.title = v;
+      else if (b === 'draft.notes' && ui.sheet && ui.sheet.draft) ui.sheet.draft.notes = v;
       else if (b === 'nameDraft') ui.nameDraft = v;
       else if (b === 'fb.note' && ui.fb) ui.fb.note = v;
       else if (b === 'gift.text' && ui.sheet && ui.sheet.kind === 'gift') ui.sheet.text = v;
