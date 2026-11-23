@@ -14,7 +14,7 @@ export function startEngine() {
     5: { label: 'Epic', xp: 20, combo: 10, ex: ['Take down the hammock', 'Put up pictures on the wall', 'Book a flight'] },
     0: { label: 'No points', xp: 0, combo: 0, ex: ['Buy batteries', 'Book the dentist', 'Bins go out Thursday'] } // a note: on the list, worth nothing
   };
-  var SIZE_KEYS = [1, 2, 3, 4, 5, 0];
+  var SIZE_KEYS = [0, 1, 2, 3, 4, 5]; // No points first
   function sizeTxt(n) { return n === 0 ? 'No points' : SIZES[n].label + ' (' + SIZES[n].xp + ' pts)'; }
   var GRACE = [[0, 'None'], [1, 'Today'], [3, '3 days'], [7, '1 week'], [-1, 'Never']]; // -1 = can't be stolen
   function graceLabel(g) { for (var i = 0; i < GRACE.length; i++) if (GRACE[i][0] === g) return GRACE[i][1]; return g + ' days'; }
