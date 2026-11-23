@@ -31,6 +31,18 @@ for (const home of homes.docs) {
     });
   } catch (e) { console.error(home.id, 'failed:', e.message); continue; }
   if (!sent.length) console.log(home.id, ': nobody to nudge right now');
+  // Status per player (settings only, no tasks or messages), so a silent week can be explained from the log.
+  try {
+    const d0 = (await home.ref.get()).data(), st = JSON.parse(d0.state), eng = startEngine(); eng.load(d0.state);
+    for (const pid of ['A', 'B']) {
+      const m = st.members && st.members[pid]; if (!m) continue;
+      const n = m.nudge || null, uid = Object.keys(pids).find((u) => pids[u] === pid);
+      const user = uid ? await db.doc('users/' + uid).get() : null, tok = !!(user && user.exists && user.data().push && user.data().push.token);
+      const pv = eng.preview(pid, Date.now());
+      console.log('  ' + pid + ':', n ? 'level=' + n.level + ' perm=' + n.perm + ' quiet=' + JSON.stringify(n.quiet) + ' when=' + n.when : 'no nudge settings',
+        '| lastNudge=' + (m.lastNudge ? new Date(m.lastNudge).toISOString() : '-'), '| token=' + tok, '| paused=' + !!(st.household && st.household.paused), '| would say: ' + (pv ? pv.kind : 'nothing'));
+    }
+  } catch (e) { console.log('  status failed:', e.message); }
   for (const n of sent) {
     const uid = Object.keys(pids).find((u) => pids[u] === n.pid);
     console.log(home.id, n.pid, n.kind, '-', n.title, '|', n.body, DRY ? '(dry run)' : '');
