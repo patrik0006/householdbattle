@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.12.5 · Hachiko · 23 Nov 2026 · commit __COMMIT__
+## v0.12.5 · Hachiko · 23 Nov 2026 · commit b3a171c
 - Push notifications work again. If you'd allowed notifications on your phone, the app sometimes didn't save that, so nudges and reminders were never sent. It's saved now whenever you open the app.
 
 ## v0.12.4 · Hachiko · 23 Nov 2026 · commit fe57a83
