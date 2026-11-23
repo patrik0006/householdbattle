@@ -1,5 +1,5 @@
 // The version is built into this file so a stale cached version.js can never make the app think it's older than it is.
-const APP_VERSION = '0.12.4';
+const APP_VERSION = '0.12.5';
 export function startGame(SYNCAPI) {
   'use strict';
 
@@ -2876,6 +2876,9 @@ export function startGame(SYNCAPI) {
       case 'ns-prev': s.step = Math.max(0, s.step - 1); break;
       case 'ns-perm': if (!REPLAYING) requestPush(); break;
       case 'ns-sys': s.sys = false; s.d.perm = ds.v; buzz('light'); break;
+      case 'push-perm': // the phone's real notification permission, saved for the nudge job (it only sends to 'granted')
+        if (S.members[pid] && S.members[pid].nudge && (ds.v === 'granted' || ds.v === 'denied')) S.members[pid].nudge.perm = ds.v;
+        break;
       case 'ns-skip': S.members[pid].nudge = nudgeDefaults(); S.members[pid].nudge.skipped = true; ui.sheet = null; infoToast(pid, 'Change nudges anytime in Settings.'); break;
       case 'ns-save': if (!S.members[pid]) break; if (!REPLAYING && s.d.perm === 'granted') setTimeout(refreshPush, 0); S.members[pid].nudge = { when: s.d.when, level: s.d.level, quiet: s.d.quiet.slice(), perm: s.d.perm };
         ui.sheet = null; infoToast(pid, s.d.level === 'off' ? 'No nudges. Peace and quiet.' : s.d.perm === 'granted' ? 'Nudges on.' : 'Saved. Allow notifications to get nudges.'); break;
@@ -3770,7 +3773,7 @@ export function startGame(SYNCAPI) {
     if (!pushSupported()) { if (s) { s.pushErr = 'This browser can’t show notifications. Install the app to your home screen first.'; doAct(ME, 'ns-sys', { v: 'denied' }); } return; }
     Notification.requestPermission().then(function (res) {
       if (res !== 'granted') { if (nudgeSheetOpen()) doAct(ME, 'ns-sys', { v: 'denied' }); return; }
-      return registerPushToken().then(function () { if (nudgeSheetOpen()) doAct(ME, 'ns-sys', { v: 'granted' }); }, function (e) {
+      return registerPushToken().then(function () { if (nudgeSheetOpen()) doAct(ME, 'ns-sys', { v: 'granted' }); doAct(ME, 'push-perm', { v: 'granted' }); }, function (e) {
         console.warn('push token failed', e);
         var s2 = nudgeSheetOpen(); if (s2) { s2.pushErr = 'Allowed, but we couldn’t connect to the notification service. Try again later.'; renderPhone(ME); }
       });
@@ -3785,8 +3788,12 @@ export function startGame(SYNCAPI) {
   function refreshPush() {
     try {
       var n = S && S.members[ME] && S.members[ME].nudge;
-      if (!n || n.level === 'off' || n.perm !== 'granted' || !pushSupported() || Notification.permission !== 'granted') return;
-      registerPushToken().catch(function (e) { console.warn('push refresh failed', e); });
+      if (!n || n.level === 'off' || !pushSupported()) return;
+      var sys = Notification.permission;
+      if (sys === 'denied' && n.perm === 'granted' && SYNC.api.kind !== 'mock') { doAct(ME, 'push-perm', { v: 'denied' }); return; }
+      if (sys !== 'granted') return;
+      // Allowed on this phone: make sure the job knows (older versions sometimes didn't save it) and the token is fresh.
+      registerPushToken().then(function () { if (n.perm !== 'granted') doAct(ME, 'push-perm', { v: 'granted' }); }, function (e) { console.warn('push refresh failed', e); });
     } catch (e) { }
   }
   // Tapping a nudge notification opens the app on the right task.

@@ -1,5 +1,8 @@
 # Changelog
 
+## v0.12.5 · Hachiko · 23 Nov 2026 · commit __COMMIT__
+- Push notifications work again. If you'd allowed notifications on your phone, the app sometimes didn't save that, so nudges and reminders were never sent. It's saved now whenever you open the app.
+
 ## v0.12.4 · Hachiko · 23 Nov 2026 · commit fe57a83
 - Task notes now save. Before, whatever you typed in Notes was lost when you saved the task. Notes show in the task summary, with a note icon on the task in the list.
 

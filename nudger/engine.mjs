@@ -2873,6 +2873,9 @@ export function startEngine() {
       case 'ns-prev': s.step = Math.max(0, s.step - 1); break;
       case 'ns-perm': if (!REPLAYING) requestPush(); break;
       case 'ns-sys': s.sys = false; s.d.perm = ds.v; buzz('light'); break;
+      case 'push-perm': // the phone's real notification permission, saved for the nudge job (it only sends to 'granted')
+        if (S.members[pid] && S.members[pid].nudge && (ds.v === 'granted' || ds.v === 'denied')) S.members[pid].nudge.perm = ds.v;
+        break;
       case 'ns-skip': S.members[pid].nudge = nudgeDefaults(); S.members[pid].nudge.skipped = true; ui.sheet = null; infoToast(pid, 'Change nudges anytime in Settings.'); break;
       case 'ns-save': if (!S.members[pid]) break; if (!REPLAYING && s.d.perm === 'granted') setTimeout(refreshPush, 0); S.members[pid].nudge = { when: s.d.when, level: s.d.level, quiet: s.d.quiet.slice(), perm: s.d.perm };
         ui.sheet = null; infoToast(pid, s.d.level === 'off' ? 'No nudges. Peace and quiet.' : s.d.perm === 'granted' ? 'Nudges on.' : 'Saved. Allow notifications to get nudges.'); break;

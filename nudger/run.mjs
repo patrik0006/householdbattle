@@ -17,16 +17,21 @@ const messaging = getMessaging();
 const homes = await db.collection('households').get();
 let total = 0;
 for (const home of homes.docs) {
-  let sent = [], pids = {};
+  let sent = [], pids = home.data().pids || {};
+  // A phone with a push token has allowed notifications, even if older app versions didn't save that in the settings.
+  const hasToken = {};
+  for (const u of Object.keys(pids)) { const us = await db.doc('users/' + u).get(); hasToken[pids[u]] = !!(us.exists && us.data().push && us.data().push.token); }
   try {
     await db.runTransaction(async (tx) => {
       const snap = await tx.get(home.ref);
       const d = snap.data();
       pids = d.pids || {};
+      const st = JSON.parse(d.state); let fixed = false;
+      for (const p of ['A', 'B']) { const n = st.members && st.members[p] && st.members[p].nudge; if (n && hasToken[p] && n.level !== 'off' && n.perm !== 'granted') { n.perm = 'granted'; fixed = true; console.log('  ' + p + ': has a push token, marking notifications as allowed'); } }
       const eng = startEngine();
-      eng.load(d.state);
+      eng.load(JSON.stringify(st));
       sent = eng.tick(Date.now());
-      if (!sent.length || DRY) return;
+      if ((!sent.length && !fixed) || DRY) return;
       tx.update(home.ref, { state: eng.json(), rev: d.rev + 1, updatedAt: FieldValue.serverTimestamp(), updatedBy: 'nudger' });
     });
   } catch (e) { console.error(home.id, 'failed:', e.message); continue; }
