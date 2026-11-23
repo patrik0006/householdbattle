@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.12.4 · Hachiko · 23 Nov 2026 · commit __COMMIT__
+## v0.12.4 · Hachiko · 23 Nov 2026 · commit fe57a83
 - Task notes now save. Before, whatever you typed in Notes was lost when you saved the task. Notes show in the task summary, with a note icon on the task in the list.
 
 ## v0.12.3 · Hachiko · 23 Nov 2026 · commit c4b52f8
