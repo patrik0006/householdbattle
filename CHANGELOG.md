@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.12.3 · Hachiko · 23 Nov 2026 · commit __COMMIT__
+## v0.12.3 · Hachiko · 23 Nov 2026 · commit c4b52f8
 - "No points" is now the first size option instead of the last.
 
 ## v0.12.2 · Hachiko · 18 Nov 2026 · commit 3aaf0e2
