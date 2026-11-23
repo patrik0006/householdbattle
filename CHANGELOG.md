@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.12.6 · Hachiko · 23 Nov 2026 · commit __COMMIT__
+## v0.12.6 · Hachiko · 23 Nov 2026 · commit 7615ae9
 - Your list is now split into Today, This week and Later. Drag tasks between them, or use ⋯ › Move to.
 - Anything in Today that isn't done slides into This week the next day, so nothing falls off your plan.
 - Tasks you'd put in To do are now under This week.
