@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.12.8 · Hachiko · 24 Nov 2026 · commit __COMMIT__
+## v0.12.8 · Hachiko · 24 Nov 2026 · commit 3831818
 - You now get a notification when a new version is out. If you're reading this as a notification, it works!
 
 ## v0.12.7 · Hachiko · 24 Nov 2026 · commit cbe2e53
