@@ -118,8 +118,12 @@ async function firebaseSync() {
       if (vapidKey) opts.vapidKey = vapidKey;
       const token = await M.getToken(messaging, opts);
       if (!token) throw new Error('no-token');
-      await F.setDoc(userRef(me().uid), { push: { token, code: info.code, pid: info.pid, at: Date.now(), ua: navigator.userAgent.slice(0, 120) } }, { merge: true });
+      await F.setDoc(userRef(me().uid), { push: { token, code: info.code, pid: info.pid, at: Date.now(), ua: navigator.userAgent.slice(0, 120) }, pushErr: null }, { merge: true });
       return token;
+    },
+    // Why this phone couldn't get a push token, so the nightly log can say.
+    async reportPushError(msg) {
+      await F.setDoc(userRef(me().uid), { pushErr: { msg: String(msg).slice(0, 160), at: Date.now(), ua: navigator.userAgent.slice(0, 120) } }, { merge: true });
     },
     // Feedback notes wait on users/{uid}.feedback until the job copies them into the repo.
     async sendFeedback(rec) {

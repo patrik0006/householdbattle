@@ -43,9 +43,10 @@ for (const home of homes.docs) {
       const m = st.members && st.members[pid]; if (!m) continue;
       const n = m.nudge || null, uid = Object.keys(pids).find((u) => pids[u] === pid);
       const user = uid ? await db.doc('users/' + uid).get() : null, tok = !!(user && user.exists && user.data().push && user.data().push.token);
+      const ud = user && user.exists ? user.data() : {}, perr = ud.pushErr ? ' | last push error: ' + ud.pushErr.msg + ' (' + new Date(ud.pushErr.at).toISOString().slice(0, 16) + ')' : '', since = ud.push && ud.push.at ? ' | token from ' + new Date(ud.push.at).toISOString().slice(0, 10) : '';
       const pv = eng.preview(pid, Date.now());
       console.log('  ' + pid + ':', n ? 'level=' + n.level + ' perm=' + n.perm + ' quiet=' + JSON.stringify(n.quiet) + ' when=' + n.when : 'no nudge settings',
-        '| lastNudge=' + (m.lastNudge ? new Date(m.lastNudge).toISOString() : '-'), '| token=' + tok, '| paused=' + !!(st.household && st.household.paused), '| would say: ' + (pv ? pv.kind : 'nothing'));
+        '| lastNudge=' + (m.lastNudge ? new Date(m.lastNudge).toISOString() : '-'), '| token=' + tok, '| paused=' + !!(st.household && st.household.paused), '| would say: ' + (pv ? pv.kind : 'nothing') + since + perr);
     }
   } catch (e) { console.log('  status failed:', e.message); }
   for (const n of sent) {

@@ -957,6 +957,13 @@ button.pcard { width: 100%; border: 0; color: inherit; text-align: left; cursor:
 .plan-div::after { order: 3; }
 .plan-empty.sm { padding: 10px; }
 
+.push-state { display: flex; align-items: center; gap: 10px; border-radius: 14px; padding: 12px 14px; margin-bottom: 10px; font-size: var(--fs-sm); line-height: 1.35; }
+.push-state svg { flex: none; width: 20px; height: 20px; }
+.push-state span { flex: 1; }
+.push-state.ok { background: rgba(78,214,140,0.12); color: var(--mint, #4ED68C); }
+.push-state.warn { background: rgba(255,107,107,0.12); color: var(--text); border: 1px solid rgba(255,107,107,0.4); }
+.push-state .btn { flex: none; width: auto; padding: 8px 14px; margin: 0; }
+
 /* ---------- Real app: one full-screen phone instead of the test bench ---------- */
 html, body { height: 100%; }
 body { background: var(--bg); overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
@@ -986,8 +993,8 @@ window.__splashT0 = Date.now();
 </script>
 <noscript>HouseholdBattle needs JavaScript.</noscript>
 <script type="module">
-import { createSync } from './sync.js?v=0.12.6';
-import { startGame } from './app.js?v=0.12.6';
+import { createSync } from './sync.js?v=0.12.7';
+import { startGame } from './app.js?v=0.12.7';
 createSync().then(startGame).catch(function (e) {
   document.getElementById('phone').innerHTML = '<div class="app"><div class="ob"><div class="logo">HOUSEHOLD<br>BATTLE</div><p>Couldn\'t start. Check your connection and try again.</p><button class="btn gold" onclick="location.reload()">TRY AGAIN</button></div></div>';
   console.error(e);

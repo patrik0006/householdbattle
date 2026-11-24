@@ -1749,10 +1749,20 @@ export function startEngine() {
     addAct({ kind: 'cleared', actor: by, type: type });
     log('<b>' + (type === 'clearweek' ? "This week's history" : 'All history') + '</b> cleared');
   }
+  // Is this phone set up for push? The prototype only knows the saved answer; the real app asks the phone.
+  function pushState(pid) { return pid === ME && typeof phonePushState === 'function' ? phonePushState() : 'off'; }
   function nudgeSettingsHTML(pid) {
     var n = nudgePrefs(pid) || nudgeDefaults(), lh = learnedHour(pid), lvl = NUDGE_LEVELS.filter(function (l) { return l[0] === n.level; })[0];
     var rows = '<dl class="kv"><dt>Pushiness</dt><dd>' + lvl[1] + '</dd>' + (n.level !== 'off' ? '<dt>Nudge time</dt><dd>Around ' + hh(nudgeHour(pid)) + (lh != null ? ' · learned from when you finish tasks' : ' · ' + (NUDGE_WHEN.filter(function (w) { return w[0] === n.when; })[0] || NUDGE_WHEN[4])[1].toLowerCase()) + '</dd><dt>Quiet hours</dt><dd>' + hh(n.quiet[0]) + '–' + hh(n.quiet[1]) + '</dd><dt>Notifications</dt><dd>' + (n.perm === 'granted' ? 'On' : n.perm === 'denied' ? 'Blocked on this phone' : 'Not allowed yet') + '</dd>' : '') + '</dl>';
-    return '<section class="sect"><h4>NUDGES</h4>' + rows + '<button class="btn ghost" data-act="ns-edit">Change nudges</button></section>';
+    var ps = n.level === 'off' ? null : pushState(pid), pmsg = {
+      on: ['ok', 'Notifications are on for this phone.'],
+      off: ['warn', 'Notifications aren\u2019t set up on this phone, so you won\u2019t get nudges or reminders.'],
+      blocked: ['warn', 'Notifications are blocked for this app. Turn them on in Android Settings \u203A Apps \u203A HouseholdBattle \u203A Notifications, then come back.'],
+      error: ['warn', 'Notifications are allowed, but this phone couldn\u2019t connect to the notification service.'],
+      unsupported: ['warn', 'This browser can\u2019t show notifications. Open the app from your home screen.']
+    }[ps];
+    var pushRow = pmsg ? '<div class="push-state ' + pmsg[0] + '" role="status">' + (pmsg[0] === 'ok' ? IC.check : IC.clock) + '<span>' + pmsg[1] + '</span>' + (ps === 'off' || ps === 'error' ? '<button class="btn gold sm" data-act="push-enable">' + (ps === 'error' ? 'Try again' : 'Turn on') + '</button>' : '') + '</div>' : '';
+    return '<section class="sect"><h4>NUDGES</h4>' + pushRow + rows + '<button class="btn ghost" data-act="ns-edit">Change nudges</button></section>';
   }
   function settingsHTML(pid) {
     var ui = UI[pid], h = S.household, o = other(pid), hasP = hasPartner(pid), r = h.request;
@@ -2892,6 +2902,7 @@ export function startEngine() {
       case 'ns-prev': s.step = Math.max(0, s.step - 1); break;
       case 'ns-perm': if (!REPLAYING) requestPush(); break;
       case 'ns-sys': s.sys = false; s.d.perm = ds.v; buzz('light'); break;
+      case 'push-enable': if (!REPLAYING) requestPush(); break;
       case 'push-perm': // the phone's real notification permission, saved for the nudge job (it only sends to 'granted')
         if (S.members[pid] && S.members[pid].nudge && (ds.v === 'granted' || ds.v === 'denied')) S.members[pid].nudge.perm = ds.v;
         break;

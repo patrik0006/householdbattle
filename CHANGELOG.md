@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.12.7 · Hachiko · 24 Nov 2026 · commit __COMMIT__
+- Settings › Nudges now shows whether notifications work on this phone, with a Turn on button when they don't.
+- If a phone can't connect to the notification service, the reason is now saved so it can be fixed.
+
 ## v0.12.6 · Hachiko · 23 Nov 2026 · commit 7615ae9
 - Your list is now split into Today, This week and Later. Drag tasks between them, or use ⋯ › Move to.
 - Anything in Today that isn't done slides into This week the next day, so nothing falls off your plan.
