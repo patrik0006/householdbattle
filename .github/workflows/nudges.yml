@@ -5,6 +5,10 @@ on:
   schedule:
     - cron: '*/5 * * * *'
   workflow_dispatch:
+  # a new version: wait for the site to finish publishing, then tell everyone (see the update push in run.mjs)
+  push:
+    branches: [main]
+    paths: ['version.js']
 permissions:
   contents: write
 concurrency:
@@ -15,6 +19,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      - name: Wait for the new version to go live
+        if: github.event_name == 'push'
+        run: sleep 150
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:

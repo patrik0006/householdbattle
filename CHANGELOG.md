@@ -1,5 +1,8 @@
 # Changelog
 
+## v0.12.8 · Hachiko · 24 Nov 2026 · commit __COMMIT__
+- You now get a notification when a new version is out. If you're reading this as a notification, it works!
+
 ## v0.12.7 · Hachiko · 24 Nov 2026 · commit cbe2e53
 - Settings › Nudges now shows whether notifications work on this phone, with a Turn on button when they don't.
 - If a phone can't connect to the notification service, the reason is now saved so it can be fixed.

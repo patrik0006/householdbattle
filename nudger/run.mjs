@@ -65,4 +65,31 @@ for (const home of homes.docs) {
     }
   }
 }
+// ---------- New version: one push per person, the first time the job sees it ----------
+try {
+  const { readFileSync } = await import('node:fs');
+  const log = readFileSync(new URL('../CHANGELOG.md', import.meta.url), 'utf8');
+  const m = log.match(/^## v(\d+\.\d+\.\d+)(?: · ([^·\n]+))?[^\n]*\n((?:- .*\n?)*)/m);
+  if (m) {
+    const ver = m[1], name = (m[2] || '').trim(), first = ((m[3] || '').split('\n').find((l) => l.startsWith('- ')) || '- See what\'s new in the app.').slice(2).replace(/[*_`]/g, '');
+    for (const home of homes.docs) {
+      const pids = home.data().pids || {};
+      for (const uid of Object.keys(pids)) {
+        const ref = db.doc('users/' + uid), u = await ref.get(), ud = u.exists ? u.data() : {};
+        if (ud.announced === ver) continue;
+        const token = ud.push && ud.push.token;
+        if (!token) { console.log('  update v' + ver + ': no push token for', pids[uid], '(will try again next run)'); continue; }
+        if (DRY) { console.log('  update v' + ver + ' would go to', pids[uid]); continue; }
+        try {
+          await messaging.send({ token, webpush: { headers: { TTL: '86400', Urgency: 'normal' }, data: { title: 'New version: ' + ver + (name ? ' · ' + name : ''), body: first.length > 140 ? first.slice(0, 137) + '…' : first, nudge: '', tag: 'update' } } });
+          await ref.set({ announced: ver }, { merge: true }); total++;
+          console.log('  update v' + ver + ' pushed to', pids[uid]);
+        } catch (e) {
+          console.log('  update push failed for', pids[uid] + ':', e.code || e.message);
+          if (e.code === 'messaging/registration-token-not-registered' || e.code === 'messaging/invalid-argument') await ref.set({ push: null }, { merge: true });
+        }
+      }
+    }
+  }
+} catch (e) { console.log('update announcement failed:', e.message); }
 console.log('checked', homes.size, 'household(s);', total, 'push(es) sent');

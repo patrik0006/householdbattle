@@ -1,5 +1,5 @@
 // The version is built into this file so a stale cached version.js can never make the app think it's older than it is.
-const APP_VERSION = '0.12.7';
+const APP_VERSION = '0.12.8';
 export function startGame(SYNCAPI) {
   'use strict';
 
