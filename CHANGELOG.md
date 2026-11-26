@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.12.9 · Hachiko · 26 Nov 2026 · commit __COMMIT__
+- New size: Very hard (15 points), between Hard and Epic.
+- When you add a task, choose where it goes: Today, This week or Later. There's a new step for it, and you can change it on the summary.
+- Feedback notes from the app are now stored encrypted, so only you can read them.
+
 ## v0.12.8 · Hachiko · 24 Nov 2026 · commit 3831818
 - You now get a notification when a new version is out. If you're reading this as a notification, it works!
 

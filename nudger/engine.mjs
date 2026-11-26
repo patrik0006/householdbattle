@@ -11,10 +11,11 @@ export function startEngine() {
     2: { label: 'Easy', xp: 3, combo: 2, ex: ['Empty the dishwasher', 'Take out the trash', 'Clear out the fridge', 'Call your sister about that thing'] },
     3: { label: 'Annoying', xp: 5, combo: 3, ex: ['Clean the bathroom', 'Vacuum downstairs', 'Clean the humidifier'] },
     4: { label: 'Hard', xp: 10, combo: 5, ex: ['Clean the pipes', 'Weed the bushes'] },
+    6: { label: 'Very hard', xp: 15, combo: 7, ex: ['Clean out the garage', 'Deep-clean the oven', 'Paint the fence'] }, // 0.12.9: key 6 so existing tasks keep their sizes
     5: { label: 'Epic', xp: 20, combo: 10, ex: ['Take down the hammock', 'Put up pictures on the wall', 'Book a flight'] },
     0: { label: 'No points', xp: 0, combo: 0, ex: ['Buy batteries', 'Book the dentist', 'Bins go out Thursday'] } // a note: on the list, worth nothing
   };
-  var SIZE_KEYS = [0, 1, 2, 3, 4, 5]; // No points first
+  var SIZE_KEYS = [0, 1, 2, 3, 4, 6, 5]; // No points first; Very hard (6) sits between Hard and Epic
   function sizeTxt(n) { return n === 0 ? 'No points' : SIZES[n].label + ' (' + SIZES[n].xp + ' pts)'; }
   var GRACE = [[0, 'None'], [1, 'Today'], [3, '3 days'], [7, '1 week'], [-1, 'Never']]; // -1 = can't be stolen
   function graceLabel(g) { for (var i = 0; i < GRACE.length; i++) if (GRACE[i][0] === g) return GRACE[i][1]; return g + ' days'; }
@@ -78,7 +79,7 @@ export function startEngine() {
     { id: 'begins', name: 'Now it begins', icon: 'flag', metal: 1, need: 1, desc: 'Create your first task.', value: function (cs, pid) { return actsBy(pid, ['add', 'assign']).length; } },
     { id: 'first', name: 'First Blood', icon: 'drop', metal: 1, need: 1, desc: 'Complete your first task.', value: function (cs) { return cs.length; } },
     { id: 'roll', name: 'On a Roll', icon: 'flame', metal: 1, need: 5, desc: '5 tasks in one day.', value: function (cs) { return maxPerDay(cs); } },
-    { id: 'hardlab', name: 'Beast of Burden', icon: 'weight', metal: 2, need: 5, desc: '5 Hard or Epic tasks in one week.', value: function (cs) { return weekly(cs.filter(isHate).map(function (c) { return c.at; })); } },
+    { id: 'hardlab', name: 'Beast of Burden', icon: 'weight', metal: 2, need: 5, desc: '5 Hard, Very hard or Epic tasks in one week.', value: function (cs) { return weekly(cs.filter(isHate).map(function (c) { return c.at; })); } },
     { id: 'slaver', name: "Slaver's Dog", icon: 'chain', metal: 2, need: 11, noXp: true, desc: 'Assign more than 10 tasks to your partner in one week.', value: function (cs, pid) { return weekly(actsBy(pid, ['assign']).map(function (a) { return a.at; })); } },
     { id: 'bloodhound', name: 'Blood Hound', icon: 'paw', metal: 1, need: 11, noXp: true, desc: 'Create more than 10 tasks in one week.', value: function (cs, pid) { return weekly(actsBy(pid, ['add', 'assign']).filter(function (a) { return !a.reassign; }).map(function (a) { return a.at; })); } },
     { id: 'epic', name: 'Epic Win', icon: 'crown', metal: 2, need: 1, desc: 'Complete your first Epic task.', value: function (cs) { return cs.filter(function (c) { return c.size === 5; }).length; } },
@@ -86,7 +87,7 @@ export function startEngine() {
     { id: 'walkies', name: 'Daily Walkies', icon: 'paw', metal: 2, need: 7, desc: 'Complete at least one task every day for 7 days in a row.', value: function (cs) { return streakDays(cs); } },
     { id: 'thief', name: 'Snatch!', icon: 'claw', metal: 3, need: 5, desc: "Steal 5 of your partner's tasks.", value: function (cs) { return cs.filter(function (c) { return c.stolen; }).length; } },
     { id: 'archaeo', name: 'Bone Finder', icon: 'bone', metal: 2, rare: true, need: 30, desc: 'Finish a task that waited 30 days or more.', value: function (cs) { return cs.reduce(function (m, c) { return Math.max(m, c.alreadyDone ? 0 : (c.waitedDays || 0)); }, 0); } },
-    { id: 'masochist', name: 'Hound Dog', icon: 'bolt', metal: 3, rare: true, need: 3, desc: '3 Hard or Epic tasks in one day.', value: function (cs) { return maxPerDay(cs.filter(isHate)); } },
+    { id: 'masochist', name: 'Hound Dog', icon: 'bolt', metal: 3, rare: true, need: 3, desc: '3 Hard, Very hard or Epic tasks in one day.', value: function (cs) { return maxPerDay(cs.filter(isHate)); } },
     { id: 'argos', name: 'Argos', icon: 'house', metal: 1, rare: true, need: 7, desc: 'Come back to the app after a week or more away.', value: function (cs, pid) { return (S.argos && S.argos[pid]) || 0; } },
     { id: 'bluff', name: 'Alpha', icon: 'cards', metal: 2, rare: true, need: 1, desc: 'Collect the bonus from a challenge your partner failed.', value: function (cs) { return cs.filter(function (c) { return c.challengeCollect; }).length; } },
     { id: 'bounty', name: 'Bounty Hunter', icon: 'target', metal: 2, rare: true, need: 1, desc: 'Collect a maxed-out bounty.', value: function (cs) { return cs.filter(function (c) { return c.bounty && c.bounty >= SIZES[c.size].xp; }).length; } },
@@ -2105,9 +2106,9 @@ export function startEngine() {
   }
 
   function stepDots(step) {
-    var idx = { what: 0, size: 1, who: 2, repeat: 3, summary: 4 }[step];
-    var h = '<span class="steps" aria-label="Step ' + Math.min(idx + 1, 4) + ' of 4">';
-    for (var i = 0; i < 4; i++) h += '<i class="' + (i <= idx ? 'on' : '') + '"></i>';
+    var idx = { what: 0, size: 1, who: 2, repeat: 3, when: 4, summary: 5 }[step];
+    var h = '<span class="steps" aria-label="Step ' + Math.min(idx + 1, 5) + ' of 5">';
+    for (var i = 0; i < 5; i++) h += '<i class="' + (i <= idx ? 'on' : '') + '"></i>';
     return h + '</span>';
   }
   function addDirty(s) { return !!s.draft && s.orig != null && JSON.stringify(s.draft) !== s.orig; }
@@ -2147,6 +2148,11 @@ export function startEngine() {
       inner += '<h3>Does it repeat?</h3><div class="bigopts">' + [['none', 'No', 'One-off task'], ['twice', 'Twice a day', 'Done before 12:00? It comes back at 12:00'], ['daily', 'Daily', 'Every day'], ['alternate', 'Every other day', 'Today, then every second day'], ['weekly', 'Weekly', 'On one weekday'], ['biweekly', 'Every 2 weeks', 'On one weekday, every other week'], ['monthly', 'Monthly', 'On one day of the month']].map(function (r) { return '<button class="bigopt' + (d.repeat === r[0] ? ' on' : '') + '" data-act="add-repeat" data-r="' + r[0] + '"><span class="bt"><b>' + r[1] + '</b><span>' + r[2] + '</span></span></button>'; }).join('') + '</div>';
       if (d.repeat === 'weekly' || d.repeat === 'biweekly' || d.repeat === 'monthly') inner += dayPicker(d) + '<button class="btn gold" data-act="add-repeat-next">NEXT</button>';
       inner += skip;
+    } else if (s.step === 'when') {
+      var forP = d.who === 'partner';
+      inner += '<h3>' + (forP ? 'Where in ' + esc(nameOf(other(pid))) + '\u2019s plan?' : 'When will you do it?') + '</h3><div class="bigopts">' + [['today', 'Today', 'At the bottom of Today'], ['week', 'This week', 'At the bottom of This week'], ['later', 'Later', 'Not planned yet']].map(function (o) {
+        return '<button class="bigopt' + ((d.plan || 'later') === o[0] ? ' on' : '') + '" data-act="add-plan" data-b="' + o[0] + '"><span class="bt"><b>' + o[1] + '</b><span>' + o[2] + '</span></span></button>';
+      }).join('') + '</div>' + skip;
     } else {
       inner += summaryHTML(pid, s);
     }
@@ -2170,6 +2176,7 @@ export function startEngine() {
     if (d.who === 'me' || d.who === 'partner') h += '<div class="sum-block"><span class="lbl">Grace period · how long only ' + (d.who === 'me' ? 'you' : esc(nameOf(o))) + ' can do it before it can be stolen. Never = it can\'t be stolen.</span>' + seg('sum-grace', 'g', GRACE, d.grace) + '</div>';
     if (d.who === 'partner') h += '<div class="sum-block"><span class="lbl">Note to ' + esc(nameOf(o)) + ' (optional)</span>' + composerHTML(pid, 'sheet', 'assign', 'select') + '</div>';
     h += '<div class="sum-block"><span class="lbl">Repeats</span>' + seg('sum-repeat', 'r', [['none', 'No'], ['twice', 'Twice a day'], ['daily', 'Daily'], ['alternate', 'Every other day'], ['weekly', 'Weekly'], ['biweekly', 'Every 2 weeks'], ['monthly', 'Monthly']], d.repeat) + (d.repeat === 'weekly' || d.repeat === 'biweekly' || d.repeat === 'monthly' ? dayPicker(d) : '') + '</div>';
+    if (!s.editId && planOwnerFor(pid, d.who)) h += '<div class="sum-block"><span class="lbl">' + (d.who === 'partner' ? 'In ' + esc(nameOf(o)) + '\u2019s plan' : 'Plan') + '</span>' + seg('sum-plan', 'b', [['today', 'Today'], ['week', 'This week'], ['later', 'Later']], d.plan || 'later') + '</div>';
     h += '<span class="xp-preview">Worth <b>' + xp + ' pts</b>' + (d.repeat !== 'none' ? ' each time' : '') + '</span>';
     var ok = !!d.title.trim();
     if (s.editId) h += '<button class="btn gold" data-act="add-save"' + (ok ? '' : ' disabled') + '>SAVE</button>';
@@ -2685,6 +2692,18 @@ export function startEngine() {
   // A Today task that wasn't done slides into This week the next day, so nothing falls off the plan.
   function planBucket(pid, t) { var m = S.members[pid], v = m && m.planned && m.planned[t.id]; if (!v) return null; return typeof v === 'number' && v > 1 && v === sod(effNow()) ? 'today' : 'week'; }
   var PLAN_NAMES = { today: 'Today', week: 'This week', later: 'Later' };
+  function planOwnerFor(pid, who) { return who === 'partner' ? (canPlanFor(pid) ? other(pid) : null) : pid; }
+  // Put a task at the bottom of Today / This week in someone's plan (Later = off the plan).
+  function placeIn(who, t, b) {
+    var m = S.members[who]; if (!m) return;
+    var pm = m.planned = m.planned || {};
+    if (b === 'later' || !b) { delete pm[t.id]; return; }
+    pm[t.id] = b === 'today' ? sod(effNow()) : 'w';
+    var od = m.order = (m.order || []).filter(function (id) { return id !== t.id; }), lastP = -1;
+    od.forEach(function (id, i) { var tt = getTask(id); if (tt && planBucket(who, tt) === b) lastP = i; });
+    if (lastP < 0 && b === 'week') od.forEach(function (id, i) { var tt = getTask(id); if (tt && planBucket(who, tt) === 'today') lastP = i; });
+    od.splice(lastP + 1, 0, t.id);
+  }
   function canPlan(t, pid) { return t.status === 'open' && (t.assignee === pid || t.assignee === 'any' || t.assignee === 'both'); }
   function canDoneFor(t, pid) { var o = other(pid); return hasPartner(pid) && !isPaused() && isActive(t) && t.assignee !== pid && canComplete(t, o) && !helpingMe(t, pid); }
   function doneFor(pid, id) {
@@ -2854,8 +2873,10 @@ export function startEngine() {
       case 'add-size': s.draft.size = parseInt(ds.n, 10); s.step = 'who'; break;
       case 'add-who': s.draft.who = ds.w; if (ds.w !== 'partner') s.step = 'repeat'; break;
       case 'add-who-next': s.step = 'repeat'; break;
-      case 'add-repeat': s.draft.repeat = ds.r; if (ds.r === 'none' || ds.r === 'twice' || ds.r === 'daily' || ds.r === 'alternate') { draftDefaults(s.draft); s.step = 'summary'; } break;
-      case 'add-repeat-next': draftDefaults(s.draft); s.step = 'summary'; break;
+      case 'add-repeat': s.draft.repeat = ds.r; if (ds.r === 'none' || ds.r === 'twice' || ds.r === 'daily' || ds.r === 'alternate') { draftDefaults(s.draft); s.step = planOwnerFor(pid, s.draft.who) ? 'when' : 'summary'; } break;
+      case 'add-repeat-next': draftDefaults(s.draft); s.step = planOwnerFor(pid, s.draft.who) ? 'when' : 'summary'; break;
+      case 'add-plan': s.draft.plan = ds.b; draftDefaults(s.draft); s.step = 'summary'; break;
+      case 'sum-plan': s.draft.plan = ds.b; break;
       case 'add-weekday': s.draft.weekday = parseInt(ds.n, 10); break;
       case 'add-monthday': s.draft.monthDay = Math.max(1, Math.min(31, s.draft.monthDay + parseInt(ds.d, 10))); break;
       case 'add-skip': draftDefaults(s.draft); s.step = 'summary'; break;
@@ -2863,7 +2884,8 @@ export function startEngine() {
         if (s.step === 'size') s.step = 'what';
         else if (s.step === 'who') s.step = 'size';
         else if (s.step === 'repeat') s.step = 'who';
-        else if (s.step === 'summary') s.step = s.from === 'suggestion' ? 'what' : 'repeat';
+        else if (s.step === 'when') s.step = 'repeat';
+        else if (s.step === 'summary') s.step = s.from === 'suggestion' ? 'what' : planOwnerFor(pid, s.draft.who) ? 'when' : 'repeat';
         break;
       case 'sum-size': s.draft.size = parseInt(ds.n, 10); break;
       case 'done-edit': var cE = S.completions.find(function (x) { return x.id === ds.id; }); if (canEditDone(pid, cE)) openSheet(pid, { kind: 'done-edit', id: cE.id, draft: { title: cE.title, size: cE.size } }); break;
@@ -2976,6 +2998,7 @@ export function startEngine() {
         if (s.editId) { saveEdit(pid, s.editId, s.draft); ui.sheet = null; infoToast(pid, 'Saved.'); }
         else {
           var cr = createTask(pid, s.draft);
+          var planWhoN = planOwnerFor(pid, s.draft.who); if (planWhoN && s.draft.plan && s.draft.plan !== 'later') placeIn(planWhoN, cr.task, s.draft.plan);
           ui.sheet = null;
           if (cr.task.assignee === o) { ui.filter = 'partner'; infoToast(pid, 'Assigned to ' + nameOf(o) + '.'); }
           else if (cr.task.repeat && cr.task.dueAt > now()) infoToast(pid, 'Added. First due ' + fmtDate(cr.task.dueAt) + '.');
