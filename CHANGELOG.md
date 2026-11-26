@@ -1,5 +1,8 @@
 # Changelog
 
+## v0.12.12 · Hachiko · 26 Nov 2026 · commit __COMMIT__
+- The slim header only unfolds when you pull down at the top of the list with your finger, not when a quick swipe coasts back up to the top.
+
 ## v0.12.11 · Hachiko · 26 Nov 2026 · commit 0b19f3f
 - Smoother folding header: it now snaps to its slim size in one step and the list slides up, instead of resizing frame by frame.
 

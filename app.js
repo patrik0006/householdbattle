@@ -1,5 +1,5 @@
 // The version is built into this file so a stale cached version.js can never make the app think it's older than it is.
-const APP_VERSION = '0.12.11';
+const APP_VERSION = '0.12.12';
 export function startGame(SYNCAPI) {
   'use strict';
 
@@ -2635,22 +2635,30 @@ export function startGame(SYNCAPI) {
       clearTimeout(tmr); tmr = setTimeout(function () { [chips, sc].forEach(function (el) { el.style.transition = ''; el.style.transform = ''; }); app.classList.remove('fold-anim'); }, 320);
     }
     if (sc.scrollTop < 8) set(false);
-    var queued = false;
+    var queued = false, hold = false;
     sc.addEventListener('scroll', function () {
       if (queued) return; queued = true;
       requestAnimationFrame(function () { // at most one check per frame
         queued = false;
         if (sc.querySelector('.task.dragging') || app.querySelector('.is-dragging')) return; // never change the layout under a drag
-        if (!ui.compact && sc.scrollTop > 40 && sc.scrollHeight - sc.clientHeight > 240) set(true);
-        else if (ui.compact && sc.scrollTop < 8) set(false);
+        if (hold && sc.scrollTop < 8) hold = false; // the tap-to-unfold scroll reached the top
+        if (!ui.compact && !hold && sc.scrollTop > 40 && sc.scrollHeight - sc.clientHeight > 240) set(true);
+        else if (ui.compact && sc.scrollTop < 8 && touching) set(false); // only while the finger is on the list, not when a fling coasts to the top
       });
     }, { passive: true });
+    // Unfold only on purpose: finger down and pulling at the top, or the mouse wheel scrolling up at the top.
+    var touching = false, y0 = 0;
+    sc.addEventListener('touchstart', function (e) { touching = true; y0 = e.touches[0].clientY; }, { passive: true });
+    sc.addEventListener('touchmove', function (e) { if (ui.compact && sc.scrollTop <= 0 && e.touches[0].clientY - y0 > 14) set(false); }, { passive: true });
+    sc.addEventListener('touchend', function () { touching = false; }, { passive: true });
+    sc.addEventListener('touchcancel', function () { touching = false; }, { passive: true });
+    sc.addEventListener('wheel', function (e) { if (ui.compact && e.deltaY < 0 && sc.scrollTop < 8) set(false); }, { passive: true });
     var top = root.querySelectorAll('.app > .banner, .app > .hdr');
     Array.prototype.forEach.call(top, function (el) {
       el.addEventListener('click', function (e) {
         if (!ui.compact) return;
         e.preventDefault(); e.stopPropagation(); // first tap unfolds; the buttons work again after that
-        set(false); sc.scrollTo({ top: 0, behavior: 'smooth' });
+        hold = true; set(false); sc.scrollTo({ top: 0, behavior: 'smooth' });
       }, true);
     });
   }
