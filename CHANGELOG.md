@@ -1,5 +1,8 @@
 # Changelog
 
+## v0.12.11 · Hachiko · 26 Nov 2026 · commit __COMMIT__
+- Smoother folding header: it now snaps to its slim size in one step and the list slides up, instead of resizing frame by frame.
+
 ## v0.12.10 · Hachiko · 26 Nov 2026 · commit 363459e
 - More room for your tasks: scroll down the list and the score header folds into a slim bar with just the dogs and the score. Scroll back to the top, or tap the bar, to bring it back.
 

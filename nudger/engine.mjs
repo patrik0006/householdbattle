@@ -2618,12 +2618,29 @@ export function startEngine() {
   function wireCompact(root, pid) {
     var ui = UI[pid], app = root.querySelector('.app'), sc = root.querySelector('.app > .scroll[data-scroll^="tasks-"]');
     if (!app || !sc) { ui.compact = false; return; }
-    function set(on) { if (!!ui.compact === on) return; ui.compact = on; app.classList.toggle('compact', on); }
+    var chips = app.querySelector('.chips'), still = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches, tmr = null;
+    function set(on) {
+      if (!!ui.compact === on) return; ui.compact = on;
+      var before = chips ? chips.getBoundingClientRect().top : 0;
+      app.classList.toggle('compact', on); // one layout change, no per-frame resizing
+      if (!chips || still) return;
+      var d = before - chips.getBoundingClientRect().top; if (!d) return;
+      // FLIP: start the chips and the list where they were, then slide them home on the GPU
+      [chips, sc].forEach(function (el) { el.style.transition = 'none'; el.style.transform = 'translateY(' + d + 'px)'; });
+      app.classList.remove('fold-anim'); void app.offsetWidth; app.classList.add('fold-anim');
+      requestAnimationFrame(function () { [chips, sc].forEach(function (el) { el.style.transition = 'transform 0.26s cubic-bezier(.2,.8,.2,1)'; el.style.transform = ''; }); });
+      clearTimeout(tmr); tmr = setTimeout(function () { [chips, sc].forEach(function (el) { el.style.transition = ''; el.style.transform = ''; }); app.classList.remove('fold-anim'); }, 320);
+    }
     if (sc.scrollTop < 8) set(false);
+    var queued = false;
     sc.addEventListener('scroll', function () {
-      if (sc.querySelector('.task.dragging') || app.querySelector('.is-dragging')) return; // never change the layout under a drag
-      if (!ui.compact && sc.scrollTop > 40 && sc.scrollHeight - sc.clientHeight > 240) set(true);
-      else if (ui.compact && sc.scrollTop < 8) set(false);
+      if (queued) return; queued = true;
+      requestAnimationFrame(function () { // at most one check per frame
+        queued = false;
+        if (sc.querySelector('.task.dragging') || app.querySelector('.is-dragging')) return; // never change the layout under a drag
+        if (!ui.compact && sc.scrollTop > 40 && sc.scrollHeight - sc.clientHeight > 240) set(true);
+        else if (ui.compact && sc.scrollTop < 8) set(false);
+      });
     }, { passive: true });
     var top = root.querySelectorAll('.app > .banner, .app > .hdr');
     Array.prototype.forEach.call(top, function (el) {

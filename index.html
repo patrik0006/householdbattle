@@ -965,10 +965,12 @@ button.pcard { width: 100%; border: 0; color: inherit; text-align: left; cursor:
 .push-state .btn { flex: none; width: auto; padding: 8px 14px; margin: 0; }
 
 /* ---------- 0.12.10: slim header while scrolling the task list ---------- */
-.hdr, .hdr .vs, .hdr .vs .avatar.dogav, .hdr .vs .score-num, .banner { transition: height 0.28s ease, width 0.28s ease, padding 0.28s ease, font-size 0.28s ease, margin 0.28s ease; }
-.hdr > .hdr-top, .hdr > .cheeky, .hdr > .lvlrow, .hdr > .hdr-chips, .banner > *:not(:first-child) { transition: max-height 0.28s ease, opacity 0.2s ease, padding 0.28s ease, margin 0.28s ease; max-height: 140px; }
+/* 0.12.11: no animated layout (that lagged on phones). The fold happens in one step and the list slides into place with a transform. */
+.app > .nav { position: relative; z-index: 3; }
+.app.fold-anim > .hdr, .app.fold-anim > .banner { animation: foldFade 0.26s ease-out; }
+@keyframes foldFade { from { opacity: 0.35; } to { opacity: 1; } }
 .app.compact .hdr { padding-top: 8px; padding-bottom: 8px; gap: 6px; cursor: pointer; }
-.app.compact .hdr > .hdr-top, .app.compact .hdr > .cheeky, .app.compact .hdr > .lvlrow, .app.compact .hdr > .hdr-chips { max-height: 0; opacity: 0; overflow: hidden; padding-block: 0; margin-block: 0; min-height: 0; pointer-events: none; }
+.app.compact .hdr > .hdr-top, .app.compact .hdr > .cheeky, .app.compact .hdr > .lvlrow, .app.compact .hdr > .hdr-chips { display: none; }
 .app.compact .hdr .vs { height: 46px; margin-bottom: -6px; }
 .app.compact .hdr .vs .avatar.dogav { width: 46px; height: 46px; }
 .app.compact .hdr .vs .player-meta { padding-bottom: 8px; }
@@ -976,10 +978,10 @@ button.pcard { width: 100%; border: 0; color: inherit; text-align: left; cursor:
 .app.compact .hdr .vs .score-num { font-size: 22px; }
 .app.compact .hdr .tug { height: 8px; margin-bottom: 0; }
 .app.compact .banner { padding-top: 8px; padding-bottom: 8px; gap: 0; cursor: pointer; }
-.app.compact .banner > *:not(:first-child) { max-height: 0; opacity: 0; overflow: hidden; margin-block: 0; pointer-events: none; }
+.app.compact .banner > *:not(:first-child) { display: none; }
 .app.compact .banner .btxt { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .app.compact .banner .brow:first-child > :not(.btxt) { display: none; }
-@media (prefers-reduced-motion: reduce) { .hdr, .hdr *, .banner, .banner > * { transition: none !important; } }
+@media (prefers-reduced-motion: reduce) { .app.fold-anim > .hdr, .app.fold-anim > .banner { animation: none; } }
 
 /* ---------- Real app: one full-screen phone instead of the test bench ---------- */
 html, body { height: 100%; }
@@ -1010,8 +1012,8 @@ window.__splashT0 = Date.now();
 </script>
 <noscript>HouseholdBattle needs JavaScript.</noscript>
 <script type="module">
-import { createSync } from './sync.js?v=0.12.10';
-import { startGame } from './app.js?v=0.12.10';
+import { createSync } from './sync.js?v=0.12.11';
+import { startGame } from './app.js?v=0.12.11';
 createSync().then(startGame).catch(function (e) {
   document.getElementById('phone').innerHTML = '<div class="app"><div class="ob"><div class="logo">HOUSEHOLD<br>BATTLE</div><p>Couldn\'t start. Check your connection and try again.</p><button class="btn gold" onclick="location.reload()">TRY AGAIN</button></div></div>';
   console.error(e);
