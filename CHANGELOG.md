@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.12.12 · Hachiko · 26 Nov 2026 · commit __COMMIT__
+## v0.12.12 · Hachiko · 26 Nov 2026 · commit a909be4
 - The slim header only unfolds when you pull down at the top of the list with your finger, not when a quick swipe coasts back up to the top.
 
 ## v0.12.11 · Hachiko · 26 Nov 2026 · commit 0b19f3f
