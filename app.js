@@ -1,5 +1,5 @@
 // The version is built into this file so a stale cached version.js can never make the app think it's older than it is.
-const APP_VERSION = '0.12.9';
+const APP_VERSION = '0.12.10';
 export function startGame(SYNCAPI) {
   'use strict';
 
@@ -2425,7 +2425,8 @@ export function startGame(SYNCAPI) {
     maybeAskNudges(pid);
     underdogNotice(pid);
     maybeOpenChest(pid);
-    return '<div class="app' + (paused ? ' is-paused' : '') + '">' + (SYNC.status === 'offline' ? '<div class="netbar" role="status">Offline. Your changes will sync when you\'re back online.</div>' : '') + main + fab + (ui.settings ? '' : toastHTML(pid)) + sheetHTML(pid) + dogPickerHTML(pid) + chestHTML(pid) + udModalHTML(pid) + weekSumHTML(pid) + notifHTML(pid) + updateBarHTML(pid) + whatsNewHTML(pid) + fbHTML(pid) + '</div>';
+    var compact = ui.compact && ui.tab === 'tasks' && !ui.settings;
+    return '<div class="app' + (paused ? ' is-paused' : '') + (compact ? ' compact' : '') + '">' + (SYNC.status === 'offline' ? '<div class="netbar" role="status">Offline. Your changes will sync when you\'re back online.</div>' : '') + main + fab + (ui.settings ? '' : toastHTML(pid)) + sheetHTML(pid) + dogPickerHTML(pid) + chestHTML(pid) + udModalHTML(pid) + weekSumHTML(pid) + notifHTML(pid) + updateBarHTML(pid) + whatsNewHTML(pid) + fbHTML(pid) + '</div>';
   }
 
   var phoneEl = {}, reduceMotion = false;
@@ -2587,6 +2588,7 @@ export function startGame(SYNCAPI) {
     root.innerHTML = html;
     Array.prototype.forEach.call(root.querySelectorAll('[data-scroll]'), function (el) { var k = el.getAttribute('data-scroll'); if (scrolls[k] != null) { el.scrollTop = scrolls[k][0]; el.scrollLeft = scrolls[k][1]; } });
     var ch = root.querySelector('.chips'); if (ch) wireChips(ch);
+    wireCompact(root, pid);
     wireSheets(root, pid);
     wireChest(root, pid);
     wireSummary(root, pid);
@@ -2614,6 +2616,27 @@ export function startGame(SYNCAPI) {
     if (ui.catchup && !ui.catchup.started && !ui.closed && !splashOn(ui)) { ui.catchup.started = true; var wait = ui.introAt && Date.now() - ui.introAt < 1000 ? 950 : 0; setTimeout(function () { requestAnimationFrame(function () { runCatchup(pid); }); }, wait); }
   }
   // Patch the live screen to match freshly rendered HTML, node by node, without ever replacing the field being typed in.
+  // Scroll the task list down: the score header and any banner fold into a slim bar, so the list gets the room.
+  // Back at the top (or a tap on the slim bar): everything unfolds again.
+  function wireCompact(root, pid) {
+    var ui = UI[pid], app = root.querySelector('.app'), sc = root.querySelector('.app > .scroll[data-scroll^="tasks-"]');
+    if (!app || !sc) { ui.compact = false; return; }
+    function set(on) { if (!!ui.compact === on) return; ui.compact = on; app.classList.toggle('compact', on); }
+    if (sc.scrollTop < 8) set(false);
+    sc.addEventListener('scroll', function () {
+      if (sc.querySelector('.task.dragging') || app.querySelector('.is-dragging')) return; // never change the layout under a drag
+      if (!ui.compact && sc.scrollTop > 40 && sc.scrollHeight - sc.clientHeight > 240) set(true);
+      else if (ui.compact && sc.scrollTop < 8) set(false);
+    }, { passive: true });
+    var top = root.querySelectorAll('.app > .banner, .app > .hdr');
+    Array.prototype.forEach.call(top, function (el) {
+      el.addEventListener('click', function (e) {
+        if (!ui.compact) return;
+        e.preventDefault(); e.stopPropagation(); // first tap unfolds; the buttons work again after that
+        set(false); sc.scrollTo({ top: 0, behavior: 'smooth' });
+      }, true);
+    });
+  }
   function morphKids(a, b, keep) {
     var ak = Array.prototype.slice.call(a.childNodes), bk = Array.prototype.slice.call(b.childNodes);
     var ka = -1, kb = -1, kid = keep.id;

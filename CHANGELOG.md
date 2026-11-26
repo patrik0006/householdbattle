@@ -1,5 +1,8 @@
 # Changelog
 
+## v0.12.10 · Hachiko · 26 Nov 2026 · commit __COMMIT__
+- More room for your tasks: scroll down the list and the score header folds into a slim bar with just the dogs and the score. Scroll back to the top, or tap the bar, to bring it back.
+
 ## v0.12.9 · Hachiko · 26 Nov 2026 · commit 9d5d4cf
 - New size: Very hard (15 points), between Hard and Epic.
 - When you add a task, choose where it goes: Today, This week or Later. There's a new step for it, and you can change it on the summary.
