@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.12.11 · Hachiko · 26 Nov 2026 · commit __COMMIT__
+## v0.12.11 · Hachiko · 26 Nov 2026 · commit 0b19f3f
 - Smoother folding header: it now snaps to its slim size in one step and the list slides up, instead of resizing frame by frame.
 
 ## v0.12.10 · Hachiko · 26 Nov 2026 · commit 363459e
